@@ -182,11 +182,58 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Auth + Onboarding end-to-end (verified by main via scripts + screenshots)"
-  stuck_tasks: []
+    - "Patients module - FIX CRITICAL: full_name generated column issue"
+    - "Auth session persistence - investigate middleware/cookie settings"
+  stuck_tasks:
+    - "Patients module (CRUD, search, filters All/VIP/Archived, tags, VIP toggle, archive, delete, notes, statistics, table + profile page)"
   test_all: false
   test_priority: "high_first"
 
+  - task: "Patients module (CRUD, search, filters All/VIP/Archived, tags, VIP toggle, archive, delete, notes, statistics, table + profile page)"
+    implemented: true
+    working: false
+    file: "components/patients/**, lib/api/patients.ts, app/(app)/patients/**"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Built against real 'patients' table (soft-delete via deleted_at, archived flag, is_vip, tags jsonb, full_name). Needs frontend testing."
+        -working: false
+        -agent: "testing"
+        -comment: "CRITICAL BUG: Supabase 400 error when fetching patients. Console shows 'Failed to load resource: the server responded with a status of 400 at https://nvfdcrgmbtwlvejhzofo.supabase.co/rest/v1/patients?select=*'. Creating patient fails with error 'cannot insert a non-DEFAULT value into column full_name'. ROOT CAUSE: full_name is a GENERATED COLUMN in Supabase. The API code in lib/api/patients.ts uses select('*') which includes full_name (line 8), and withFullName() function tries to INSERT/UPDATE full_name explicitly (lines 31, 37). FIX NEEDED: (1) Change select('*') to explicitly list columns excluding full_name, (2) Remove withFullName() calls from insert/update, (3) Let Supabase auto-generate full_name. UI TESTED: Page loads correctly, search input works, filter tabs work, create dialog opens and form can be filled. DATA LAYER BROKEN: No patients load (empty state shown), create fails with DB error. Cannot test row actions, profile page, or seeded data until DB issue is fixed."
+  - task: "Services module (CRUD, categories via metadata, duration/price/VAT/buffers/colors/emoji, active toggle, AI-scheduling flag)"
+    implemented: true
+    working: "NA"
+    file: "components/services/**, lib/api/services.ts, app/(app)/services/**"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Built against real 'services' table. Category stored in existing metadata jsonb. Needs frontend testing."
+        -working: "NA"
+        -agent: "testing"
+        -comment: "AUTHENTICATION ISSUE: Session expired during testing. Navigation to /services redirected to /login?redirect=%2Fservices. Could not complete testing due to auth session timeout. UI STRUCTURE: Code review shows proper implementation with service cards, category grouping, create dialog, toggle switch, kebab menu. NEEDS RETEST: Once auth session persistence is fixed, need to verify: (1) seeded services render, (2) create service works, (3) toggle active switch, (4) edit/delete via kebab menu, (5) category grouping displays correctly."
+  - task: "Working Hours module (weekly editor, appointment defaults + lunch break on business, holidays CRUD)"
+    implemented: true
+    working: "NA"
+    file: "components/working-hours/**, lib/api/working-hours.ts, app/(app)/working-hours/**"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Edits working_hours rows, business settings (default_appointment_duration, slot_interval_minutes, default_buffer_minutes, max_daily_appointments, lunch_*), business_holidays CRUD. Needs frontend testing."
+        -working: "NA"
+        -agent: "testing"
+        -comment: "AUTHENTICATION ISSUE: Session expired during testing. Navigation to /working-hours redirected to /login?redirect=%2Fworking-hours. Could not complete testing due to auth session timeout. UI STRUCTURE: Code review shows proper implementation with weekly editor (7 days with switches and time inputs), appointment defaults card with save button, holidays card with add/delete functionality. NEEDS RETEST: Once auth session persistence is fixed, need to verify: (1) weekly editor displays all 7 days, (2) toggle day open/closed works, (3) time inputs work, (4) save weekly hours works, (5) appointment defaults save works, (6) add/delete holidays works."
+
 agent_communication:
     -agent: "main"
-    -message: "Milestone 1 complete: Landing, Email auth, Onboarding (real Supabase writes verified under RLS), protected app shell + dashboard + module scaffolds. Email confirmation disabled by user. Next planned: Patients/Services CRUD, Working Hours editor, Calendar, then AI NL parser (Gemini 2.5 Flash via Emergent) + Scheduler optimization preview. Awaiting user go-ahead on next module priority and whether to run automated frontend testing."
+    -message: "Modules 1-3 built (Patients, Services, Working Hours) against the REAL Supabase schema. Seeded demo account for testing => login: owner@cadencetest.com / Test123456! (has business 'Rossi Physiotherapy' + 3 patients + 3 services + working hours). Please run automated frontend tests on: (1) login with demo account, (2) Patients: create/edit/search/filter tabs/VIP toggle/archive/delete + open profile page, (3) Services: create/edit/toggle active/delete + category grouping, (4) Working Hours: toggle a day, edit times, Save; edit appointment defaults + Save; add & delete a holiday. Note: dev server is slow on first compile (allow long waits/retries). Do NOT test AI/Scheduler/Analytics/Templates/Settings/Calendar yet (not built)."
+    -agent: "testing"
+    -message: "TESTING COMPLETE with CRITICAL ISSUES FOUND. (1) PATIENTS MODULE - BROKEN: Supabase 400 error on fetch, create fails with 'cannot insert non-DEFAULT value into column full_name'. Root cause: full_name is a GENERATED COLUMN but lib/api/patients.ts uses select('*') and tries to INSERT/UPDATE it explicitly via withFullName(). FIX: Remove full_name from select/insert/update operations. (2) SERVICES & WORKING HOURS - CANNOT TEST: Auth session expires quickly, redirects to login. Need to fix session persistence or middleware. (3) LOGIN WORKS: Successfully authenticated with demo credentials. (4) UI STRUCTURE: All components properly implemented, dialogs open, forms work. Only data layer is broken. PRIORITY: Fix Patients module full_name issue first (high priority, blocks all patient operations), then investigate auth session timeout."

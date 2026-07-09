@@ -12,6 +12,7 @@ import { SidebarNav } from './sidebar-nav'
 import { UserMenu } from './user-menu'
 import { ThemeToggle } from './theme-toggle'
 import { NAV_SECTIONS } from '@/lib/brand'
+import { WorkspaceProvider, type WorkspaceBusiness } from '@/lib/workspace-context'
 
 function useTitle() {
   const pathname = usePathname()
@@ -23,7 +24,7 @@ function useTitle() {
   return 'Cadence'
 }
 
-export function AppShell({ user, children }: { user: { email: string; name?: string }; children: ReactNode }) {
+export function AppShell({ user, business, children }: { user: { email: string; name?: string }; business: WorkspaceBusiness | null; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const title = useTitle()
 
@@ -62,7 +63,9 @@ export function AppShell({ user, children }: { user: { email: string; name?: str
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">{children}</div>
+          <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+            <WorkspaceProvider business={business}>{children}</WorkspaceProvider>
+          </div>
         </main>
       </div>
     </div>

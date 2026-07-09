@@ -18,6 +18,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!profile?.onboarding_completed) redirect('/onboarding')
 
+  const { data: business } = await supabase
+    .from('business')
+    .select('id, business_name, default_appointment_duration, slot_interval_minutes, currency, timezone, lunch_break_enabled, lunch_start, lunch_end')
+    .eq('profile_id', user.id)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (!business) redirect('/onboarding')
+
   const name = profile?.display_name || profile?.first_name || (user.user_metadata?.full_name as string) || undefined
-  return <AppShell user={{ email: user.email || '', name }}>{children}</AppShell>
+  return <AppShell user={{ email: user.email || '', name }} business={business as any}>{children}</AppShell>
 }
