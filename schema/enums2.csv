@@ -1,0 +1,2 @@
+tgname,table_name,function_name
+on_auth_user_created,auth.users,handle_new_user

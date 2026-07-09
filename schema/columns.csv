@@ -1,0 +1,101 @@
+table_name,column_name,data_type,is_nullable,column_default
+active_waiting_list,id,uuid,YES,null
+active_waiting_list,business_id,uuid,YES,null
+active_waiting_list,patient_id,uuid,YES,null
+active_waiting_list,preferred_service_id,uuid,YES,null
+active_waiting_list,priority,USER-DEFINED,YES,null
+active_waiting_list,earliest_date,date,YES,null
+active_waiting_list,latest_date,date,YES,null
+active_waiting_list,preferred_weekdays,ARRAY,YES,null
+active_waiting_list,earliest_time,time without time zone,YES,null
+active_waiting_list,latest_time,time without time zone,YES,null
+active_waiting_list,preferred_duration_minutes,integer,YES,null
+active_waiting_list,flexible,boolean,YES,null
+active_waiting_list,active,boolean,YES,null
+active_waiting_list,notes,text,YES,null
+active_waiting_list,inserted_by_ai,boolean,YES,null
+active_waiting_list,matched_appointment_id,uuid,YES,null
+active_waiting_list,matched_at,timestamp with time zone,YES,null
+active_waiting_list,created_at,timestamp with time zone,YES,null
+active_waiting_list,updated_at,timestamp with time zone,YES,null
+active_waiting_list,deleted_at,timestamp with time zone,YES,null
+ai_commands,id,uuid,NO,gen_random_uuid()
+ai_commands,business_id,uuid,NO,null
+ai_commands,profile_id,uuid,YES,null
+ai_commands,patient_id,uuid,YES,null
+ai_commands,optimization_run_id,uuid,YES,null
+ai_commands,input_text,text,NO,null
+ai_commands,parsed_json,jsonb,YES,null
+ai_commands,ai_provider,text,YES,null
+ai_commands,ai_model,text,YES,null
+ai_commands,prompt_version,text,YES,null
+ai_commands,response_time_ms,integer,YES,null
+ai_commands,tokens_input,integer,YES,null
+ai_commands,tokens_output,integer,YES,null
+ai_commands,success,boolean,NO,true
+ai_commands,error_message,text,YES,null
+ai_commands,created_at,timestamp with time zone,NO,now()
+ai_commands,updated_at,timestamp with time zone,NO,now()
+ai_commands,deleted_at,timestamp with time zone,YES,null
+ai_prompts,id,uuid,NO,gen_random_uuid()
+ai_prompts,business_id,uuid,YES,null
+ai_prompts,name,text,NO,null
+ai_prompts,description,text,YES,null
+ai_prompts,prompt,text,NO,null
+ai_prompts,version,integer,NO,1
+ai_prompts,prompt_type,text,NO,null
+ai_prompts,ai_provider,text,YES,null
+ai_prompts,ai_model,text,YES,null
+ai_prompts,temperature,numeric,YES,0.2
+ai_prompts,max_tokens,integer,YES,2048
+ai_prompts,active,boolean,NO,true
+ai_prompts,system_prompt,boolean,NO,false
+ai_prompts,created_by,uuid,YES,null
+ai_prompts,created_at,timestamp with time zone,NO,now()
+ai_prompts,updated_at,timestamp with time zone,NO,now()
+ai_prompts,deleted_at,timestamp with time zone,YES,null
+algorithm_settings,id,uuid,NO,gen_random_uuid()
+algorithm_settings,business_id,uuid,NO,null
+algorithm_settings,name,text,NO,'Default'::text
+algorithm_settings,active,boolean,NO,true
+algorithm_settings,optimization_mode,USER-DEFINED,NO,'balanced'::optimization_mode
+algorithm_settings,weight_idle_time,numeric,NO,1
+algorithm_settings,weight_patient_preference,numeric,NO,5
+algorithm_settings,weight_revenue,numeric,NO,3
+algorithm_settings,weight_continuity,numeric,NO,8
+algorithm_settings,weight_vip,numeric,NO,100
+algorithm_settings,weight_manual_lock,numeric,NO,1000
+algorithm_settings,weight_waiting_list,numeric,NO,4
+algorithm_settings,weight_free_slots,numeric,NO,2
+algorithm_settings,max_patient_moves,integer,NO,2
+algorithm_settings,max_daily_moves,integer,NO,5
+algorithm_settings,max_solver_seconds,integer,NO,30
+algorithm_settings,allow_split_days,boolean,NO,true
+algorithm_settings,allow_waiting_list,boolean,NO,true
+algorithm_settings,fill_gaps_first,boolean,NO,true
+algorithm_settings,preserve_existing_schedule,boolean,NO,true
+algorithm_settings,use_ai_explanations,boolean,NO,true
+algorithm_settings,metadata,jsonb,NO,'{}'::jsonb
+algorithm_settings,created_by,uuid,YES,null
+algorithm_settings,created_at,timestamp with time zone,NO,now()
+algorithm_settings,updated_at,timestamp with time zone,NO,now()
+api_keys,id,uuid,NO,gen_random_uuid()
+api_keys,business_id,uuid,NO,null
+api_keys,created_by,uuid,YES,null
+api_keys,name,text,NO,null
+api_keys,description,text,YES,null
+api_keys,api_key_hash,text,NO,null
+api_keys,key_prefix,text,NO,null
+api_keys,permissions,jsonb,NO,'[]'::jsonb
+api_keys,allowed_ips,ARRAY,YES,null
+api_keys,allowed_origins,ARRAY,YES,null
+api_keys,requests_per_minute,integer,NO,60
+api_keys,requests_per_day,integer,NO,10000
+api_keys,last_used_at,timestamp with time zone,YES,null
+api_keys,expires_at,timestamp with time zone,YES,null
+api_keys,enabled,boolean,NO,true
+api_keys,metadata,jsonb,YES,'{}'::jsonb
+api_keys,created_at,timestamp with time zone,NO,now()
+api_keys,updated_at,timestamp with time zone,NO,now()
+api_keys,deleted_at,timestamp with time zone,YES,null
+api_request_log,id,uuid,NO,gen_random_uuid()
