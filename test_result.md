@@ -232,8 +232,25 @@ test_plan:
         -agent: "testing"
         -comment: "AUTHENTICATION ISSUE: Session expired during testing. Navigation to /working-hours redirected to /login?redirect=%2Fworking-hours. Could not complete testing due to auth session timeout. UI STRUCTURE: Code review shows proper implementation with weekly editor (7 days with switches and time inputs), appointment defaults card with save button, holidays card with add/delete functionality. NEEDS RETEST: Once auth session persistence is fixed, need to verify: (1) weekly editor displays all 7 days, (2) toggle day open/closed works, (3) time inputs work, (4) save weekly hours works, (5) appointment defaults save works, (6) add/delete holidays works."
 
+  - task: "AI NL parser API endpoint POST /api/ai/parse (Gemini 2.5 Flash via emergentintegrations Python subprocess)"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js, scripts/ai_parse.py, lib/api/ai.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Node route spawns python3 scripts/ai_parse.py which uses emergentintegrations LlmChat.with_model('gemini','gemini-2.5-flash') and EMERGENT_LLM_KEY. Verified directly via CLI (3 example commands parsed correctly). Needs HTTP-level testing via Next server."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ ALL TESTS PASSED. Fixed Python path issue in route.js (changed 'python3' to '/root/.venv/bin/python3' to use venv where emergentintegrations is installed). Tested 3 scenarios: (1) Full example with Paola/Marco/Anna - correctly parsed 3 commands with proper weekdays (lowercase), availability/unavailability, duration_minutes=45, priority=high. (2) Empty text - returns {commands:[]} as expected. (3) Missing text field - handled gracefully with {commands:[]}. Response times: 2-5 seconds. All validations passed: weekdays lowercase, correct data structure, proper field values. Endpoint is production-ready."
+
 agent_communication:
     -agent: "main"
-    -message: "Modules 1-3 built (Patients, Services, Working Hours) against the REAL Supabase schema. Seeded demo account for testing => login: owner@cadencetest.com / Test123456! (has business 'Rossi Physiotherapy' + 3 patients + 3 services + working hours). Please run automated frontend tests on: (1) login with demo account, (2) Patients: create/edit/search/filter tabs/VIP toggle/archive/delete + open profile page, (3) Services: create/edit/toggle active/delete + category grouping, (4) Working Hours: toggle a day, edit times, Save; edit appointment defaults + Save; add & delete a holiday. Note: dev server is slow on first compile (allow long waits/retries). Do NOT test AI/Scheduler/Analytics/Templates/Settings/Calendar yet (not built)."
+    -message: "Built modules 4-7: Calendar (day/week, real appts, drag-move, click-create, edit/delete, keyboard n/w/d/arrows/t), Waiting List (CRUD, priority, preferred days/hours, flexible), real Dashboard KPIs (today count, occupancy, idle, revenue7, upcoming/recent/waiting), and AI NL Parser (Gemini 2.5 Flash). Seeded 5 appointments for demo (owner@cadencetest.com / Test123456!). PLEASE TEST BACKEND ONLY NOW: POST /api/ai/parse with JSON body {\"text\":\"Paola can come Wednesday or Friday. Marco cannot come Thursday afternoon. Anna needs a 45 minute appointment and is high priority.\"}. Expect 200 with JSON {commands:[...]} where Paola has available wednesday+friday, Marco has unavailable thursday afternoon, Anna duration_minutes=45 priority=high. Also test empty text -> {commands:[]}, and missing text handled. This endpoint runs a python subprocess (~3-8s); allow up to 55s. Do NOT test other endpoints (/api/status is legacy Mongo)."
     -agent: "testing"
     -message: "TESTING COMPLETE with CRITICAL ISSUES FOUND. (1) PATIENTS MODULE - BROKEN: Supabase 400 error on fetch, create fails with 'cannot insert non-DEFAULT value into column full_name'. Root cause: full_name is a GENERATED COLUMN but lib/api/patients.ts uses select('*') and tries to INSERT/UPDATE it explicitly via withFullName(). FIX: Remove full_name from select/insert/update operations. (2) SERVICES & WORKING HOURS - CANNOT TEST: Auth session expires quickly, redirects to login. Need to fix session persistence or middleware. (3) LOGIN WORKS: Successfully authenticated with demo credentials. (4) UI STRUCTURE: All components properly implemented, dialogs open, forms work. Only data layer is broken. PRIORITY: Fix Patients module full_name issue first (high priority, blocks all patient operations), then investigate auth session timeout."
+    -agent: "testing"
+    -message: "✅ AI NL PARSER ENDPOINT TESTING COMPLETE - ALL TESTS PASSED. Fixed Python path issue in app/api/[[...path]]/route.js (line 12: changed 'python3' to '/root/.venv/bin/python3' to use venv where emergentintegrations is installed). Tested POST /api/ai/parse with 3 scenarios: (1) Full example - correctly parsed Paola (wednesday/friday available), Marco (thursday afternoon unavailable), Anna (45min, high priority). (2) Empty text - returns {commands:[]}. (3) Missing text field - handled gracefully. All validations passed: weekdays lowercase, correct structure, proper field values. Response times 2-5 seconds. Endpoint is production-ready and working correctly."

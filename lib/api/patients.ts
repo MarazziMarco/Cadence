@@ -22,19 +22,19 @@ export async function getPatient(id: string): Promise<Patient | null> {
   return data as Patient | null
 }
 
-function withFullName<T extends { first_name?: string | null; last_name?: string | null }>(v: T) {
-  const full = [v.first_name, v.last_name].filter(Boolean).join(' ').trim()
-  return { ...v, full_name: full || v.first_name || null }
+function clean<T extends Record<string, any>>(v: T) {
+  const { full_name, ...rest } = v as any
+  return rest
 }
 
 export async function createPatient(businessId: string, values: Partial<Patient>): Promise<Patient> {
-  const { data, error } = await sb().from('patients').insert({ business_id: businessId, ...withFullName(values) }).select('*').single()
+  const { data, error } = await sb().from('patients').insert({ business_id: businessId, ...clean(values) }).select('*').single()
   if (error) throw error
   return data as Patient
 }
 
 export async function updatePatient(id: string, values: Partial<Patient>): Promise<Patient> {
-  const { data, error } = await sb().from('patients').update(withFullName(values)).eq('id', id).select('*').single()
+  const { data, error } = await sb().from('patients').update(clean(values)).eq('id', id).select('*').single()
   if (error) throw error
   return data as Patient
 }

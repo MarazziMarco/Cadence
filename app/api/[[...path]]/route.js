@@ -1,6 +1,27 @@
 import { MongoClient } from 'mongodb'
 import { v4 as uuidv4 } from 'uuid'
 import { NextResponse } from 'next/server'
+import { spawn } from 'child_process'
+import path from 'path'
+
+export const runtime = 'nodejs'
+
+// Run the Gemini NL->JSON parser (emergentintegrations) as a Python subprocess
+function runPythonParser(input) {
+  return new Promise((resolve) => {
+    const py = spawn('/root/.venv/bin/python3', [path.join(process.cwd(), 'scripts', 'ai_parse.py')], { env: { ...process.env } })
+    let out = '', err = ''
+    const timer = setTimeout(() => { try { py.kill('SIGKILL') } catch {} ; resolve({ error: 'timeout' }) }, 50000)
+    py.stdout.on('data', (d) => (out += d))
+    py.stderr.on('data', (d) => (err += d))
+    py.on('close', () => {
+      clearTimeout(timer)
+      try { resolve(JSON.parse(out.trim())) }
+      catch { resolve({ error: 'parse_failed', raw: out.slice(0, 800), stderr: err.slice(0, 400) }) }
+    })
+    py.stdin.write(JSON.stringify(input)); py.stdin.end()
+  })
+}
 
 // MongoDB connection
 let client
@@ -36,6 +57,14 @@ async function handleRoute(request, { params }) {
   const method = request.method
 
   try {
+    // AI natural-language parser (no DB dependency) - POST /api/ai/parse
+    if (route === '/ai/parse' && method === 'POST') {
+      const body = await request.json().catch(() => ({}))
+      const result = await runPythonParser({ text: body.text || '', session_id: body.session_id || 'ai-parse' })
+      const status = result?.error ? 502 : 200
+      return handleCORS(NextResponse.json(result, { status }))
+    }
+
     const db = await connectToMongo()
 
     // Root endpoint - GET /api/root (since /api/ is not accessible with catch-all)
