@@ -101,3 +101,92 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Cadence — production-ready AI appointment-scheduling SaaS (Next.js + TS + Supabase + Tailwind + shadcn + Framer Motion + PWA). Uses EXISTING Supabase schema (never redesign). Build order: Auth, Onboarding, Dashboard, Calendar, Patients, Services, Working Hours, Waiting List, Scheduler, AI NL parser (Gemini 2.5 Flash via Emergent), Optimization Preview, Analytics, Templates, Settings, Landing, PWA."
+
+backend:
+  - task: "Supabase Auth (email/password) + SSR cookie sessions + protected-route middleware"
+    implemented: true
+    working: true
+    file: "lib/supabase/*.ts, middleware.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Verified via node script: signUp returns session (email confirm OFF), profiles row auto-created by handle_new_user trigger. Middleware redirects unauth->/login and auth->/dashboard."
+  - task: "Onboarding DB writes against real schema (profiles update, business insert, working_hours insert) under RLS"
+    implemented: true
+    working: true
+    file: "components/onboarding/onboarding-wizard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Verified via authenticated node script: profile update OK, business insert OK, 7x working_hours insert OK, read-back OK. RLS permits owner operations."
+
+frontend:
+  - task: "Landing page (premium hero + features, Framer Motion)"
+    implemented: true
+    working: true
+    file: "components/landing/landing.tsx, app/page.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Renders 200, screenshot verified. Redirects to /dashboard when authenticated."
+  - task: "Auth pages (login, signup, forgot-password)"
+    implemented: true
+    working: true
+    file: "app/(auth)/**"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Screenshot verified; signup->onboarding redirect confirmed in real browser."
+  - task: "Onboarding wizard UI (4-step)"
+    implemented: true
+    working: true
+    file: "components/onboarding/onboarding-wizard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Browser-verified: signup->onboarding, name pre-filled, step transitions, business-name validation gating Continue."
+  - task: "App shell (sidebar 12 modules, topbar, theme toggle, user menu, mobile drawer) + Dashboard + module scaffolds"
+    implemented: true
+    working: true
+    file: "components/app-shell/**, app/(app)/**"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Routes compile; /dashboard guarded (redirects to /onboarding until completed). Data modules are scaffolds pending build."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Auth + Onboarding end-to-end (verified by main via scripts + screenshots)"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    -agent: "main"
+    -message: "Milestone 1 complete: Landing, Email auth, Onboarding (real Supabase writes verified under RLS), protected app shell + dashboard + module scaffolds. Email confirmation disabled by user. Next planned: Patients/Services CRUD, Working Hours editor, Calendar, then AI NL parser (Gemini 2.5 Flash via Emergent) + Scheduler optimization preview. Awaiting user go-ahead on next module priority and whether to run automated frontend testing."

@@ -1,0 +1,40 @@
+pg_get_functiondef
+"CREATE OR REPLACE FUNCTION app.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+
+BEGIN
+
+INSERT INTO public.profiles (
+
+    id,
+
+    email,
+
+    created_at,
+
+    updated_at
+
+)
+
+VALUES (
+
+    NEW.id,
+
+    NEW.email,
+
+    NOW(),
+
+    NOW()
+
+);
+
+RETURN NEW;
+
+END;
+
+$function$
+"

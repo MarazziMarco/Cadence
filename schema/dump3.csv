@@ -1,0 +1,859 @@
+schema_dump
+"active_waiting_list|id|uuid|YES|null
+active_waiting_list|business_id|uuid|YES|null
+active_waiting_list|patient_id|uuid|YES|null
+active_waiting_list|preferred_service_id|uuid|YES|null
+active_waiting_list|priority|USER-DEFINED|YES|null
+active_waiting_list|earliest_date|date|YES|null
+active_waiting_list|latest_date|date|YES|null
+active_waiting_list|preferred_weekdays|ARRAY|YES|null
+active_waiting_list|earliest_time|time without time zone|YES|null
+active_waiting_list|latest_time|time without time zone|YES|null
+active_waiting_list|preferred_duration_minutes|integer|YES|null
+active_waiting_list|flexible|boolean|YES|null
+active_waiting_list|active|boolean|YES|null
+active_waiting_list|notes|text|YES|null
+active_waiting_list|inserted_by_ai|boolean|YES|null
+active_waiting_list|matched_appointment_id|uuid|YES|null
+active_waiting_list|matched_at|timestamp with time zone|YES|null
+active_waiting_list|created_at|timestamp with time zone|YES|null
+active_waiting_list|updated_at|timestamp with time zone|YES|null
+active_waiting_list|deleted_at|timestamp with time zone|YES|null
+ai_commands|id|uuid|NO|gen_random_uuid()
+ai_commands|business_id|uuid|NO|null
+ai_commands|profile_id|uuid|YES|null
+ai_commands|patient_id|uuid|YES|null
+ai_commands|optimization_run_id|uuid|YES|null
+ai_commands|input_text|text|NO|null
+ai_commands|parsed_json|jsonb|YES|null
+ai_commands|ai_provider|text|YES|null
+ai_commands|ai_model|text|YES|null
+ai_commands|prompt_version|text|YES|null
+ai_commands|response_time_ms|integer|YES|null
+ai_commands|tokens_input|integer|YES|null
+ai_commands|tokens_output|integer|YES|null
+ai_commands|success|boolean|NO|true
+ai_commands|error_message|text|YES|null
+ai_commands|created_at|timestamp with time zone|NO|now()
+ai_commands|updated_at|timestamp with time zone|NO|now()
+ai_commands|deleted_at|timestamp with time zone|YES|null
+ai_prompts|id|uuid|NO|gen_random_uuid()
+ai_prompts|business_id|uuid|YES|null
+ai_prompts|name|text|NO|null
+ai_prompts|description|text|YES|null
+ai_prompts|prompt|text|NO|null
+ai_prompts|version|integer|NO|1
+ai_prompts|prompt_type|text|NO|null
+ai_prompts|ai_provider|text|YES|null
+ai_prompts|ai_model|text|YES|null
+ai_prompts|temperature|numeric|YES|0.2
+ai_prompts|max_tokens|integer|YES|2048
+ai_prompts|active|boolean|NO|true
+ai_prompts|system_prompt|boolean|NO|false
+ai_prompts|created_by|uuid|YES|null
+ai_prompts|created_at|timestamp with time zone|NO|now()
+ai_prompts|updated_at|timestamp with time zone|NO|now()
+ai_prompts|deleted_at|timestamp with time zone|YES|null
+algorithm_settings|id|uuid|NO|gen_random_uuid()
+algorithm_settings|business_id|uuid|NO|null
+algorithm_settings|name|text|NO|'Default'::text
+algorithm_settings|active|boolean|NO|true
+algorithm_settings|optimization_mode|USER-DEFINED|NO|'balanced'::optimization_mode
+algorithm_settings|weight_idle_time|numeric|NO|1
+algorithm_settings|weight_patient_preference|numeric|NO|5
+algorithm_settings|weight_revenue|numeric|NO|3
+algorithm_settings|weight_continuity|numeric|NO|8
+algorithm_settings|weight_vip|numeric|NO|100
+algorithm_settings|weight_manual_lock|numeric|NO|1000
+algorithm_settings|weight_waiting_list|numeric|NO|4
+algorithm_settings|weight_free_slots|numeric|NO|2
+algorithm_settings|max_patient_moves|integer|NO|2
+algorithm_settings|max_daily_moves|integer|NO|5
+algorithm_settings|max_solver_seconds|integer|NO|30
+algorithm_settings|allow_split_days|boolean|NO|true
+algorithm_settings|allow_waiting_list|boolean|NO|true
+algorithm_settings|fill_gaps_first|boolean|NO|true
+algorithm_settings|preserve_existing_schedule|boolean|NO|true
+algorithm_settings|use_ai_explanations|boolean|NO|true
+algorithm_settings|metadata|jsonb|NO|'{}'::jsonb
+algorithm_settings|created_by|uuid|YES|null
+algorithm_settings|created_at|timestamp with time zone|NO|now()
+algorithm_settings|updated_at|timestamp with time zone|NO|now()
+api_keys|id|uuid|NO|gen_random_uuid()
+api_keys|business_id|uuid|NO|null
+api_keys|created_by|uuid|YES|null
+api_keys|name|text|NO|null
+api_keys|description|text|YES|null
+api_keys|api_key_hash|text|NO|null
+api_keys|key_prefix|text|NO|null
+api_keys|permissions|jsonb|NO|'[]'::jsonb
+api_keys|allowed_ips|ARRAY|YES|null
+api_keys|allowed_origins|ARRAY|YES|null
+api_keys|requests_per_minute|integer|NO|60
+api_keys|requests_per_day|integer|NO|10000
+api_keys|last_used_at|timestamp with time zone|YES|null
+api_keys|expires_at|timestamp with time zone|YES|null
+api_keys|enabled|boolean|NO|true
+api_keys|metadata|jsonb|YES|'{}'::jsonb
+api_keys|created_at|timestamp with time zone|NO|now()
+api_keys|updated_at|timestamp with time zone|NO|now()
+api_keys|deleted_at|timestamp with time zone|YES|null
+api_request_log|id|uuid|NO|gen_random_uuid()
+api_request_log|api_key_id|uuid|YES|null
+api_request_log|business_id|uuid|YES|null
+api_request_log|endpoint|text|NO|null
+api_request_log|method|text|NO|null
+api_request_log|status_code|integer|YES|null
+api_request_log|ip_address|inet|YES|null
+api_request_log|user_agent|text|YES|null
+api_request_log|duration_ms|integer|YES|null
+api_request_log|request_size|integer|YES|null
+api_request_log|response_size|integer|YES|null
+api_request_log|created_at|timestamp with time zone|NO|now()
+appointment_notes|id|uuid|NO|gen_random_uuid()
+appointment_notes|appointment_id|uuid|NO|null
+appointment_notes|note|text|NO|null
+appointment_notes|is_pinned|boolean|NO|false
+appointment_notes|created_by|uuid|YES|null
+appointment_notes|created_at|timestamp with time zone|NO|now()
+appointment_notes|updated_at|timestamp with time zone|NO|now()
+appointment_notes|deleted_at|timestamp with time zone|YES|null
+appointments|id|uuid|NO|gen_random_uuid()
+appointments|business_id|uuid|NO|null
+appointments|patient_id|uuid|NO|null
+appointments|service_id|uuid|YES|null
+appointments|title|text|YES|null
+appointments|description|text|YES|null
+appointments|appointment_date|date|NO|null
+appointments|start_time|time without time zone|NO|null
+appointments|end_time|time without time zone|NO|null
+appointments|duration_minutes|integer|NO|null
+appointments|price|numeric|YES|0
+appointments|status|USER-DEFINED|NO|'scheduled'::appointment_status
+appointments|source|USER-DEFINED|NO|'manual'::booking_source
+appointments|confirmed|boolean|NO|false
+appointments|locked|boolean|NO|false
+appointments|generated_by_ai|boolean|NO|false
+appointments|optimization_run_id|uuid|YES|null
+appointments|reminder_sent|boolean|NO|false
+appointments|internal_notes|text|YES|null
+appointments|created_at|timestamp with time zone|NO|now()
+appointments|updated_at|timestamp with time zone|NO|now()
+appointments|deleted_at|timestamp with time zone|YES|null
+appointments|color|text|YES|'#2563EB'::text
+appointments|is_recurring|boolean|NO|false
+appointments|parent_appointment_id|uuid|YES|null
+appointments|reminder_minutes_before|integer|YES|1440
+appointments|checked_in_at|timestamp with time zone|YES|null
+appointments|checked_out_at|timestamp with time zone|YES|null
+appointments|completed_at|timestamp with time zone|YES|null
+appointments|cancelled_at|timestamp with time zone|YES|null
+appointments|manual_override|boolean|NO|false
+appointments|version|integer|NO|1
+appointments|created_by|uuid|YES|null
+appointments|updated_by|uuid|YES|null
+appointments|last_ai_update|timestamp with time zone|YES|null
+appointments|recurrence_rule|text|YES|null
+appointments|recurrence_end_date|date|YES|null
+appointments|external_calendar_id|text|YES|null
+appointments|is_first_visit|boolean|YES|false
+appointments|confirmation_sent|boolean|YES|false
+appointments|reminder_count|integer|YES|0
+attachments|id|uuid|NO|gen_random_uuid()
+attachments|business_id|uuid|NO|null
+attachments|patient_id|uuid|YES|null
+attachments|appointment_id|uuid|YES|null
+attachments|uploaded_by|uuid|YES|null
+attachments|file_name|text|NO|null
+attachments|original_file_name|text|NO|null
+attachments|file_extension|text|YES|null
+attachments|mime_type|text|NO|null
+attachments|storage_path|text|NO|null
+attachments|public_url|text|YES|null
+attachments|file_size|bigint|NO|null
+attachments|checksum|text|YES|null
+attachments|category|text|YES|'document'::text
+attachments|description|text|YES|null
+attachments|created_at|timestamp with time zone|NO|now()
+attachments|updated_at|timestamp with time zone|NO|now()
+attachments|deleted_at|timestamp with time zone|YES|null
+audit_log|id|uuid|NO|gen_random_uuid()
+audit_log|business_id|uuid|NO|null
+audit_log|profile_id|uuid|YES|null
+audit_log|table_name|text|NO|null
+audit_log|record_id|uuid|YES|null
+audit_log|action|USER-DEFINED|NO|null
+audit_log|old_data|jsonb|YES|null
+audit_log|new_data|jsonb|YES|null
+audit_log|ip_address|inet|YES|null
+audit_log|user_agent|text|YES|null
+audit_log|created_at|timestamp with time zone|NO|now()
+business|id|uuid|NO|gen_random_uuid()
+business|profile_id|uuid|NO|null
+business|business_name|text|NO|null
+business|business_type|USER-DEFINED|NO|'other'::business_type
+business|email|USER-DEFINED|YES|null
+business|phone|text|YES|null
+business|website|text|YES|null
+business|address|text|YES|null
+business|city|text|YES|null
+business|postal_code|text|YES|null
+business|country|text|YES|'Italy'::text
+business|logo_url|text|YES|null
+business|currency|text|NO|'EUR'::text
+business|timezone|text|NO|'Europe/Rome'::text
+business|language|text|NO|'en'::text
+business|active|boolean|NO|true
+business|created_at|timestamp with time zone|NO|now()
+business|updated_at|timestamp with time zone|NO|now()
+business|deleted_at|timestamp with time zone|YES|null
+business|accent_color|text|YES|'#2563EB'::text
+business|primary_color|text|YES|'#2563EB'::text
+business|secondary_color|text|YES|'#0F172A'::text
+business|logo_dark_url|text|YES|null
+business|cover_image_url|text|YES|null
+business|description|text|YES|null
+business|booking_enabled|boolean|NO|true
+business|booking_notice_hours|integer|NO|24
+business|cancellation_notice_hours|integer|NO|24
+business|slot_interval_minutes|integer|NO|15
+business|default_buffer_minutes|integer|NO|0
+business|default_appointment_duration|integer|NO|30
+business|max_daily_appointments|integer|YES|null
+business|lunch_break_enabled|boolean|NO|false
+business|lunch_start|time without time zone|YES|null
+business|lunch_end|time without time zone|YES|null
+business|facebook_url|text|YES|null
+business|instagram_url|text|YES|null
+business|linkedin_url|text|YES|null
+business|google_maps_url|text|YES|null
+business|whatsapp_number|text|YES|null
+business|booking_page_slug|text|YES|null
+business|metadata|jsonb|YES|'{}'::jsonb
+business_constraints|id|uuid|NO|gen_random_uuid()
+business_constraints|business_id|uuid|NO|null
+business_constraints|constraint_key|text|NO|null
+business_constraints|constraint_name|text|NO|null
+business_constraints|description|text|YES|null
+business_constraints|enabled|boolean|NO|true
+business_constraints|value_json|jsonb|NO|'{}'::jsonb
+business_constraints|priority|integer|NO|100
+business_constraints|created_by|uuid|YES|null
+business_constraints|created_at|timestamp with time zone|NO|now()
+business_constraints|updated_at|timestamp with time zone|NO|now()
+business_constraints|deleted_at|timestamp with time zone|YES|null
+business_holidays|id|uuid|NO|gen_random_uuid()
+business_holidays|business_id|uuid|NO|null
+business_holidays|title|text|NO|null
+business_holidays|description|text|YES|null
+business_holidays|start_date|date|NO|null
+business_holidays|end_date|date|NO|null
+business_holidays|is_closed|boolean|NO|true
+business_holidays|affects_scheduler|boolean|NO|true
+business_holidays|created_by|uuid|YES|null
+business_holidays|created_at|timestamp with time zone|NO|now()
+business_holidays|updated_at|timestamp with time zone|NO|now()
+business_holidays|deleted_at|timestamp with time zone|YES|null
+calendar_connections|id|uuid|NO|gen_random_uuid()
+calendar_connections|business_id|uuid|NO|null
+calendar_connections|provider|text|NO|null
+calendar_connections|account_email|text|YES|null
+calendar_connections|account_name|text|YES|null
+calendar_connections|external_calendar_id|text|YES|null
+calendar_connections|access_token|text|YES|null
+calendar_connections|refresh_token|text|YES|null
+calendar_connections|token_expires_at|timestamp with time zone|YES|null
+calendar_connections|sync_enabled|boolean|NO|true
+calendar_connections|two_way_sync|boolean|NO|true
+calendar_connections|import_external_events|boolean|NO|true
+calendar_connections|export_internal_events|boolean|NO|true
+calendar_connections|sync_interval_minutes|integer|NO|15
+calendar_connections|last_sync_at|timestamp with time zone|YES|null
+calendar_connections|last_successful_sync|timestamp with time zone|YES|null
+calendar_connections|last_error|text|YES|null
+calendar_connections|created_by|uuid|YES|null
+calendar_connections|created_at|timestamp with time zone|NO|now()
+calendar_connections|updated_at|timestamp with time zone|NO|now()
+calendar_connections|deleted_at|timestamp with time zone|YES|null
+customer_accounts|id|uuid|NO|gen_random_uuid()
+customer_accounts|business_id|uuid|NO|null
+customer_accounts|patient_id|uuid|NO|null
+customer_accounts|auth_user_id|uuid|YES|null
+customer_accounts|email|USER-DEFINED|NO|null
+customer_accounts|password_enabled|boolean|NO|false
+customer_accounts|google_enabled|boolean|NO|false
+customer_accounts|apple_enabled|boolean|NO|false
+customer_accounts|portal_enabled|boolean|NO|false
+customer_accounts|can_book|boolean|NO|true
+customer_accounts|can_cancel|boolean|NO|true
+customer_accounts|can_reschedule|boolean|NO|true
+customer_accounts|language|text|YES|'en'::text
+customer_accounts|last_login|timestamp with time zone|YES|null
+customer_accounts|created_at|timestamp with time zone|NO|now()
+customer_accounts|updated_at|timestamp with time zone|NO|now()
+customer_accounts|deleted_at|timestamp with time zone|YES|null
+customer_booking_requests|id|uuid|NO|gen_random_uuid()
+customer_booking_requests|business_id|uuid|NO|null
+customer_booking_requests|customer_account_id|uuid|YES|null
+customer_booking_requests|patient_id|uuid|YES|null
+customer_booking_requests|service_id|uuid|YES|null
+customer_booking_requests|requested_date|date|YES|null
+customer_booking_requests|earliest_date|date|YES|null
+customer_booking_requests|latest_date|date|YES|null
+customer_booking_requests|preferred_weekdays|ARRAY|YES|null
+customer_booking_requests|earliest_time|time without time zone|YES|null
+customer_booking_requests|latest_time|time without time zone|YES|null
+customer_booking_requests|requested_duration_minutes|integer|YES|null
+customer_booking_requests|flexibility_score|integer|YES|5
+customer_booking_requests|notes|text|YES|null
+customer_booking_requests|status|text|NO|'pending'::text
+customer_booking_requests|scheduler_job_id|uuid|YES|null
+customer_booking_requests|generated_appointment_id|uuid|YES|null
+customer_booking_requests|processed_at|timestamp with time zone|YES|null
+customer_booking_requests|created_at|timestamp with time zone|NO|now()
+customer_booking_requests|updated_at|timestamp with time zone|NO|now()
+customer_booking_requests|deleted_at|timestamp with time zone|YES|null
+customer_booking_requests|metadata|jsonb|YES|'{}'::jsonb
+dashboard_stats|id|uuid|NO|gen_random_uuid()
+dashboard_stats|business_id|uuid|NO|null
+dashboard_stats|stat_date|date|NO|null
+dashboard_stats|total_patients|integer|NO|0
+dashboard_stats|active_patients|integer|NO|0
+dashboard_stats|new_patients|integer|NO|0
+dashboard_stats|appointments_total|integer|NO|0
+dashboard_stats|appointments_completed|integer|NO|0
+dashboard_stats|appointments_cancelled|integer|NO|0
+dashboard_stats|appointments_no_show|integer|NO|0
+dashboard_stats|appointments_rescheduled|integer|NO|0
+dashboard_stats|revenue_expected|numeric|NO|0
+dashboard_stats|revenue_actual|numeric|NO|0
+dashboard_stats|occupied_minutes|integer|NO|0
+dashboard_stats|free_minutes|integer|NO|0
+dashboard_stats|occupancy_percentage|numeric|NO|0
+dashboard_stats|optimizer_runs|integer|NO|0
+dashboard_stats|patients_moved|integer|NO|0
+dashboard_stats|notifications_sent|integer|NO|0
+dashboard_stats|ai_commands|integer|NO|0
+dashboard_stats|created_at|timestamp with time zone|NO|now()
+dashboard_stats|updated_at|timestamp with time zone|NO|now()
+feature_flags|id|uuid|NO|gen_random_uuid()
+feature_flags|business_id|uuid|NO|null
+feature_flags|feature_key|text|NO|null
+feature_flags|feature_name|text|NO|null
+feature_flags|description|text|YES|null
+feature_flags|enabled|boolean|NO|false
+feature_flags|rollout_percentage|integer|NO|100
+feature_flags|config|jsonb|NO|'{}'::jsonb
+feature_flags|created_by|uuid|YES|null
+feature_flags|created_at|timestamp with time zone|NO|now()
+feature_flags|updated_at|timestamp with time zone|NO|now()
+feature_flags|deleted_at|timestamp with time zone|YES|null
+invoices|id|uuid|NO|gen_random_uuid()
+invoices|business_id|uuid|NO|null
+invoices|patient_id|uuid|YES|null
+invoices|appointment_id|uuid|YES|null
+invoices|invoice_number|text|NO|null
+invoices|issue_date|date|NO|CURRENT_DATE
+invoices|due_date|date|YES|null
+invoices|status|text|NO|'draft'::text
+invoices|subtotal|numeric|NO|0
+invoices|tax_amount|numeric|NO|0
+invoices|discount_amount|numeric|NO|0
+invoices|total_amount|numeric|NO|0
+invoices|currency|text|NO|'EUR'::text
+invoices|payment_method|text|YES|null
+invoices|payment_status|text|NO|'unpaid'::text
+invoices|paid_at|timestamp with time zone|YES|null
+invoices|notes|text|YES|null
+invoices|external_invoice_id|text|YES|null
+invoices|metadata|jsonb|YES|'{}'::jsonb
+invoices|created_by|uuid|YES|null
+invoices|created_at|timestamp with time zone|NO|now()
+invoices|updated_at|timestamp with time zone|NO|now()
+invoices|deleted_at|timestamp with time zone|YES|null
+notifications|id|uuid|NO|gen_random_uuid()
+notifications|business_id|uuid|NO|null
+notifications|patient_id|uuid|YES|null
+notifications|appointment_id|uuid|YES|null
+notifications|template_id|uuid|YES|null
+notifications|channel|USER-DEFINED|NO|null
+notifications|status|USER-DEFINED|NO|'pending'::notification_status
+notifications|recipient|text|NO|null
+notifications|subject|text|YES|null
+notifications|message|text|NO|null
+notifications|scheduled_at|timestamp with time zone|YES|null
+notifications|sent_at|timestamp with time zone|YES|null
+notifications|error_message|text|YES|null
+notifications|created_at|timestamp with time zone|NO|now()
+notifications|updated_at|timestamp with time zone|NO|now()
+notifications|deleted_at|timestamp with time zone|YES|null
+optimization_changes|id|uuid|NO|gen_random_uuid()
+optimization_changes|optimization_run_id|uuid|NO|null
+optimization_changes|appointment_id|uuid|NO|null
+optimization_changes|patient_id|uuid|NO|null
+optimization_changes|old_date|date|YES|null
+optimization_changes|old_start_time|time without time zone|YES|null
+optimization_changes|old_end_time|time without time zone|YES|null
+optimization_changes|new_date|date|YES|null
+optimization_changes|new_start_time|time without time zone|YES|null
+optimization_changes|new_end_time|time without time zone|YES|null
+optimization_changes|was_moved|boolean|NO|true
+optimization_changes|notification_required|boolean|NO|true
+optimization_changes|notification_sent|boolean|NO|false
+optimization_changes|accepted|boolean|NO|false
+optimization_changes|ai_reason|text|YES|null
+optimization_changes|created_at|timestamp with time zone|NO|now()
+optimization_changes|updated_at|timestamp with time zone|NO|now()
+optimization_changes|deleted_at|timestamp with time zone|YES|null
+optimization_runs|id|uuid|NO|gen_random_uuid()
+optimization_runs|business_id|uuid|NO|null
+optimization_runs|profile_id|uuid|YES|null
+optimization_runs|mode|USER-DEFINED|NO|'balanced'::optimization_mode
+optimization_runs|result|USER-DEFINED|NO|'preview'::optimization_result
+optimization_runs|objective_score|numeric|YES|null
+optimization_runs|idle_minutes_before|integer|YES|null
+optimization_runs|idle_minutes_after|integer|YES|null
+optimization_runs|moved_appointments|integer|NO|0
+optimization_runs|unchanged_appointments|integer|NO|0
+optimization_runs|created_appointments|integer|NO|0
+optimization_runs|cancelled_appointments|integer|NO|0
+optimization_runs|total_appointments|integer|NO|0
+optimization_runs|estimated_revenue_before|numeric|YES|null
+optimization_runs|estimated_revenue_after|numeric|YES|null
+optimization_runs|ai_summary|text|YES|null
+optimization_runs|ai_explanation|text|YES|null
+optimization_runs|execution_time_ms|integer|YES|null
+optimization_runs|accepted|boolean|NO|false
+optimization_runs|created_at|timestamp with time zone|NO|now()
+optimization_runs|updated_at|timestamp with time zone|NO|now()
+optimization_runs|deleted_at|timestamp with time zone|YES|null
+patient_availability|id|uuid|NO|gen_random_uuid()
+patient_availability|patient_id|uuid|NO|null
+patient_availability|weekday|USER-DEFINED|NO|null
+patient_availability|start_time|time without time zone|NO|null
+patient_availability|end_time|time without time zone|NO|null
+patient_availability|priority|USER-DEFINED|NO|'normal'::availability_priority
+patient_availability|valid_from|date|YES|null
+patient_availability|valid_until|date|YES|null
+patient_availability|recurring|boolean|NO|true
+patient_availability|notes|text|YES|null
+patient_availability|created_at|timestamp with time zone|NO|now()
+patient_availability|updated_at|timestamp with time zone|NO|now()
+patient_availability|deleted_at|timestamp with time zone|YES|null
+patient_exceptions|id|uuid|NO|gen_random_uuid()
+patient_exceptions|patient_id|uuid|NO|null
+patient_exceptions|exception_date|date|NO|null
+patient_exceptions|is_available|boolean|NO|false
+patient_exceptions|start_time|time without time zone|YES|null
+patient_exceptions|end_time|time without time zone|YES|null
+patient_exceptions|reason|text|YES|null
+patient_exceptions|created_at|timestamp with time zone|NO|now()
+patient_exceptions|updated_at|timestamp with time zone|NO|now()
+patient_exceptions|deleted_at|timestamp with time zone|YES|null
+patient_notes|id|uuid|NO|gen_random_uuid()
+patient_notes|patient_id|uuid|NO|null
+patient_notes|note|text|NO|null
+patient_notes|is_pinned|boolean|NO|false
+patient_notes|created_by|uuid|YES|null
+patient_notes|created_at|timestamp with time zone|NO|now()
+patient_notes|updated_at|timestamp with time zone|NO|now()
+patient_notes|deleted_at|timestamp with time zone|YES|null
+patients|id|uuid|NO|gen_random_uuid()
+patients|business_id|uuid|NO|null
+patients|first_name|text|NO|null
+patients|last_name|text|YES|null
+patients|full_name|text|YES|null
+patients|email|USER-DEFINED|YES|null
+patients|phone|text|YES|null
+patients|birth_date|date|YES|null
+patients|address|text|YES|null
+patients|city|text|YES|null
+patients|postal_code|text|YES|null
+patients|notes|text|YES|null
+patients|preferred_service_id|uuid|YES|null
+patients|preferred_duration_minutes|integer|YES|null
+patients|color|text|YES|'#2563EB'::text
+patients|is_active|boolean|NO|true
+patients|created_at|timestamp with time zone|NO|now()
+patients|updated_at|timestamp with time zone|NO|now()
+patients|deleted_at|timestamp with time zone|YES|null
+patients|gender|text|YES|null
+patients|emergency_contact|text|YES|null
+patients|emergency_phone|text|YES|null
+patients|preferred_language|text|YES|'en'::text
+patients|occupation|text|YES|null
+patients|referral_source|text|YES|null
+patients|tags|jsonb|YES|'[]'::jsonb
+patients|preferred_color|text|YES|'#2563EB'::text
+patients|marketing_consent|boolean|NO|false
+patients|email_consent|boolean|NO|true
+patients|sms_consent|boolean|NO|true
+patients|whatsapp_consent|boolean|NO|true
+patients|last_visit|timestamp with time zone|YES|null
+patients|next_visit|timestamp with time zone|YES|null
+patients|total_appointments|integer|NO|0
+patients|completed_appointments|integer|NO|0
+patients|cancelled_appointments|integer|NO|0
+patients|no_show_count|integer|NO|0
+patients|total_spent|numeric|NO|0
+patients|average_visit_duration|integer|YES|null
+patients|average_days_between_visits|integer|YES|null
+patients|internal_rating|smallint|YES|null
+patients|is_vip|boolean|NO|false
+patients|blacklisted|boolean|NO|false
+patients|archived|boolean|NO|false
+patients|last_ai_analysis|timestamp with time zone|YES|null
+patients|metadata|jsonb|YES|'{}'::jsonb
+patients|search_vector|tsvector|YES|null
+preferences|id|uuid|NO|gen_random_uuid()
+preferences|profile_id|uuid|NO|null
+preferences|theme|text|NO|'light'::text
+preferences|language|text|NO|'en'::text
+preferences|timezone|text|NO|'UTC'::text
+preferences|date_format|text|NO|'dd/MM/yyyy'::text
+preferences|time_format|integer|NO|24
+preferences|week_starts_on|USER-DEFINED|NO|'monday'::weekday
+preferences|default_calendar_view|text|NO|'calendar'::text
+preferences|optimization_mode|USER-DEFINED|NO|'balanced'::optimization_mode
+preferences|ai_enabled|boolean|NO|true
+preferences|auto_show_preview|boolean|NO|true
+preferences|onboarding_completed|boolean|NO|false
+preferences|created_at|timestamp with time zone|NO|now()
+preferences|updated_at|timestamp with time zone|NO|now()
+profiles|id|uuid|NO|null
+profiles|email|USER-DEFINED|NO|null
+profiles|first_name|text|YES|null
+profiles|last_name|text|YES|null
+profiles|display_name|text|YES|null
+profiles|avatar_url|text|YES|null
+profiles|phone|text|YES|null
+profiles|language|text|NO|'en'::text
+profiles|timezone|text|NO|'UTC'::text
+profiles|onboarding_completed|boolean|NO|false
+profiles|last_login_at|timestamp with time zone|YES|null
+profiles|created_at|timestamp with time zone|NO|now()
+profiles|updated_at|timestamp with time zone|NO|now()
+profiles|deleted_at|timestamp with time zone|YES|null
+scheduler_constraints|id|uuid|NO|gen_random_uuid()
+scheduler_constraints|business_id|uuid|NO|null
+scheduler_constraints|constraint_key|text|NO|null
+scheduler_constraints|name|text|NO|null
+scheduler_constraints|description|text|YES|null
+scheduler_constraints|category|text|NO|null
+scheduler_constraints|constraint_type|text|NO|null
+scheduler_constraints|enabled|boolean|NO|true
+scheduler_constraints|weight|numeric|YES|1
+scheduler_constraints|priority|integer|YES|100
+scheduler_constraints|value_json|jsonb|NO|'{}'::jsonb
+scheduler_constraints|affects_optimizer|boolean|NO|true
+scheduler_constraints|affects_manual_booking|boolean|NO|true
+scheduler_constraints|created_by|uuid|YES|null
+scheduler_constraints|created_at|timestamp with time zone|NO|now()
+scheduler_constraints|updated_at|timestamp with time zone|NO|now()
+scheduler_constraints|deleted_at|timestamp with time zone|YES|null
+scheduler_explanations|id|uuid|NO|gen_random_uuid()
+scheduler_explanations|business_id|uuid|NO|null
+scheduler_explanations|scheduler_job_id|uuid|YES|null
+scheduler_explanations|optimization_run_id|uuid|YES|null
+scheduler_explanations|optimization_change_id|uuid|YES|null
+scheduler_explanations|appointment_id|uuid|YES|null
+scheduler_explanations|patient_id|uuid|YES|null
+scheduler_explanations|explanation_type|text|NO|null
+scheduler_explanations|priority|integer|NO|0
+scheduler_explanations|title|text|NO|null
+scheduler_explanations|explanation|text|NO|null
+scheduler_explanations|technical_reason|text|YES|null
+scheduler_explanations|before_json|jsonb|YES|'{}'::jsonb
+scheduler_explanations|after_json|jsonb|YES|'{}'::jsonb
+scheduler_explanations|constraint_name|text|YES|null
+scheduler_explanations|score_before|numeric|YES|null
+scheduler_explanations|score_after|numeric|YES|null
+scheduler_explanations|ai_generated|boolean|NO|true
+scheduler_explanations|visible_to_user|boolean|NO|true
+scheduler_explanations|metadata|jsonb|YES|'{}'::jsonb
+scheduler_explanations|created_at|timestamp with time zone|NO|now()
+scheduler_explanations|updated_at|timestamp with time zone|NO|now()
+scheduler_explanations|deleted_at|timestamp with time zone|YES|null
+scheduler_jobs|id|uuid|NO|gen_random_uuid()
+scheduler_jobs|business_id|uuid|NO|null
+scheduler_jobs|profile_id|uuid|YES|null
+scheduler_jobs|scenario_id|uuid|YES|null
+scheduler_jobs|optimization_run_id|uuid|YES|null
+scheduler_jobs|status|text|NO|'queued'::text
+scheduler_jobs|progress|smallint|NO|0
+scheduler_jobs|current_step|text|YES|null
+scheduler_jobs|total_steps|smallint|YES|null
+scheduler_jobs|current_iteration|integer|YES|null
+scheduler_jobs|objective_score|numeric|YES|null
+scheduler_jobs|algorithm_name|text|YES|null
+scheduler_jobs|solver_name|text|YES|null
+scheduler_jobs|solver_version|text|YES|null
+scheduler_jobs|started_at|timestamp with time zone|YES|null
+scheduler_jobs|finished_at|timestamp with time zone|YES|null
+scheduler_jobs|cancelled_at|timestamp with time zone|YES|null
+scheduler_jobs|execution_time_ms|integer|YES|null
+scheduler_jobs|error_message|text|YES|null
+scheduler_jobs|input_json|jsonb|YES|'{}'::jsonb
+scheduler_jobs|output_json|jsonb|YES|'{}'::jsonb
+scheduler_jobs|statistics|jsonb|YES|'{}'::jsonb
+scheduler_jobs|created_at|timestamp with time zone|NO|now()
+scheduler_jobs|updated_at|timestamp with time zone|NO|now()
+scheduler_jobs|deleted_at|timestamp with time zone|YES|null
+scheduler_metrics|id|uuid|NO|gen_random_uuid()
+scheduler_metrics|scheduler_job_id|uuid|NO|null
+scheduler_metrics|business_id|uuid|NO|null
+scheduler_metrics|optimization_run_id|uuid|YES|null
+scheduler_metrics|metric_date|timestamp with time zone|NO|now()
+scheduler_metrics|objective_score|numeric|YES|null
+scheduler_metrics|total_constraints|integer|YES|0
+scheduler_metrics|satisfied_constraints|integer|YES|0
+scheduler_metrics|violated_constraints|integer|YES|0
+scheduler_metrics|soft_constraint_penalty|numeric|YES|0
+scheduler_metrics|hard_constraint_violations|integer|YES|0
+scheduler_metrics|idle_minutes_before|integer|YES|0
+scheduler_metrics|idle_minutes_after|integer|YES|0
+scheduler_metrics|occupied_minutes|integer|YES|0
+scheduler_metrics|occupancy_percentage|numeric|YES|0
+scheduler_metrics|appointments_created|integer|YES|0
+scheduler_metrics|appointments_moved|integer|YES|0
+scheduler_metrics|appointments_locked|integer|YES|0
+scheduler_metrics|appointments_cancelled|integer|YES|0
+scheduler_metrics|patients_affected|integer|YES|0
+scheduler_metrics|waiting_list_inserted|integer|YES|0
+scheduler_metrics|waiting_list_remaining|integer|YES|0
+scheduler_metrics|execution_time_ms|integer|YES|null
+scheduler_metrics|solver_iterations|integer|YES|null
+scheduler_metrics|solver_nodes|integer|YES|null
+scheduler_metrics|solver_gap|numeric|YES|null
+scheduler_metrics|memory_usage_mb|numeric|YES|null
+scheduler_metrics|cpu_time_ms|integer|YES|null
+scheduler_metrics|metadata|jsonb|YES|'{}'::jsonb
+scheduler_metrics|created_at|timestamp with time zone|NO|now()
+scheduler_scenarios|id|uuid|NO|gen_random_uuid()
+scheduler_scenarios|business_id|uuid|NO|null
+scheduler_scenarios|created_by|uuid|YES|null
+scheduler_scenarios|name|text|NO|null
+scheduler_scenarios|description|text|YES|null
+scheduler_scenarios|status|text|NO|'draft'::text
+scheduler_scenarios|objective_score|numeric|YES|null
+scheduler_scenarios|appointments_before|integer|YES|null
+scheduler_scenarios|appointments_after|integer|YES|null
+scheduler_scenarios|moved_appointments|integer|YES|null
+scheduler_scenarios|idle_minutes_before|integer|YES|null
+scheduler_scenarios|idle_minutes_after|integer|YES|null
+scheduler_scenarios|expected_revenue_before|numeric|YES|null
+scheduler_scenarios|expected_revenue_after|numeric|YES|null
+scheduler_scenarios|simulation_data|jsonb|NO|'{}'::jsonb
+scheduler_scenarios|accepted|boolean|NO|false
+scheduler_scenarios|accepted_at|timestamp with time zone|YES|null
+scheduler_scenarios|created_at|timestamp with time zone|NO|now()
+scheduler_scenarios|updated_at|timestamp with time zone|NO|now()
+scheduler_scenarios|deleted_at|timestamp with time zone|YES|null
+scheduler_snapshots|id|uuid|NO|gen_random_uuid()
+scheduler_snapshots|business_id|uuid|NO|null
+scheduler_snapshots|scheduler_job_id|uuid|YES|null
+scheduler_snapshots|optimization_run_id|uuid|YES|null
+scheduler_snapshots|snapshot_name|text|YES|null
+scheduler_snapshots|snapshot_type|text|NO|'before'::text
+scheduler_snapshots|version|integer|NO|null
+scheduler_snapshots|total_appointments|integer|NO|0
+scheduler_snapshots|total_patients|integer|NO|0
+scheduler_snapshots|objective_score|numeric|YES|null
+scheduler_snapshots|calendar_json|jsonb|NO|null
+scheduler_snapshots|statistics_json|jsonb|YES|'{}'::jsonb
+scheduler_snapshots|created_by|uuid|YES|null
+scheduler_snapshots|created_at|timestamp with time zone|NO|now()
+scheduler_snapshots|metadata|jsonb|YES|'{}'::jsonb
+scheduler_snapshots|deleted_at|timestamp with time zone|YES|null
+services|id|uuid|NO|gen_random_uuid()
+services|business_id|uuid|NO|null
+services|name|text|NO|null
+services|description|text|YES|null
+services|duration_minutes|integer|NO|null
+services|price|numeric|YES|0
+services|color|text|YES|'#2563EB'::text
+services|is_active|boolean|NO|true
+services|sort_order|integer|NO|0
+services|created_at|timestamp with time zone|NO|now()
+services|updated_at|timestamp with time zone|NO|now()
+services|deleted_at|timestamp with time zone|YES|null
+services|online_bookable|boolean|NO|true
+services|requires_confirmation|boolean|NO|false
+services|buffer_before_minutes|integer|NO|0
+services|buffer_after_minutes|integer|NO|0
+services|max_daily_bookings|integer|YES|null
+services|icon|text|YES|null
+services|emoji|text|YES|null
+services|vat_percentage|numeric|YES|22
+services|estimated_cost|numeric|YES|null
+services|requires_notes|boolean|NO|false
+services|visible_on_dashboard|boolean|NO|true
+services|allow_ai_scheduling|boolean|NO|true
+services|minimum_notice_hours|integer|YES|0
+services|maximum_days_in_advance|integer|YES|null
+services|metadata|jsonb|YES|'{}'::jsonb
+services|search_vector|tsvector|YES|null
+templates|id|uuid|NO|gen_random_uuid()
+templates|business_id|uuid|NO|null
+templates|type|USER-DEFINED|NO|null
+templates|title|text|NO|null
+templates|subject|text|YES|null
+templates|body|text|NO|null
+templates|language|text|NO|'en'::text
+templates|channel|USER-DEFINED|NO|'whatsapp'::notification_channel
+templates|is_default|boolean|NO|false
+templates|is_active|boolean|NO|true
+templates|created_at|timestamp with time zone|NO|now()
+templates|updated_at|timestamp with time zone|NO|now()
+templates|deleted_at|timestamp with time zone|YES|null
+templates|search_vector|tsvector|YES|null
+v_active_waiting_list|id|uuid|YES|null
+v_active_waiting_list|business_id|uuid|YES|null
+v_active_waiting_list|patient_id|uuid|YES|null
+v_active_waiting_list|preferred_service_id|uuid|YES|null
+v_active_waiting_list|priority|USER-DEFINED|YES|null
+v_active_waiting_list|earliest_date|date|YES|null
+v_active_waiting_list|latest_date|date|YES|null
+v_active_waiting_list|preferred_weekdays|ARRAY|YES|null
+v_active_waiting_list|earliest_time|time without time zone|YES|null
+v_active_waiting_list|latest_time|time without time zone|YES|null
+v_active_waiting_list|preferred_duration_minutes|integer|YES|null
+v_active_waiting_list|flexible|boolean|YES|null
+v_active_waiting_list|active|boolean|YES|null
+v_active_waiting_list|notes|text|YES|null
+v_active_waiting_list|inserted_by_ai|boolean|YES|null
+v_active_waiting_list|matched_appointment_id|uuid|YES|null
+v_active_waiting_list|matched_at|timestamp with time zone|YES|null
+v_active_waiting_list|created_at|timestamp with time zone|YES|null
+v_active_waiting_list|updated_at|timestamp with time zone|YES|null
+v_active_waiting_list|deleted_at|timestamp with time zone|YES|null
+v_active_waiting_list|full_name|text|YES|null
+v_active_waiting_list|service_name|text|YES|null
+v_ai_activity|business_id|uuid|YES|null
+v_ai_activity|total_requests|bigint|YES|null
+v_ai_activity|successful|bigint|YES|null
+v_ai_activity|avg_response_ms|numeric|YES|null
+v_ai_activity|input_tokens|bigint|YES|null
+v_ai_activity|output_tokens|bigint|YES|null
+v_dashboard_today|business_id|uuid|YES|null
+v_dashboard_today|today|date|YES|null
+v_dashboard_today|scheduled|bigint|YES|null
+v_dashboard_today|confirmed|bigint|YES|null
+v_dashboard_today|completed|bigint|YES|null
+v_dashboard_today|cancelled|bigint|YES|null
+v_dashboard_today|no_show|bigint|YES|null
+v_dashboard_today|expected_revenue|numeric|YES|null
+v_dashboard_today|realized_revenue|numeric|YES|null
+v_patient_statistics|id|uuid|YES|null
+v_patient_statistics|business_id|uuid|YES|null
+v_patient_statistics|full_name|text|YES|null
+v_patient_statistics|total_appointments|bigint|YES|null
+v_patient_statistics|completed|bigint|YES|null
+v_patient_statistics|cancelled|bigint|YES|null
+v_patient_statistics|no_show|bigint|YES|null
+v_patient_statistics|total_revenue|numeric|YES|null
+v_patient_statistics|last_visit|date|YES|null
+v_upcoming_appointments|id|uuid|YES|null
+v_upcoming_appointments|business_id|uuid|YES|null
+v_upcoming_appointments|patient_id|uuid|YES|null
+v_upcoming_appointments|service_id|uuid|YES|null
+v_upcoming_appointments|title|text|YES|null
+v_upcoming_appointments|description|text|YES|null
+v_upcoming_appointments|appointment_date|date|YES|null
+v_upcoming_appointments|start_time|time without time zone|YES|null
+v_upcoming_appointments|end_time|time without time zone|YES|null
+v_upcoming_appointments|duration_minutes|integer|YES|null
+v_upcoming_appointments|price|numeric|YES|null
+v_upcoming_appointments|status|USER-DEFINED|YES|null
+v_upcoming_appointments|source|USER-DEFINED|YES|null
+v_upcoming_appointments|confirmed|boolean|YES|null
+v_upcoming_appointments|locked|boolean|YES|null
+v_upcoming_appointments|generated_by_ai|boolean|YES|null
+v_upcoming_appointments|optimization_run_id|uuid|YES|null
+v_upcoming_appointments|reminder_sent|boolean|YES|null
+v_upcoming_appointments|internal_notes|text|YES|null
+v_upcoming_appointments|created_at|timestamp with time zone|YES|null
+v_upcoming_appointments|updated_at|timestamp with time zone|YES|null
+v_upcoming_appointments|deleted_at|timestamp with time zone|YES|null
+v_upcoming_appointments|color|text|YES|null
+v_upcoming_appointments|is_recurring|boolean|YES|null
+v_upcoming_appointments|parent_appointment_id|uuid|YES|null
+v_upcoming_appointments|reminder_minutes_before|integer|YES|null
+v_upcoming_appointments|checked_in_at|timestamp with time zone|YES|null
+v_upcoming_appointments|checked_out_at|timestamp with time zone|YES|null
+v_upcoming_appointments|completed_at|timestamp with time zone|YES|null
+v_upcoming_appointments|cancelled_at|timestamp with time zone|YES|null
+v_upcoming_appointments|manual_override|boolean|YES|null
+v_upcoming_appointments|version|integer|YES|null
+v_upcoming_appointments|created_by|uuid|YES|null
+v_upcoming_appointments|updated_by|uuid|YES|null
+v_upcoming_appointments|last_ai_update|timestamp with time zone|YES|null
+v_upcoming_appointments|recurrence_rule|text|YES|null
+v_upcoming_appointments|recurrence_end_date|date|YES|null
+v_upcoming_appointments|external_calendar_id|text|YES|null
+v_upcoming_appointments|is_first_visit|boolean|YES|null
+v_upcoming_appointments|confirmation_sent|boolean|YES|null
+v_upcoming_appointments|reminder_count|integer|YES|null
+v_upcoming_appointments|full_name|text|YES|null
+v_upcoming_appointments|service_name|text|YES|null
+waiting_list|id|uuid|NO|gen_random_uuid()
+waiting_list|business_id|uuid|NO|null
+waiting_list|patient_id|uuid|NO|null
+waiting_list|preferred_service_id|uuid|YES|null
+waiting_list|priority|USER-DEFINED|NO|'normal'::availability_priority
+waiting_list|earliest_date|date|YES|null
+waiting_list|latest_date|date|YES|null
+waiting_list|preferred_weekdays|ARRAY|YES|null
+waiting_list|earliest_time|time without time zone|YES|null
+waiting_list|latest_time|time without time zone|YES|null
+waiting_list|preferred_duration_minutes|integer|YES|null
+waiting_list|flexible|boolean|NO|true
+waiting_list|active|boolean|NO|true
+waiting_list|notes|text|YES|null
+waiting_list|inserted_by_ai|boolean|NO|false
+waiting_list|matched_appointment_id|uuid|YES|null
+waiting_list|matched_at|timestamp with time zone|YES|null
+waiting_list|created_at|timestamp with time zone|NO|now()
+waiting_list|updated_at|timestamp with time zone|NO|now()
+waiting_list|deleted_at|timestamp with time zone|YES|null
+webhook_deliveries|id|uuid|NO|gen_random_uuid()
+webhook_deliveries|webhook_id|uuid|NO|null
+webhook_deliveries|event_name|text|NO|null
+webhook_deliveries|payload|jsonb|NO|null
+webhook_deliveries|response_code|integer|YES|null
+webhook_deliveries|response_body|text|YES|null
+webhook_deliveries|duration_ms|integer|YES|null
+webhook_deliveries|success|boolean|NO|false
+webhook_deliveries|created_at|timestamp with time zone|NO|now()
+webhooks|id|uuid|NO|gen_random_uuid()
+webhooks|business_id|uuid|NO|null
+webhooks|name|text|NO|null
+webhooks|description|text|YES|null
+webhooks|url|text|NO|null
+webhooks|secret|text|YES|null
+webhooks|event_type|text|NO|null
+webhooks|method|text|NO|'POST'::text
+webhooks|headers|jsonb|YES|'{}'::jsonb
+webhooks|enabled|boolean|NO|true
+webhooks|retry_count|integer|NO|3
+webhooks|timeout_seconds|integer|NO|10
+webhooks|last_called_at|timestamp with time zone|YES|null
+webhooks|last_success_at|timestamp with time zone|YES|null
+webhooks|last_error|text|YES|null
+webhooks|total_calls|integer|NO|0
+webhooks|failed_calls|integer|NO|0
+webhooks|metadata|jsonb|YES|'{}'::jsonb
+webhooks|created_by|uuid|YES|null
+webhooks|created_at|timestamp with time zone|NO|now()
+webhooks|updated_at|timestamp with time zone|NO|now()
+webhooks|deleted_at|timestamp with time zone|YES|null
+working_hours|id|uuid|NO|gen_random_uuid()
+working_hours|business_id|uuid|NO|null
+working_hours|weekday|USER-DEFINED|NO|null
+working_hours|is_open|boolean|NO|true
+working_hours|morning_start|time without time zone|YES|null
+working_hours|morning_end|time without time zone|YES|null
+working_hours|afternoon_start|time without time zone|YES|null
+working_hours|afternoon_end|time without time zone|YES|null
+working_hours|created_at|timestamp with time zone|NO|now()
+working_hours|updated_at|timestamp with time zone|NO|now()"
