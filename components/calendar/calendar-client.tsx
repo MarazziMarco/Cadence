@@ -14,11 +14,10 @@ import { cn } from '@/lib/utils'
 
 const START_HOUR = 7, END_HOUR = 21, HOUR_H = 56
 const SLOT = 15
-const DAY_MS = 86400000
 
 function startOfWeek(d: Date) { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x }
-function ymd(d: Date) { return d.toISOString().slice(0, 10) }
-function addDays(d: Date, n: number) { return new Date(d.getTime() + n * DAY_MS) }
+function ymd(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x }
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export function CalendarClient() {

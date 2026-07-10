@@ -33,7 +33,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
       setPatientId(appt?.patient_id ?? '')
       setNewClient('')
       setServiceId(appt?.service_id ?? 'none')
-      setDate(appt?.appointment_date ?? defaultDate ?? new Date().toISOString().slice(0, 10))
+      setDate(appt?.appointment_date ?? defaultDate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })())
       setStart(appt ? appt.start_time.slice(0, 5) : (defaultStart ?? '09:00'))
       setDuration(String(appt?.duration_minutes ?? business?.default_appointment_duration ?? 30))
     }

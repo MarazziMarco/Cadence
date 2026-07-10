@@ -29,9 +29,19 @@ export async function ensureAlgorithmSettings(businessId: string): Promise<void>
   }
 }
 
-export async function runOptimization(businessId: string, dateFrom: string, dateTo: string): Promise<string> {
+export async function runOptimization(businessId: string, dateFrom: string, dateTo: string, opts?: { mode?: string; allowWaitingList?: boolean }): Promise<string> {
   // Make sure the required settings row exists before invoking the Edge Function.
   await ensureAlgorithmSettings(businessId)
+
+  // The Edge Function reads mode/allow_waiting_list off the business's active
+  // algorithm_settings row rather than the invoke body, so persist them first.
+  if (opts && (opts.mode !== undefined || opts.allowWaitingList !== undefined)) {
+    const updates: Record<string, unknown> = {}
+    if (opts.mode !== undefined) updates.optimization_mode = opts.mode
+    if (opts.allowWaitingList !== undefined) updates.allow_waiting_list = opts.allowWaitingList
+    const { error: settingsErr } = await sb().from('algorithm_settings').update(updates).eq('business_id', businessId).eq('active', true)
+    if (settingsErr) throw settingsErr
+  }
 
   const { data, error } = await sb().functions.invoke('optimize-schedule', {
     body: { business_id: businessId, date_from: dateFrom, date_to: dateTo },

@@ -14,17 +14,34 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { OPTIMIZATION_MODE } from '@/lib/types/db'
+import { cn } from '@/lib/utils'
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '—')
-const todayStr = () => new Date().toISOString().slice(0, 10)
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const parseYmd = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+const startOfWeek = (d: Date) => { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); return x }
+const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
+const todayStr = () => ymd(new Date())
+
+const RANGES = [
+  { value: 'day', label: 'Giorno' },
+  { value: 'week', label: 'Settimana' },
+  { value: 'custom', label: 'Intervallo' },
+] as const
+type Range = (typeof RANGES)[number]['value']
 
 export function SchedulerClient() {
   const { business } = useWorkspace()
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
+  const [range, setRange] = useState<Range>('day')
   const [date, setDate] = useState(todayStr())
+  const [customFrom, setCustomFrom] = useState(todayStr())
+  const [customTo, setCustomTo] = useState(todayStr())
   const [mode, setMode] = useState('balanced')
+  const [includeWaitingList, setIncludeWaitingList] = useState(false)
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [run, setRun] = useState<any>(null)
@@ -35,10 +52,14 @@ export function SchedulerClient() {
     if (businessId) ensureAlgorithmSettings(businessId).catch(() => {})
   }, [businessId])
 
+  const [dateFrom, dateTo] = range === 'day' ? [date, date]
+    : range === 'week' ? (() => { const s = startOfWeek(parseYmd(date)); return [ymd(s), ymd(addDays(s, 6))] })()
+    : [customFrom, customTo]
+
   async function optimize() {
     setLoading(true); setRun(null); setChanges([])
     try {
-      const runId = await runOptimization(businessId, date, date)
+      const runId = await runOptimization(businessId, dateFrom, dateTo, { mode, allowWaitingList: includeWaitingList })
       const res = await fetchRun(runId)
       setRun(res.run); setChanges(res.changes)
       if (res.changes.length === 0) toast.info('Already optimal — no beneficial changes found.')
@@ -76,10 +97,35 @@ export function SchedulerClient() {
       <PageHeader title="Scheduler" description="Build the best possible day. Every optimization is a preview — you decide, row by row." />
 
       <Card className="mb-6 shadow-sm">
-        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end">
-          <div className="space-y-2"><Label>Day to optimize</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:w-48" /></div>
-          <div className="space-y-2"><Label>Mode</Label><Select value={mode} onValueChange={setMode}><SelectTrigger className="sm:w-44"><SelectValue /></SelectTrigger><SelectContent>{OPTIMIZATION_MODE.map((o) => <SelectItem key={o} value={o} className="capitalize">{o}</SelectItem>)}</SelectContent></Select></div>
-          <Button onClick={optimize} disabled={loading || !businessId} className="sm:ml-auto">{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Optimize day</Button>
+        <CardContent className="flex flex-col gap-4 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="space-y-2">
+              <Label>Range</Label>
+              <div className="inline-flex rounded-lg border border-border p-0.5">
+                {RANGES.map((r) => (
+                  <button key={r.value} onClick={() => setRange(r.value)} className={cn('rounded-md px-3 py-1.5 text-sm font-medium transition-colors', range === r.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{r.label}</button>
+                ))}
+              </div>
+            </div>
+
+            {range === 'custom' ? (
+              <>
+                <div className="space-y-2"><Label>Da</Label><Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="sm:w-44" /></div>
+                <div className="space-y-2"><Label>A</Label><Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-44" /></div>
+              </>
+            ) : (
+              <div className="space-y-2"><Label>{range === 'week' ? 'Settimana di' : 'Giorno da ottimizzare'}</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:w-48" /></div>
+            )}
+
+            <div className="space-y-2"><Label>Mode</Label><Select value={mode} onValueChange={setMode}><SelectTrigger className="sm:w-44"><SelectValue /></SelectTrigger><SelectContent>{OPTIMIZATION_MODE.map((o) => <SelectItem key={o} value={o} className="capitalize">{o}</SelectItem>)}</SelectContent></Select></div>
+
+            <Button onClick={optimize} disabled={loading || !businessId || (range === 'custom' && (!customFrom || !customTo || customFrom > customTo))} className="sm:ml-auto">{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Optimize</Button>
+          </div>
+
+          <div className="flex items-center gap-2 border-t border-border pt-4">
+            <Switch checked={includeWaitingList} onCheckedChange={setIncludeWaitingList} id="include-waiting-list" />
+            <Label htmlFor="include-waiting-list" className="cursor-pointer font-normal">Includi pazienti dalla lista d'attesa</Label>
+          </div>
         </CardContent>
       </Card>
 
