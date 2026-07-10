@@ -4,7 +4,18 @@
       "Bash(grep -rln \"appointment_date\\\\|start_time\\\\|end_time\" /app --include=\"*.ts\" --include=\"*.tsx\" -not -path \"*/node_modules/*\")",
       "Bash(npx tsc *)",
       "Bash(git stash *)",
-      "Bash(git -c user.name=emergent-agent-e1 -c user.email=github@emergent.sh commit components/calendar/appointment-dialog.tsx components/calendar/calendar-client.tsx components/scheduler/scheduler-client.tsx lib/api/scheduler.ts -m ' *)"
+      "Bash(git -c user.name=emergent-agent-e1 -c user.email=github@emergent.sh commit components/calendar/appointment-dialog.tsx components/calendar/calendar-client.tsx components/scheduler/scheduler-client.tsx lib/api/scheduler.ts -m ' *)",
+      "Bash(export SUPABASE_ACCESS_TOKEN='sbp_1a8a45759a87ba043b3a8e2166138fb6f60018fe')",
+      "Bash(curl -sS -o /tmp/claude-0/-app/5b30afb1-b064-436c-9733-16ac6634ab3b/scratchpad/functions_list.json -w 'HTTP_STATUS:%{http_code}\\\\n' -H 'Authorization: Bearer sbp_1a8a45759a87ba043b3a8e2166138fb6f60018fe' https://api.supabase.com/v1/projects/__TRACKED_VAR__/functions)",
+      "Bash(unset SUPABASE_ACCESS_TOKEN)",
+      "Bash(python3 *)",
+      "Bash(awk NR>=630 && NR<=900 && length\\($0\\)<800 *)",
+      "Bash(grep -no '{\"version\":3,\"sources\":\\\\[[^]]*\\\\]' /tmp/claude-0/-app/5b30afb1-b064-436c-9733-16ac6634ab3b/scratchpad/strings_out.txt)",
+      "Bash(curl -sS -X POST -w '\\\\nHTTP_STATUS:%{http_code}\\\\n' -H 'Authorization: Bearer sbp_1a8a45759a87ba043b3a8e2166138fb6f60018fe' -H 'Content-Type: application/json' -d '{\"query\":\"select business_id, active, optimization_mode, weight_idle_time, weight_free_slots, weight_manual_lock, weight_vip, max_patient_moves, max_daily_moves, fill_gaps_first, preserve_existing_schedule, metadata, updated_at from algorithm_settings order by updated_at desc limit 10;\"}' https://api.supabase.com/v1/projects/__TRACKED_VAR__/database/query)",
+      "Bash(curl -sS -X POST -w '\\\\nHTTP_STATUS:%{http_code}\\\\n' -H 'Authorization: Bearer sbp_1a8a45759a87ba043b3a8e2166138fb6f60018fe' -H 'Content-Type: application/json' --data @/tmp/claude-0/-app/5b30afb1-b064-436c-9733-16ac6634ab3b/scratchpad/q1.json https://api.supabase.com/v1/projects/__TRACKED_VAR__/database/query)",
+      "Bash(curl -sS -X POST -w '\\\\nHTTP_STATUS:%{http_code}\\\\n' -H 'Authorization: Bearer sbp_1a8a45759a87ba043b3a8e2166138fb6f60018fe' -H 'Content-Type: application/json' --data @/tmp/claude-0/-app/5b30afb1-b064-436c-9733-16ac6634ab3b/scratchpad/q2.json https://api.supabase.com/v1/projects/__TRACKED_VAR__/database/query)",
+      "Bash(curl -sS -X POST -H 'Authorization: Bearer sbp_1a8a45759a87ba043b3a8e2166138fb6f60018fe' -H 'Content-Type: application/json' --data @/tmp/claude-0/-app/5b30afb1-b064-436c-9733-16ac6634ab3b/scratchpad/q2.json https://api.supabase.com/v1/projects/__TRACKED_VAR__/database/query)",
+      "Bash(timeout 280 yarn build)"
     ]
   }
 }
