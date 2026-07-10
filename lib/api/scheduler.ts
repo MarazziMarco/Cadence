@@ -7,11 +7,53 @@ import { timeToMin } from '@/lib/api/appointments'
 
 const sb = () => createClient()
 
+// Ensures a business always has an active `algorithm_settings` row (required by
+// the optimize-schedule Edge Function). Idempotent: only inserts when missing.
+// All other columns rely on their DB defaults — we NEVER modify the schema.
+export async function ensureAlgorithmSettings(businessId: string): Promise<void> {
+  if (!businessId) return
+  const client = sb()
+  const { data: existing } = await client
+    .from('algorithm_settings')
+    .select('id')
+    .eq('business_id', businessId)
+    .eq('active', true)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle()
+  if (existing) return
+  const { error } = await client.from('algorithm_settings').insert({ business_id: businessId })
+  if (error && !/duplicate|unique/i.test(error.message || '')) {
+    // eslint-disable-next-line no-console
+    console.warn('ensureAlgorithmSettings:', error.message)
+  }
+}
+
 export async function runOptimization(businessId: string, dateFrom: string, dateTo: string): Promise<string> {
+  // Make sure the required settings row exists before invoking the Edge Function.
+  await ensureAlgorithmSettings(businessId)
+
   const { data, error } = await sb().functions.invoke('optimize-schedule', {
     body: { business_id: businessId, date_from: dateFrom, date_to: dateTo },
   })
-  if (error) throw new Error(error.message || 'Edge function error')
+  if (error) {
+    // supabase-js wraps non-2xx responses in FunctionsHttpError, exposing the raw
+    // Response on `error.context`. Read it to surface the real server message.
+    let message = error.message || 'Edge function error'
+    const ctx = (error as any).context
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = await ctx.json()
+        if (body?.error) message = body.error
+      } catch {
+        try {
+          const txt = await ctx.text?.()
+          if (txt) message = txt
+        } catch {}
+      }
+    }
+    throw new Error(message)
+  }
   if (!data || data.error) throw new Error(data?.error || 'Optimization failed')
   if (!data.run_id) throw new Error('No run_id returned')
   return data.run_id as string

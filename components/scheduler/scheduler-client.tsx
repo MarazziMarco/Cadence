@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { Wand2, Loader2, Clock, DollarSign, ListChecks, ArrowRightLeft, ShieldCheck, Check, X, ArrowRight, Sparkles, PlusCircle } from 'lucide-react'
-import { runOptimization, fetchRun, acceptChange, rejectChange } from '@/lib/api/scheduler'
+import { runOptimization, fetchRun, acceptChange, rejectChange, ensureAlgorithmSettings } from '@/lib/api/scheduler'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
 import { Button } from '@/components/ui/button'
@@ -29,6 +29,11 @@ export function SchedulerClient() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [run, setRun] = useState<any>(null)
   const [changes, setChanges] = useState<any[]>([])
+
+  // Ensure the business has an active algorithm_settings row on first access.
+  useEffect(() => {
+    if (businessId) ensureAlgorithmSettings(businessId).catch(() => {})
+  }, [businessId])
 
   async function optimize() {
     setLoading(true); setRun(null); setChanges([])
