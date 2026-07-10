@@ -8,12 +8,17 @@ import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
 const LEFT = [
-  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
 ]
 const RIGHT = [
   { href: '/patients', label: 'Clients', icon: Users },
   { href: '/settings', label: 'Settings', icon: Settings },
+]
+const CREATE = [
+  { href: '/calendar?new=1', label: 'Nuovo appuntamento', icon: CalendarPlus },
+  { href: '/patients?new=1', label: 'Nuovo cliente', icon: UserPlus },
+  { href: '/services?new=1', label: 'Nuovo servizio', icon: Sparkles },
 ]
 
 export function BottomNav() {
@@ -21,28 +26,63 @@ export function BottomNav() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const go = (href: string) => { setOpen(false); router.push(href) }
-  const item = (it: any) => (
-    <Link key={it.href} href={it.href} className={cn('flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium', pathname.startsWith(it.href) ? 'text-primary' : 'text-muted-foreground')}>
-      <it.icon className="h-5 w-5" />{it.label}
-    </Link>
-  )
+
+  const Item = (it: any) => {
+    const active = pathname === it.href || pathname.startsWith(it.href + '/')
+    return (
+      <Link
+        key={it.href}
+        href={it.href}
+        aria-current={active ? 'page' : undefined}
+        className={cn(
+          'group relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium transition-colors active:scale-95',
+          active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        <span className={cn('flex h-8 w-12 items-center justify-center rounded-full transition-all duration-200', active ? 'bg-primary/10' : 'bg-transparent')}>
+          <it.icon className={cn('h-5 w-5 transition-transform duration-200', active ? 'scale-110' : 'group-active:scale-90')} />
+        </span>
+        {it.label}
+      </Link>
+    )
+  }
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-border bg-background/95 backdrop-blur lg:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {LEFT.map(item)}
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button aria-label="Create" className="-mt-6 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"><Plus className="h-6 w-6" /></button>
-        </SheetTrigger>
-        <SheetContent side="bottom" className="rounded-t-2xl">
-          <SheetHeader><SheetTitle>Crea nuovo</SheetTitle></SheetHeader>
-          <div className="mt-4 space-y-2 pb-6">
-            <button onClick={() => go('/calendar?new=1')} className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left font-medium"><CalendarPlus className="h-5 w-5 text-primary" /> Nuovo appuntamento</button>
-            <button onClick={() => go('/patients?new=1')} className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left font-medium"><UserPlus className="h-5 w-5 text-primary" /> Nuovo cliente</button>
-            <button onClick={() => go('/services?new=1')} className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left font-medium"><Sparkles className="h-5 w-5 text-primary" /> Nuovo servizio</button>
-          </div>
-        </SheetContent>
-      </Sheet>
-      {RIGHT.map(item)}
+    <nav
+      className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch justify-around border-t border-border bg-background/95 backdrop-blur lg:hidden"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      {LEFT.map(Item)}
+
+      <div className="flex flex-1 items-center justify-center">
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <button
+              aria-label="Crea nuovo"
+              className="-mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-background transition-transform duration-200 active:scale-90"
+            >
+              <Plus className={cn('h-6 w-6 transition-transform duration-300', open && 'rotate-45')} />
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-2xl border-border pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <SheetHeader className="text-left"><SheetTitle>Crea nuovo</SheetTitle></SheetHeader>
+            <div className="mt-4 space-y-2">
+              {CREATE.map((c) => (
+                <button
+                  key={c.href}
+                  onClick={() => go(c.href)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left font-medium transition-all duration-200 hover:bg-accent active:scale-[0.98]"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><c.icon className="h-5 w-5" /></span>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {RIGHT.map(Item)}
     </nav>
   )
 }
