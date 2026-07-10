@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window", "deno.ns", "esnext"],
+    "strict": true
+  },
+  "tasks": {
+    "test": "deno test --allow-read"
+  },
+  "fmt": {
+    "exclude": ["fixtures/"]
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-import-prefix"]
+    }
+  }
+}

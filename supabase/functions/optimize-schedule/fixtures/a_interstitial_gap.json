@@ -1,0 +1,52 @@
+{
+  "context": {
+    "business_id": "biz-a",
+    "date_from": "2026-07-13",
+    "date_to": "2026-07-13",
+    "now": "2026-07-09T08:00:00Z",
+    "mode": "balanced",
+    "settings": {
+      "weight_idle_time": 1,
+      "weight_patient_preference": 5,
+      "weight_revenue": 3,
+      "weight_continuity": 8,
+      "weight_vip": 100,
+      "weight_manual_lock": 1000,
+      "weight_waiting_list": 4,
+      "weight_free_slots": 2,
+      "max_patient_moves": 2,
+      "max_daily_moves": 5,
+      "max_solver_seconds": 30,
+      "allow_split_days": true,
+      "allow_waiting_list": true,
+      "fill_gaps_first": true,
+      "preserve_existing_schedule": true,
+      "use_ai_explanations": true,
+      "metadata": {}
+    }
+  },
+  "working_hours": [
+    { "weekday": "monday", "is_open": true, "morning_start": "09:00", "morning_end": "13:00", "afternoon_start": "14:00", "afternoon_end": "18:00" },
+    { "weekday": "tuesday", "is_open": true, "morning_start": "09:00", "morning_end": "13:00", "afternoon_start": "14:00", "afternoon_end": "18:00" },
+    { "weekday": "wednesday", "is_open": true, "morning_start": "09:00", "morning_end": "13:00", "afternoon_start": "14:00", "afternoon_end": "18:00" },
+    { "weekday": "thursday", "is_open": true, "morning_start": "09:00", "morning_end": "13:00", "afternoon_start": "14:00", "afternoon_end": "18:00" },
+    { "weekday": "friday", "is_open": true, "morning_start": "09:00", "morning_end": "13:00", "afternoon_start": "14:00", "afternoon_end": "18:00" },
+    { "weekday": "saturday", "is_open": true, "morning_start": "09:00", "morning_end": "13:00", "afternoon_start": "14:00", "afternoon_end": "18:00" },
+    { "weekday": "sunday", "is_open": true, "morning_start": "09:00", "morning_end": "13:00", "afternoon_start": "14:00", "afternoon_end": "18:00" }
+  ],
+  "holidays": [],
+  "services": [
+    { "id": "svc-1", "duration_minutes": 45, "price": 50, "buffer_before_minutes": 0, "buffer_after_minutes": 10, "allow_ai_scheduling": true, "max_daily_bookings": null, "minimum_notice_hours": 0, "maximum_days_in_advance": null }
+  ],
+  "patients": [
+    { "id": "pat-a", "is_vip": false, "preferred_service_id": null, "preferred_duration_minutes": null, "no_show_count": 0, "average_days_between_visits": null },
+    { "id": "pat-b", "is_vip": false, "preferred_service_id": null, "preferred_duration_minutes": null, "no_show_count": 0, "average_days_between_visits": null }
+  ],
+  "patient_availability": [],
+  "patient_exceptions": [],
+  "appointments": [
+    { "id": "appt-1", "patient_id": "pat-a", "service_id": "svc-1", "appointment_date": "2026-07-13", "start_time": "09:00", "end_time": "09:45", "duration_minutes": 45, "price": 50, "locked": false, "manual_override": false, "source": "manual" },
+    { "id": "appt-2", "patient_id": "pat-b", "service_id": "svc-1", "appointment_date": "2026-07-13", "start_time": "12:00", "end_time": "12:45", "duration_minutes": 45, "price": 50, "locked": false, "manual_override": false, "source": "manual" }
+  ],
+  "waiting_list": []
+}
