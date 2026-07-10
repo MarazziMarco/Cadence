@@ -24,7 +24,7 @@ export function Landing() {
           <Logo />
           <div className="flex items-center gap-3">
             <Link href="/demo"><Button variant="ghost" className="gap-1.5"><PlayCircle className="h-4 w-4" /> Prova la demo</Button></Link>
-            <Link href="/login"><Button variant="ghost">Log in</Button></Link>
+            <Link href="/login"><Button variant="ghost"> in</Button></Link>
             <Link href="/signup"><Button>Get started</Button></Link>
           </div>
         </div>
