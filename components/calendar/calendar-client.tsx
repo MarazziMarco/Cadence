@@ -8,6 +8,7 @@ import { listAppointments, updateAppointment, minToTime, timeToMin, fmtTime, typ
 import { useWorkspace } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
 import { AppointmentDialog } from './appointment-dialog'
+import { OptimizeDialog } from './optimize-dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -99,17 +100,20 @@ export function CalendarClient() {
       <PageHeader title="Calendar" description="Your day at a glance. Drag to move, click a slot to book. Shortcuts: n, w, d, ← →, t."
         actions={<Button onClick={() => openNew()}><Plus className="mr-2 h-4 w-4" /> New</Button>} />
 
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? -1 : -7))}><ChevronLeft className="h-4 w-4" /></Button>
           <Button variant="outline" size="sm" onClick={() => setAnchor(new Date())}>Today</Button>
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? 1 : 7))}><ChevronRight className="h-4 w-4" /></Button>
           <span className="ml-2 text-sm font-semibold">{label}</span>
         </div>
-        <div className="inline-flex rounded-lg border border-border p-0.5">
-          {(['day', 'week'] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
-          ))}
+        <div className="flex items-center gap-2">
+          {businessId && <OptimizeDialog businessId={businessId} dateFrom={rangeStart} dateTo={rangeEnd} />}
+          <div className="inline-flex rounded-lg border border-border p-0.5">
+            {(['day', 'week'] as const).map((v) => (
+              <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
+            ))}
+          </div>
         </div>
       </div>
 
