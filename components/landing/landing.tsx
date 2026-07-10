@@ -49,7 +49,7 @@ export function Landing() {
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.18 }}
             className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
-            <Link href="/signup"><Button size="lg" className="h-12 px-7 text-base">Start free <ArrowRight className="ml-1 h-4 w-4" /></Button></Link>
+            <Link href="/signup"><Button size="lg" className="h-12 px-7 text-base">Try free <ArrowRight className="ml-1 h-4 w-4" /></Button></Link>
             <Link href="/demo"><Button size="lg" variant="outline" className="h-12 gap-2 px-7 text-base"><PlayCircle className="h-4 w-4" /> Prova senza account</Button></Link>
           </motion.div>
         </div>
