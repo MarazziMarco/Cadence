@@ -1,17 +1,19 @@
 import { cn } from '@/lib/utils'
 
-export function Logo({ className, showText = true }: { className?: string; showText?: boolean }) {
+// Cadence wordmark — pure typography + color (no icon, no illustration).
+// Micro-detail: the initial "C" and a trailing "beat" dot carry the indigo accent,
+// evoking rhythm/flow; tight tracking gives it a crafted, modern feel.
+export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn('flex items-center gap-2.5', className)}>
-      <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[hsl(262_83%_58%)] shadow-sm">
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-white">
-          <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.2" />
-        </svg>
-      </div>
-      {showText && (
-        <span className="text-lg font-bold tracking-tight text-foreground">Cadence</span>
+    <span
+      className={cn(
+        'inline-flex select-none items-baseline text-lg font-semibold tracking-tight text-foreground',
+        className,
       )}
-    </div>
+    >
+      <span className="font-bold text-primary">C</span>
+      <span>adence</span>
+      <span aria-hidden className="ml-[1px] text-primary">.</span>
+    </span>
   )
 }
