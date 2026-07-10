@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX, Wallet } from 'lucide-react'
 import { getPatient, setPatientFlag, softDeletePatient } from '@/lib/api/patients'
+import { listUpcomingByPatient, fmtTime } from '@/lib/api/appointments'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PatientFormDialog } from './patient-form-dialog'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ export function PatientProfile({ id }: { id: string }) {
   const [editOpen, setEditOpen] = useState(false)
 
   const { data: p, isLoading } = useQuery({ queryKey: ['patient', id], queryFn: () => getPatient(id) })
+  const { data: upcoming = [] } = useQuery({ queryKey: ['patient-upcoming', id], queryFn: () => listUpcomingByPatient(id) })
 
   const flagMut = useMutation({
     mutationFn: (patch: any) => setPatientFlag(id, patch),

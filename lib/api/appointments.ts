@@ -56,3 +56,13 @@ export async function listPatientsForSelect(businessId: string) {
 export const timeToMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
 export const minToTime = (min: number) => { const h = Math.floor(min / 60); const m = min % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00` }
 export const fmtTime = (t: string) => { const [h, m] = t.split(':'); return `${h}:${m}` }
+
+export async function listUpcomingByPatient(patientId: string) {
+  const today = new Date().toISOString().slice(0, 10)
+  const { data, error } = await sb().from('appointments')
+    .select('id, appointment_date, start_time, end_time, duration_minutes, status, color, title, services:service_id ( name )')
+    .eq('patient_id', patientId).is('deleted_at', null).neq('status', 'cancelled')
+    .gte('appointment_date', today).order('appointment_date').order('start_time')
+  if (error) throw error
+  return data ?? []
+}

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, Trash2 } from 'lucide-react'
 import { createAppointment, updateAppointment, deleteAppointment, listPatientsForSelect, minToTime, timeToMin, type CalendarAppointment } from '@/lib/api/appointments'
+import { createPatient } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
   const { business } = useWorkspace()
   const editing = !!appt
   const [patientId, setPatientId] = useState('')
+  const [newClient, setNewClient] = useState('')
   const [serviceId, setServiceId] = useState<string>('none')
   const [date, setDate] = useState('')
   const [start, setStart] = useState('09:00')
@@ -29,6 +31,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
   useEffect(() => {
     if (open) {
       setPatientId(appt?.patient_id ?? '')
+      setNewClient('')
       setServiceId(appt?.service_id ?? 'none')
       setDate(appt?.appointment_date ?? defaultDate ?? new Date().toISOString().slice(0, 10))
       setStart(appt ? appt.start_time.slice(0, 5) : (defaultStart ?? '09:00'))
@@ -44,11 +47,13 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
 
   const save = useMutation({
     mutationFn: async () => {
+      let pid = patientId
+      if (!pid && newClient.trim()) { const np = await createPatient(businessId, { first_name: newClient.trim() }); pid = np.id }
       const startMin = timeToMin(start + ':00')
       const dur = parseInt(duration) || 30
       const svc = services.find((s: any) => s.id === serviceId)
       const values: any = {
-        patient_id: patientId,
+        patient_id: pid,
         service_id: serviceId === 'none' ? null : serviceId,
         appointment_date: date,
         start_time: minToTime(startMin),
@@ -61,7 +66,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
       if (editing) return updateAppointment(appt!.id, values)
       return createAppointment(businessId, values)
     },
-    onSuccess: () => { toast.success(editing ? 'Appointment updated' : 'Appointment created'); qc.invalidateQueries({ queryKey: ['appointments'] }); onOpenChange(false) },
+    onSuccess: () => { toast.success(editing ? 'Appointment updated' : 'Appointment created'); qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['patients'] }); qc.invalidateQueries({ queryKey: ['patients-select'] }); onOpenChange(false) },
     onError: (e: any) => toast.error(e.message || 'Failed to save'),
   })
 
@@ -78,10 +83,11 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label>Client *</Label>
-            <Select value={patientId} onValueChange={setPatientId}>
+            <Select value={patientId} onValueChange={(v) => { setPatientId(v); setNewClient('') }}>
               <SelectTrigger><SelectValue placeholder="Select a client" /></SelectTrigger>
               <SelectContent>{patients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name || p.first_name}</SelectItem>)}</SelectContent>
             </Select>
+            {!editing && <Input placeholder="…or type a new client name" value={newClient} onChange={(e) => { setNewClient(e.target.value); if (e.target.value) setPatientId('') }} />}
           </div>
           <div className="space-y-2">
             <Label>Service</Label>
@@ -100,7 +106,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
           {editing ? <Button variant="ghost" size="icon" className="text-destructive" onClick={() => del.mutate()}><Trash2 className="h-4 w-4" /></Button> : <span />}
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={() => save.mutate()} disabled={!patientId || save.isPending}>{save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? 'Save' : 'Create'}</Button>
+            <Button onClick={() => save.mutate()} disabled={(!patientId && !newClient.trim()) || save.isPending}>{save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? 'Save' : 'Create'}</Button>
           </div>
         </DialogFooter>
       </DialogContent>
