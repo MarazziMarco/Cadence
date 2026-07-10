@@ -9,6 +9,7 @@ import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { MovedMessages } from './moved-messages'
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '—')
 
@@ -138,6 +139,8 @@ export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: s
                   </div>
                 )}
               </div>
+
+              <MovedMessages businessId={businessId} changes={changes} />
             </div>
           )}
         </div>

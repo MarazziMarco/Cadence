@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rln \"appointment_date\\\\|start_time\\\\|end_time\" /app --include=\"*.ts\" --include=\"*.tsx\" -not -path \"*/node_modules/*\")",
+      "Bash(npx tsc *)",
+      "Bash(git stash *)",
+      "Bash(git -c user.name=emergent-agent-e1 -c user.email=github@emergent.sh commit components/calendar/appointment-dialog.tsx components/calendar/calendar-client.tsx components/scheduler/scheduler-client.tsx lib/api/scheduler.ts -m ' *)"
+    ]
+  }
+}

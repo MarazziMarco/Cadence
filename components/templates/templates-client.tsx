@@ -1,0 +1,72 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { Loader2, Save, RotateCcw } from 'lucide-react'
+import { useWorkspace } from '@/lib/workspace-context'
+import { PageHeader } from '@/components/common/page-header'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { getMovedTemplate, saveMovedTemplate, defaultBody, TEMPLATE_PLACEHOLDERS } from '@/lib/api/templates'
+
+export function TemplatesClient() {
+  const { business } = useWorkspace()
+  const businessId = business?.id ?? ''
+  const [body, setBody] = useState('')
+  const [lang, setLang] = useState('en')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!businessId) return
+    let alive = true
+    getMovedTemplate(businessId)
+      .then((r) => { if (alive) { setBody(r.body); setLang(r.language) } })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [businessId])
+
+  async function save() {
+    setSaving(true)
+    try { await saveMovedTemplate(businessId, body); toast.success('Template salvato') }
+    catch (e: any) { toast.error(e.message || 'Errore nel salvataggio') }
+    finally { setSaving(false) }
+  }
+
+  function insert(token: string) { setBody((b) => (b ? b + ' ' + token : token)) }
+
+  return (
+    <div>
+      <PageHeader title="Templates" description="Testo dei messaggi generati per i pazienti spostati dopo un'ottimizzazione. Nessun invio automatico — solo testo da copiare." />
+      <Card className="max-w-2xl shadow-sm">
+        <CardHeader><CardTitle className="text-base">Messaggio "Appuntamento spostato"</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {loading ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carico il template…</div>
+          ) : (
+            <>
+              <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} className="resize-y" placeholder="Scrivi il messaggio…" />
+              <div>
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">Segnaposto disponibili (clicca per inserire):</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {TEMPLATE_PLACEHOLDERS.map((p) => (
+                    <button key={p} type="button" onClick={() => insert(p)}>
+                      <Badge variant="secondary" className="cursor-pointer font-mono hover:bg-accent">{p}</Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button onClick={save} disabled={saving || !body.trim()}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Salva</Button>
+                <Button variant="outline" onClick={() => setBody(defaultBody(lang))}><RotateCcw className="mr-2 h-4 w-4" /> Ripristina default</Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

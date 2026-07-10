@@ -72,7 +72,7 @@ export function Landing() {
       <footer className="border-t border-border">
         <div className="container flex flex-col items-center justify-between gap-4 py-10 sm:flex-row">
           <Logo />
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Cadence. Crafted for modern businesses.</p>
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Cadence.. Crafted for modern businesses.</p>
         </div>
       </footer>
     </div>
