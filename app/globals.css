@@ -110,4 +110,64 @@
     background: hsl(var(--background) / 0.7);
     backdrop-filter: blur(12px);
   }
+
+  /* --- Motion vocabulary (Linear/Stripe-style, sober) ------------------
+     Reuses the Dashboard's entrance feel (short, ease-out, small travel).
+     Opt-in utility classes; nothing animates unless a class is applied. */
+  @keyframes cad-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes cad-fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: cad-fade-in 300ms ease-out both;
+  }
+  .animate-fade-up {
+    animation: cad-fade-up 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Staggered entrance for lists/grids: direct children fade-up in sequence,
+     capped so long lists don't feel slow. */
+  .stagger-in > * {
+    animation: cad-fade-up 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stagger-in > *:nth-child(1)  { animation-delay: 0ms; }
+  .stagger-in > *:nth-child(2)  { animation-delay: 40ms; }
+  .stagger-in > *:nth-child(3)  { animation-delay: 80ms; }
+  .stagger-in > *:nth-child(4)  { animation-delay: 120ms; }
+  .stagger-in > *:nth-child(5)  { animation-delay: 160ms; }
+  .stagger-in > *:nth-child(6)  { animation-delay: 200ms; }
+  .stagger-in > *:nth-child(7)  { animation-delay: 240ms; }
+  .stagger-in > *:nth-child(8)  { animation-delay: 280ms; }
+  .stagger-in > *:nth-child(n+9) { animation-delay: 320ms; }
+
+  /* Consistent, sober card hover. */
+  .hover-lift {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -12px hsl(240 10% 8% / 0.18);
+  }
+}
+
+/* Respect users who prefer reduced motion: disable all our entrance/transition
+   motion, including tailwindcss-animate's animate-in utilities. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-up,
+  .stagger-in > *,
+  [class*="animate-in"] {
+    animation: none !important;
+  }
+  .hover-lift {
+    transition: none !important;
+  }
+  .hover-lift:hover {
+    transform: none;
+  }
 }

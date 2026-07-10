@@ -44,7 +44,7 @@ export function WaitingListClient() {
       ) : entries.length === 0 ? (
         <EmptyState icon={ListChecks} title="Waiting list is empty" description="Add clients who want an earlier slot. The scheduler will place them automatically when gaps appear." action={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Add to list</Button>} />
       ) : (
-        <div className="space-y-3">
+        <div className="stagger-in space-y-3">
           {entries.map((e: any) => {
             const name = e.patients?.full_name || e.patients?.first_name || 'Client'
             return (

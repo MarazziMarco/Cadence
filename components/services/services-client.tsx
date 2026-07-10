@@ -56,9 +56,9 @@ export function ServicesClient() {
           {Object.entries(groups).map(([cat, items]) => (
             <div key={cat}>
               <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">{cat}</h3>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="stagger-in grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {items.map((s) => (
-                  <Card key={s.id} className="group relative overflow-hidden p-5 shadow-sm">
+                  <Card key={s.id} className="group relative overflow-hidden p-5 shadow-sm hover-lift">
                     <div className="absolute left-0 top-0 h-full w-1" style={{ backgroundColor: s.color || '#4f46e5' }} />
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
