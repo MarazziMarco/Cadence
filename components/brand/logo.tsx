@@ -1,19 +1,21 @@
 import { cn } from '@/lib/utils'
 
-// Cadence wordmark — pure typography + color (no icon, no illustration).
-// Micro-detail: the initial "C" and a trailing "beat" dot carry the indigo accent,
-// evoking rhythm/flow; tight tracking gives it a crafted, modern feel.
+// Cadence brand lockup: colored "C" wave mark + wordmark (provided assets).
+// - Mark stays colorful on any background.
+// - Wordmark is dark navy; it auto-inverts to white in dark mode, and callers on
+//   colored/dark surfaces can force white via `[&_img]:brightness-0 [&_img]:invert`.
 export function Logo({ className }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        'inline-flex select-none items-baseline text-lg font-semibold tracking-tight text-foreground',
-        className,
-      )}
-    >
-      <span className="font-bold text-primary">C</span>
-      <span>adence</span>
-      <span aria-hidden className="ml-[1px] text-primary">.</span>
+    <span className={cn('inline-flex select-none items-center gap-2', className)}>
+      <img src="/cadence-mark.png" alt="Cadence" width={338} height={319} className="h-7 w-auto" />
+      <img
+        src="/cadence-wordmark.png"
+        alt=""
+        aria-hidden
+        width={876}
+        height={133}
+        className="h-[16px] w-auto dark:brightness-0 dark:invert"
+      />
     </span>
   )
 }
