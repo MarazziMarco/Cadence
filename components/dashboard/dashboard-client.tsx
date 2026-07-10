@@ -48,8 +48,8 @@ export function DashboardClient({ name }: { name?: string }) {
     { label: "Today's appointments", value: data ? String(data.todayCount) : '—', icon: CalendarDays },
     { label: 'Occupancy', value: data ? `${data.occupancy}%` : '—', icon: TrendingUp },
     { label: 'Idle time today', value: data ? `${Math.floor(data.idleMin / 60)}h ${data.idleMin % 60}m` : '—', icon: Clock },
-    { label: 'Revenue (7d)', value: data ? formatMoney(data.revenue7, 'USD') : '—', icon: DollarSign },
-  ], [data])
+    { label: 'Revenue (7d)', value: data ? formatMoney(data.revenue7, business?.currency) : '—', icon: DollarSign },
+  ], [data, business?.currency])
 
   return (
     <div>

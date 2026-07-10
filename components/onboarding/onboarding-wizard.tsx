@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils'
 import {
   BUSINESS_TYPES, BUSINESS_TYPE_LABELS, WEEKDAYS, WEEKDAY_LABELS,
-  LANGUAGES, TIMEZONES, type Weekday,
+  LANGUAGES, TIMEZONES, CURRENCIES, type Weekday,
 } from '@/lib/types/db'
 
 type DayState = { is_open: boolean; morning_start: string; morning_end: string; afternoon_start: string; afternoon_end: string }
@@ -56,6 +56,7 @@ export function OnboardingWizard({ defaultFirstName, defaultLastName }: { defaul
 
   const [timezone, setTimezone] = useState('Europe/Rome')
   const [language, setLanguage] = useState('en')
+  const [currency, setCurrency] = useState('EUR')
 
   function updateDay(d: Weekday, patch: Partial<DayState>) {
     setDays((prev) => ({ ...prev, [d]: { ...prev[d], ...patch } }))
@@ -81,7 +82,7 @@ export function OnboardingWizard({ defaultFirstName, defaultLastName }: { defaul
         profile_id: user.id,
         business_name: businessName.trim(),
         business_type: businessType,
-        timezone, language,
+        timezone, language, currency,
         default_appointment_duration: parseInt(duration) || 30,
         max_daily_appointments: maxDaily ? parseInt(maxDaily) : null,
         lunch_break_enabled: lunchEnabled,
@@ -232,6 +233,13 @@ export function OnboardingWizard({ defaultFirstName, defaultLastName }: { defaul
                     <Select value={language} onValueChange={setLanguage}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>{LANGUAGES.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select value={currency} onValueChange={setCurrency}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{CURRENCIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>

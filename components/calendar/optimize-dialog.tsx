@@ -60,7 +60,7 @@ export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: s
   const revImpact = run ? Number(run.estimated_revenue_after ?? 0) - Number(run.estimated_revenue_before ?? 0) : 0
   const kpis = run ? [
     { label: 'Tempo morto', value: `${Math.floor(idleSaved / 60)}h ${idleSaved % 60}m`, icon: Clock },
-    { label: 'Ricavi', value: `+${formatMoney(revImpact, 'USD')}`, icon: DollarSign },
+    { label: 'Ricavi', value: `+${formatMoney(revImpact, business?.currency)}`, icon: DollarSign },
     { label: "Lista d'attesa", value: String(run.created_appointments ?? 0), icon: ListChecks },
     { label: 'Spostati', value: String(run.moved_appointments ?? 0), icon: ArrowRightLeft },
   ] : []

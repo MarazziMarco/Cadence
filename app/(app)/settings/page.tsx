@@ -1,9 +1,10 @@
 import Link from 'next/link'
-import { Clock, BarChart3, FileText, FlaskConical, ChevronRight } from 'lucide-react'
+import { Clock, BarChart3, FileText, FlaskConical, ChevronRight, Coins } from 'lucide-react'
 import { PageHeader } from '@/components/common/page-header'
 import { Card } from '@/components/ui/card'
 
 const LINKS = [
+  { href: '/settings/preferences', label: 'Preferences', desc: 'Currency and general business preferences', icon: Coins },
   { href: '/working-hours', label: 'Working Hours', desc: 'Weekly availability, appointment defaults, lunch break, holidays', icon: Clock },
   { href: '/analytics', label: 'Analytics', desc: 'Occupancy, revenue and optimization impact', icon: BarChart3 },
   { href: '/templates', label: 'Templates', desc: 'Reusable reminders and messages', icon: FileText },

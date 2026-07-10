@@ -5,25 +5,30 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX, Wallet } from 'lucide-react'
+import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX, Wallet, ClipboardList, Plus } from 'lucide-react'
 import { getPatient, setPatientFlag, softDeletePatient } from '@/lib/api/patients'
 import { listUpcomingByPatient, fmtTime } from '@/lib/api/appointments'
+import { getPatientPlans } from '@/lib/api/treatment-plans'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PatientFormDialog } from './patient-form-dialog'
+import { TreatmentPlanDialog } from './treatment-plan-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Progress } from '@/components/ui/progress'
 
 export function PatientProfile({ id }: { id: string }) {
   const { business } = useWorkspace()
   const qc = useQueryClient()
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
+  const [planOpen, setPlanOpen] = useState(false)
 
   const { data: p, isLoading } = useQuery({ queryKey: ['patient', id], queryFn: () => getPatient(id) })
   const { data: upcoming = [] } = useQuery({ queryKey: ['patient-upcoming', id], queryFn: () => listUpcomingByPatient(id) })
+  const { data: plans = [] } = useQuery({ queryKey: ['patient-plans', id], queryFn: () => getPatientPlans(id) })
 
   const flagMut = useMutation({
     mutationFn: (patch: any) => setPatientFlag(id, patch),
@@ -88,7 +93,42 @@ export function PatientProfile({ id }: { id: string }) {
         </Card>
       </div>
 
+      <Card className="mt-6 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-primary" /> Piani di trattamento</CardTitle>
+          {business?.id && <Button size="sm" variant="outline" onClick={() => setPlanOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Nuovo piano</Button>}
+        </CardHeader>
+        <CardContent>
+          {plans.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nessun piano attivo. Crea un piano per generare sedute collegate.</p>
+          ) : (
+            <div className="space-y-4">
+              {plans.map((plan) => {
+                const pct = plan.total ? Math.round((plan.completed / plan.total) * 100) : 0
+                return (
+                  <div key={plan.id} className="rounded-lg border border-border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">{plan.treatmentType}</p>
+                        <p className="text-xs text-muted-foreground">{[plan.serviceName, plan.therapist].filter(Boolean).join('  ·  ') || '—'}</p>
+                      </div>
+                      <Badge variant="secondary">{plan.completed}/{plan.total} completate</Badge>
+                    </div>
+                    <Progress value={pct} className="mt-2.5" />
+                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{plan.remaining} rimanenti</span>
+                      {plan.nextDate && <span>Prossima: {plan.nextDate}</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {business?.id && <PatientFormDialog businessId={business.id} patient={p} open={editOpen} onOpenChange={setEditOpen} />}
+      {business?.id && <TreatmentPlanDialog businessId={business.id} patientId={id} open={planOpen} onOpenChange={setPlanOpen} />}
     </div>
   )
 }

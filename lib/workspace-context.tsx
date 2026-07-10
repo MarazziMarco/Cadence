@@ -28,11 +28,21 @@ export function useBusinessId() {
   return useContext(Ctx).business?.id ?? null
 }
 
-export function formatMoney(amount: number | null | undefined, currency = 'EUR') {
+// Currency -> locale so amounts format naturally (separators, symbol position).
+// Kept inline (not imported) to avoid a client/type import cycle; mirrors
+// CURRENCY_LOCALE in lib/types/db.ts.
+const CURRENCY_LOCALE: Record<string, string> = {
+  EUR: 'it-IT', USD: 'en-US', GBP: 'en-GB', CHF: 'de-CH',
+  CAD: 'en-CA', AUD: 'en-AU', SEK: 'sv-SE', JPY: 'ja-JP',
+}
+
+export function formatMoney(amount: number | null | undefined, currency?: string | null) {
   const v = amount ?? 0
+  const cur = currency || 'EUR'
+  const locale = CURRENCY_LOCALE[cur] || 'en-US'
   try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(v)
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: cur }).format(v)
   } catch {
-    return `${v} ${currency}`
+    return `${v} ${cur}`
   }
 }

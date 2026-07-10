@@ -9,6 +9,7 @@ import { listPatientsForSelect } from '@/lib/api/appointments'
 import { useWorkspace } from '@/lib/workspace-context'
 import { WEEKDAY_LABELS } from '@/lib/types/db'
 import { PageHeader } from '@/components/common/page-header'
+import { VoiceAppointment } from './voice-appointment'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
@@ -121,6 +122,8 @@ export function AiAssistantClient() {
           )}
         </div>
       </div>
+
+      <VoiceAppointment />
     </div>
   )
 }

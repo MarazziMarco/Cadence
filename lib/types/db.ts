@@ -44,6 +44,25 @@ export const LANGUAGES = [
   { value: 'de', label: 'Deutsch' },
 ] as const
 
+// Supported currencies. `locale` drives Intl number formatting so amounts read
+// natural for that currency (grouping, decimal separator, symbol position).
+export const CURRENCIES = [
+  { value: 'EUR', label: 'Euro (€)', locale: 'it-IT' },
+  { value: 'USD', label: 'US Dollar ($)', locale: 'en-US' },
+  { value: 'GBP', label: 'British Pound (£)', locale: 'en-GB' },
+  { value: 'CHF', label: 'Swiss Franc (CHF)', locale: 'de-CH' },
+  { value: 'CAD', label: 'Canadian Dollar (C$)', locale: 'en-CA' },
+  { value: 'AUD', label: 'Australian Dollar (A$)', locale: 'en-AU' },
+  { value: 'SEK', label: 'Swedish Krona (kr)', locale: 'sv-SE' },
+  { value: 'JPY', label: 'Japanese Yen (¥)', locale: 'ja-JP' },
+] as const
+
+export type CurrencyCode = (typeof CURRENCIES)[number]['value']
+
+export const CURRENCY_LOCALE: Record<string, string> = Object.fromEntries(
+  CURRENCIES.map((c) => [c.value, c.locale]),
+)
+
 export const TIMEZONES = [
   'Europe/Rome', 'Europe/London', 'Europe/Madrid', 'Europe/Paris', 'Europe/Berlin',
   'UTC', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Asia/Dubai', 'Asia/Kolkata',
