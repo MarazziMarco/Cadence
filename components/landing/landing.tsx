@@ -2,11 +2,28 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { ArrowRight, CalendarDays, Wand2, Bot, ShieldCheck, Sparkles, BarChart3, PlayCircle } from 'lucide-react'
+import { ArrowRight, CalendarDays, Wand2, Bot, ShieldCheck, Sparkles, BarChart3, PlayCircle, Mic, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/app-shell/theme-toggle'
+import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/brand'
+
+// The three headline value props.
+const VALUE = [
+  { icon: Wand2, title: 'Time & money, your way', desc: 'Optimize within your own rules — working hours, priorities, how tightly to pack the day. Cadence turns wasted gaps into billable time.' },
+  { icon: Mic, title: 'Natural language & voice', desc: 'Register clients and appointments just by speaking. No forms, no typing — dictate when clients are free and Cadence writes it down.' },
+  { icon: MessageSquare, title: 'Clients kept in the loop', desc: 'Every schedule change comes with a ready-to-send message, so no client is ever left guessing about their new time.' },
+]
+
+// Visual walkthrough — real product screenshots.
+const STEPS = [
+  { img: '/landing/voice.png', title: 'Book by voice', desc: 'Add clients and appointments just by talking. Say “Marco on Tuesday at 3pm” and Cadence fills in the rest — perfect for capturing when clients are available.' },
+  { img: '/landing/calendar-before.png', title: 'A week full of gaps', desc: "This is how most weeks look: appointments scattered with dead time in between — hours you're paying for but not using." },
+  { img: '/landing/optimizer.png', title: 'Smart suggestions, your call', desc: 'One click and Cadence proposes exactly which appointments to pull earlier to close the gaps. Keep or skip each move — nothing changes until you say so.' },
+  { img: '/landing/calendar-after.png', title: 'A tight, optimized week', desc: 'Same appointments, hundreds of minutes of idle time recovered — automatically, and always within the rules you set.' },
+  { img: '/landing/messages.png', title: 'Messages ready to send', desc: 'For every appointment that moved, Cadence writes a friendly message you can copy and send to the client in one tap.' },
+]
 
 const features = [
   { icon: Wand2, title: 'Auto-optimized schedule', desc: 'One click builds the best possible day — respecting every rule you set.' },
@@ -57,7 +74,51 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="container pb-28">
+      {/* Value + product walkthrough */}
+      <section className="border-y border-border bg-muted/20">
+        <div className="container py-20 sm:py-28">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Speak. Optimize. Done.</h2>
+            <p className="mt-4 text-balance text-lg text-muted-foreground">
+              Cadence turns the dead gaps in your week into time and money — the way you want it. Talk to it in
+              plain language, hit optimize, and your whole schedule rearranges itself the best possible way.
+            </p>
+          </div>
+
+          <div className="mt-14 grid gap-6 md:grid-cols-3">
+            {VALUE.map((v, i) => (
+              <motion.div key={v.title} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.06 }}
+                className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><v.icon className="h-5 w-5" /></div>
+                <h3 className="text-base font-semibold">{v.title}</h3>
+                <p className="mt-1.5 text-sm text-muted-foreground">{v.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="mt-20 space-y-16 lg:space-y-24">
+            {STEPS.map((s, i) => (
+              <motion.div key={s.title} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }}
+                className="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
+                <div className={cn(i % 2 === 1 && 'lg:order-2')}>
+                  <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">{i + 1}</div>
+                  <h3 className="text-2xl font-bold tracking-tight">{s.title}</h3>
+                  <p className="mt-3 text-muted-foreground">{s.desc}</p>
+                </div>
+                <div className={cn(i % 2 === 1 && 'lg:order-1')}>
+                  <img src={s.img} alt={s.title} className="w-full rounded-xl border border-border object-contain shadow-lg" loading="lazy" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="mt-16 flex justify-center">
+            <Link href="/demo"><Button size="lg" className="h-12 gap-2 px-7 text-base"><PlayCircle className="h-4 w-4" /> Try it yourself — no account needed</Button></Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="container pb-28 pt-28">
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f, i) => (
             <motion.div key={f.title} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.05 }}
