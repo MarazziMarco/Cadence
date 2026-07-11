@@ -197,7 +197,7 @@ export function DemoCalendar() {
               })}
             </div>
 
-            <div className="flex max-h-[calc(100vh-20rem)] overflow-y-auto">
+            <div className="flex sm:max-h-[calc(100vh-20rem)] sm:overflow-y-auto">
               <div className="w-14 shrink-0">
                 {hours.map((h) => <div key={h} className="relative" style={{ height: HOUR_H }}><span className="absolute -top-2 right-2 text-[10px] text-muted-foreground">{String(h).padStart(2, '0')}:00</span></div>)}
               </div>
