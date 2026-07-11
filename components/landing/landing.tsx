@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/app-shell/theme-toggle'
 import { cn } from '@/lib/utils'
-import { BRAND } from '@/lib/brand'
 
 // The three headline value props.
 const VALUE = [
@@ -64,7 +63,7 @@ export function Landing() {
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.12 }}
             className="mt-6 max-w-2xl text-balance text-lg text-muted-foreground">
-            {BRAND.description}
+            Small clinics and solo professionals lose entire evenings — even their Sundays — hand-arranging next week&apos;s appointments. Cadence does it for you in one click.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.18 }}
             className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
@@ -78,10 +77,11 @@ export function Landing() {
       <section className="border-y border-border bg-muted/20">
         <div className="container py-20 sm:py-28">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Speak. Optimize. Done.</h2>
+            <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Stop rebuilding your week by hand</h2>
             <p className="mt-4 text-balance text-lg text-muted-foreground">
-              Cadence turns the dead gaps in your week into time and money — the way you want it. Talk to it in
-              plain language, hit optimize, and your whole schedule rearranges itself the best possible way.
+              Physiotherapists, osteopaths, salons, trainers, freelancers — millions of small businesses and
+              self-employed pros burn nights and weekends shuffling appointments to close the gaps. It&apos;s a
+              real, exhausting weekly puzzle. Cadence solves it: talk to it, optimize, done.
             </p>
           </div>
 
