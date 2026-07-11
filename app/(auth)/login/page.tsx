@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LogoLoader } from '@/components/brand/logo-loader'
 
 function LoginForm() {
   const router = useRouter()
@@ -17,21 +18,26 @@ function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    setLoading(false)
     if (error) {
+      setLoading(false)
       toast.error(error.message)
       return
     }
-    toast.success('Welcome back!')
+    // Keep a branded full-screen loader up while the workspace loads (entering
+    // the app can take a moment) so it's clear the login is going through.
+    setRedirecting(true)
     const redirect = params.get('redirect') || '/dashboard'
     router.push(redirect)
     router.refresh()
   }
+
+  if (redirecting) return <LogoLoader label="Signing you in…" />
 
   return (
     <div>
