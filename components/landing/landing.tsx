@@ -59,11 +59,11 @@ export function Landing() {
           </motion.div>
           <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.05 }}
             className="max-w-4xl text-balance text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl">
-            The smartest way to run your schedule
+            Stop losing your Sunday to next week&apos;s schedule
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.12 }}
-            className="mt-6 max-w-2xl text-balance text-lg text-muted-foreground">
-            Small clinics and solo professionals lose entire evenings — even their Sundays — hand-arranging next week&apos;s appointments. Cadence does it for you in one click.
+            className="mt-6 max-w-3xl text-balance text-xl font-medium text-foreground sm:text-2xl">
+            Small clinics and solo pros burn nights and weekends arranging appointments by hand. Cadence rebuilds your entire week — the best way possible — in one click.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.18 }}
             className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
