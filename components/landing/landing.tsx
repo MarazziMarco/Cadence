@@ -17,10 +17,10 @@ const VALUE = [
 ]
 
 // Visual walkthrough — real product screenshots.
-const STEPS = [
+const STEPS: { img: string; title: string; desc: string; imgMax?: string }[] = [
   { img: '/landing/voice.png', title: 'Book by voice', desc: 'Add clients and appointments just by talking. Say “Marco on Tuesday at 3pm” and Cadence fills in the rest — perfect for capturing when clients are available.' },
   { img: '/landing/calendar-before.png', title: 'A week full of gaps', desc: "This is how most weeks look: appointments scattered with dead time in between — hours you're paying for but not using." },
-  { img: '/landing/optimizer.png', title: 'Smart suggestions, your call', desc: 'One click and Cadence proposes exactly which appointments to pull earlier to close the gaps. Keep or skip each move — nothing changes until you say so.' },
+  { img: '/landing/optimizer.png', title: 'Smart suggestions, your call', desc: 'One click and Cadence proposes exactly which appointments to pull earlier to close the gaps. Keep or skip each move — nothing changes until you say so.', imgMax: 'max-w-[300px]' },
   { img: '/landing/calendar-after.png', title: 'A tight, optimized week', desc: 'Same appointments, hundreds of minutes of idle time recovered — automatically, and always within the rules you set.' },
   { img: '/landing/messages.png', title: 'Messages ready to send', desc: 'For every appointment that moved, Cadence writes a friendly message you can copy and send to the client in one tap.' },
 ]
