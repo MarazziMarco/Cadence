@@ -117,6 +117,10 @@ export function CalendarClient() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Mobile: horizontal scroll with wide day columns so cards stay
+            readable. Desktop (sm+): min-w collapses, columns fit side-by-side. */}
+        <div className="overflow-x-auto">
+        <div className="min-w-[880px] sm:min-w-0">
         <div className="flex border-b border-border bg-muted/30">
           <div className="w-14 shrink-0" />
           {days.map((d) => {
@@ -148,23 +152,25 @@ export function CalendarClient() {
                 {hours.map((h) => <div key={h} className="border-b border-border/60" style={{ height: HOUR_H }} />)}
                 {(byDay[dateStr] || []).map((a) => {
                   const top = (timeToMin(a.start_time) - START_HOUR * 60) / 60 * HOUR_H
-                  const height = Math.max(18, a.duration_minutes / 60 * HOUR_H - 2)
+                  const height = Math.max(40, a.duration_minutes / 60 * HOUR_H - 2)
                   const color = a.color || a.services?.color || a.patients?.color || '#4f46e5'
                   const name = a.patients?.full_name || a.patients?.first_name || 'Client'
                   return (
                     <div key={a.id} draggable
                       onDragStart={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); e.dataTransfer.setData('text/appt', a.id); e.dataTransfer.setData('text/grab', String(e.clientY - r.top)) }}
                       onClick={(e) => { e.stopPropagation(); openEdit(a) }}
-                      className="absolute left-1 right-1 cursor-grab overflow-hidden rounded-md border-l-2 px-2 py-1 text-left shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
+                      className="absolute left-1 right-1 cursor-grab overflow-hidden rounded-md border-l-2 px-2 py-1.5 text-left shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
                       style={{ top, height, backgroundColor: color + '1f', borderColor: color }}>
-                      <p className="truncate text-xs font-semibold" style={{ color }}>{name}</p>
-                      <p className="truncate text-[10px] text-muted-foreground">{fmtTime(a.start_time)} · {a.title || a.services?.name || `${a.duration_minutes}m`}</p>
+                      <p className="truncate text-[13px] font-semibold leading-tight sm:text-xs" style={{ color }}>{name}</p>
+                      <p className="truncate text-[11px] leading-tight text-muted-foreground">{fmtTime(a.start_time)} · {a.title || a.services?.name || `${a.duration_minutes}m`}</p>
                     </div>
                   )
                 })}
               </div>
             )
           })}
+        </div>
+        </div>
         </div>
       </div>
 

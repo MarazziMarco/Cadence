@@ -6,19 +6,28 @@
 // "optimization", no Supabase, no Edge Function.
 
 import { useMemo, useState } from 'react'
-import { Wand2, RotateCcw, Clock, ArrowRight, Sparkles, ArrowRightLeft, Check } from 'lucide-react'
+import { toast } from 'sonner'
+import { Wand2, RotateCcw, Clock, ArrowRight, Sparkles, ArrowRightLeft, Check, Mic, MicOff, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { generateDemoWeek, demoWeekDays, DOW_LABELS, type DemoAppointment } from '@/lib/demo/fixtures'
 import { compactWeek, type DemoChange } from '@/lib/demo/compact'
+import { parseAppointment } from '@/lib/voice/parse-appointment'
+import { useSpeech } from '@/lib/voice/use-speech'
+import { DemoMovedMessages } from './demo-moved-messages'
 
 const START_HOUR = 8, END_HOUR = 19, HOUR_H = 56
 const LUNCH_START = 13 * 60, LUNCH_END = 14 * 60
+const DEMO_PALETTE = ['#4f46e5', '#db2777', '#059669', '#d97706', '#0891b2', '#7c3aed']
 
 function ymd(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 function fmt(min: number) { const h = Math.floor(min / 60), m = min % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` }
+function toMin(t: string) { const [h, m] = t.split(':').map(Number); return h * 60 + m }
 
 export function DemoCalendar() {
   const days = useMemo(() => demoWeekDays(), [])
@@ -26,6 +35,12 @@ export function DemoCalendar() {
   const [preview, setPreview] = useState<{ changes: DemoChange[]; minutesRecovered: number } | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [totalRecovered, setTotalRecovered] = useState(0)
+  const [msgChanges, setMsgChanges] = useState<DemoChange[] | null>(null)
+
+  // Voice add (Web Speech API + local parser, all in memory).
+  const { supported: micSupported, listening, start: startRec, stop: stopRec } = useSpeech('it-IT')
+  const [transcript, setTranscript] = useState('')
+  const [draft, setDraft] = useState<{ name: string; dateOffset: number; time: string; duration: number } | null>(null)
 
   const byDay = useMemo(() => {
     const map: Record<string, DemoAppointment[]> = {}
@@ -44,6 +59,8 @@ export function DemoCalendar() {
     setAppts(compacted)
     setTotalRecovered((t) => t + minutesRecovered)
     setPreviewOpen(false)
+    // Auto-open the "prepare messages" panel for the patients that moved.
+    setMsgChanges(preview?.changes ?? [])
   }
 
   function handleReset() {
@@ -51,6 +68,51 @@ export function DemoCalendar() {
     setTotalRecovered(0)
     setPreview(null)
     setPreviewOpen(false)
+    setMsgChanges(null)
+    setDraft(null)
+    setTranscript('')
+  }
+
+  // Parse a dictated/typed phrase into a draft appointment. Patients are derived
+  // from the current in-memory names so dictating an existing client matches.
+  function applyVoice(text: string) {
+    const seen = new Set<string>()
+    const patients = appts
+      .map((a) => a.patientName)
+      .filter((n) => (seen.has(n) ? false : (seen.add(n), true)))
+      .map((n) => ({ id: n, first_name: n.split(' ')[0], last_name: n.split(' ').slice(1).join(' ') || null, full_name: n }))
+    const r = parseAppointment(text, patients, [])
+    let dateOffset = 0
+    if (r.date) { const idx = days.findIndex((d) => ymd(d) === r.date); if (idx >= 0) dateOffset = Math.min(idx, 4) }
+    setDraft({ name: r.patientName || '', dateOffset, time: r.time || '09:00', duration: r.durationMinutes || 30 })
+  }
+
+  function toggleMic() {
+    if (listening) { stopRec(); return }
+    setTranscript('')
+    startRec(
+      (text) => { setTranscript(text); applyVoice(text) },
+      () => toast.error('Microfono non disponibile (richiede HTTPS). Scrivi la frase qui sotto.'),
+    )
+  }
+
+  function addDraft() {
+    if (!draft) return
+    if (!draft.name.trim()) { toast.error('Inserisci un nome cliente'); return }
+    const date = ymd(days[draft.dateOffset])
+    const appt: DemoAppointment = {
+      id: `voice-${Date.now()}`,
+      patientName: draft.name.trim(),
+      color: DEMO_PALETTE[appts.length % DEMO_PALETTE.length],
+      date,
+      weekdayOffset: draft.dateOffset,
+      startMin: toMin(draft.time),
+      duration: draft.duration || 30,
+    }
+    setAppts((prev) => [...prev, appt])
+    setDraft(null)
+    setTranscript('')
+    toast.success('Appuntamento aggiunto al calendario demo')
   }
 
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
@@ -73,6 +135,44 @@ export function DemoCalendar() {
           <Button onClick={handleOptimize}><Wand2 className="mr-2 h-4 w-4" /> Ottimizza</Button>
         </div>
       </div>
+
+      {/* Voice add — free, in-memory (Web Speech API + local parser). Text input
+          is always available as fallback (mic needs HTTPS). */}
+      <div className="mb-4 rounded-xl border border-border bg-card p-4">
+        <div className="mb-1 flex items-center gap-2 text-sm font-medium"><Mic className="h-4 w-4 text-primary" /> Aggiungi un appuntamento a voce</div>
+        <p className="mb-3 text-sm text-muted-foreground">Detta ad es. “Marco martedì alle 15”. Tutto resta in memoria — niente salvataggio.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          {micSupported ? (
+            <Button variant={listening ? 'destructive' : 'default'} onClick={toggleMic}>
+              {listening ? <><MicOff className="mr-2 h-4 w-4" /> Stop</> : <><Mic className="mr-2 h-4 w-4" /> Detta</>}
+            </Button>
+          ) : (
+            <Badge variant="secondary">Microfono non disponibile — usa il testo</Badge>
+          )}
+          {listening && <span className="flex items-center gap-1.5 text-sm text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-destructive" /> In ascolto…</span>}
+        </div>
+        <div className="mt-3 flex gap-2">
+          <Input value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Es. Giulia venerdì alle 10" />
+          <Button variant="outline" onClick={() => applyVoice(transcript)} disabled={!transcript.trim()}><Sparkles className="h-4 w-4" /></Button>
+        </div>
+        {draft && (
+          <div className="mt-3 grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-4">
+            <div className="space-y-1.5"><Label>Cliente</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Nome" /></div>
+            <div className="space-y-1.5">
+              <Label>Giorno</Label>
+              <Select value={String(draft.dateOffset)} onValueChange={(v) => setDraft({ ...draft, dateOffset: Number(v) })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{days.slice(0, 5).map((d, i) => <SelectItem key={i} value={String(i)}>{DOW_LABELS[i]} {d.getDate()}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5"><Label>Ora</Label><Input type="time" value={draft.time} onChange={(e) => setDraft({ ...draft, time: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Durata (min)</Label><Input type="number" value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: parseInt(e.target.value) || 30 })} /></div>
+            <div className="flex justify-end sm:col-span-4"><Button onClick={addDraft}><Plus className="mr-2 h-4 w-4" /> Aggiungi al calendario</Button></div>
+          </div>
+        )}
+      </div>
+
+      {msgChanges && <DemoMovedMessages changes={msgChanges} onClose={() => setMsgChanges(null)} />}
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex border-b border-border bg-muted/30">
