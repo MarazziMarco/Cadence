@@ -23,7 +23,7 @@ export function Landing() {
         <div className="container flex h-16 items-center justify-between">
           <Logo />
           <div className="flex items-center gap-3">
-            <Link href="/demo"><Button variant="ghost" className="gap-1.5"><PlayCircle className="h-4 w-4" /> Try the demo</Button></Link>
+            <Link href="/demo" className="hidden sm:inline-flex"><Button variant="ghost" className="gap-1.5"><PlayCircle className="h-4 w-4" /> Try the demo</Button></Link>
             <Link href="/login"><Button variant="ghost">Log in</Button></Link>
             <Link href="/signup"><Button>Get started</Button></Link>
           </div>
