@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { LayoutDashboard, CalendarDays, Users, Settings, Plus, CalendarPlus, UserPlus, Sparkles } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, Users, Wand2, Plus, CalendarPlus, UserPlus, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
@@ -13,7 +13,7 @@ const LEFT = [
 ]
 const RIGHT = [
   { href: '/patients', label: 'Clients', icon: Users },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/scheduler', label: 'Scheduler', icon: Wand2 },
 ]
 const CREATE = [
   { href: '/calendar?new=1', label: 'Nuovo appuntamento', icon: CalendarPlus },
