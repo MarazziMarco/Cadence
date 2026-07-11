@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { CalendarDays, Wand2, Bot, TrendingUp, Clock, Users, DollarSign, Activity, ArrowRight, Plus, Loader2 } from 'lucide-react'
-import { getDashboard } from '@/lib/api/dashboard'
+import { CalendarDays, Wand2, Bot, TrendingUp, Clock, Users, DollarSign, Activity, ArrowRight, Plus, Loader2, Check } from 'lucide-react'
+import { getDashboard, getScheduleHealth } from '@/lib/api/dashboard'
 import { fmtTime } from '@/lib/api/appointments'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
@@ -15,6 +15,11 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { EmptyState } from '@/components/common/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
+
+function fmtIdle(m: number): string {
+  const h = Math.floor(m / 60), mm = m % 60
+  return h ? `${h}h ${mm}m` : `${mm} min`
+}
 
 function ApptRow({ a }: { a: any }) {
   const name = a.patients?.full_name || a.patients?.first_name || 'Client'
@@ -35,6 +40,7 @@ export function DashboardClient({ name }: { name?: string }) {
   const router = useRouter()
   const [optimizing, setOptimizing] = useState(false)
   const { data, isLoading } = useQuery({ queryKey: ['dashboard', businessId], queryFn: () => getDashboard(businessId), enabled: !!businessId })
+  const { data: health } = useQuery({ queryKey: ['schedule-health', businessId], queryFn: () => getScheduleHealth(businessId), enabled: !!businessId })
 
   function goOptimize() {
     setOptimizing(true)
@@ -66,6 +72,32 @@ export function DashboardClient({ name }: { name?: string }) {
           </motion.div>
         ))}
       </div>
+
+      {/* Schedule health — recoverable dead time (same notion as the optimizer). */}
+      {health && (health.idleToday > 0 || health.idleWeek > 0) ? (
+        <Card className="mt-6 border-primary/30 bg-accent/30 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock className="h-5 w-5" /></div>
+              <div>
+                <p className="text-lg font-bold tracking-tight">{fmtIdle(health.idleToday)} of dead time today</p>
+                <p className="text-sm text-muted-foreground">{fmtIdle(health.idleWeek)} recoverable this week — gaps between appointments the optimizer can close.</p>
+              </div>
+            </div>
+            <Button onClick={goOptimize} disabled={optimizing} className="shrink-0">{optimizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Optimize now</Button>
+          </CardContent>
+        </Card>
+      ) : health ? (
+        <Card className="mt-6 border-success/30 bg-success/5 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success/15 text-success"><Check className="h-5 w-5" /></div>
+            <div>
+              <p className="text-lg font-bold tracking-tight">Schedule looks tight</p>
+              <p className="text-sm text-muted-foreground">No recoverable dead time in this week&apos;s agenda.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2 shadow-sm transition-shadow duration-200 hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500">

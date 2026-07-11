@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PROTECTED_PREFIXES = [
   '/dashboard', '/calendar', '/patients', '/services', '/working-hours',
   '/waiting-list', '/scheduler', '/analytics', '/templates', '/settings',
-  '/ai-assistant', '/lab', '/onboarding',
+  '/ai-assistant', '/lab', '/onboarding', '/history',
 ]
 
 const AUTH_PREFIXES = ['/login', '/signup', '/forgot-password']
