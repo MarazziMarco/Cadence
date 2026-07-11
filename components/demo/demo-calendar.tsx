@@ -21,7 +21,7 @@ import { parseAppointment } from '@/lib/voice/parse-appointment'
 import { useSpeech } from '@/lib/voice/use-speech'
 import { DemoMovedMessages } from './demo-moved-messages'
 
-const START_HOUR = 8, END_HOUR = 19, HOUR_H = 56
+const START_HOUR = 8, END_HOUR = 19, HOUR_H = 80
 const LUNCH_START = 13 * 60, LUNCH_END = 14 * 60
 const DEMO_PALETTE = ['#4f46e5', '#db2777', '#059669', '#d97706', '#0891b2', '#7c3aed']
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -73,11 +73,14 @@ export function DemoCalendar() {
   function handleAccept() {
     const { compacted, minutesRecovered } = compactWeek(scopeAppts())
     const moved = new Map(compacted.map((a) => [a.id, a]))
+    const changes = preview?.changes ?? []
+    setMsgChanges(null)
+    setPreviewOpen(false)
+    // Apply first so the cards slide (CSS transition), then reveal the messages
+    // panel a beat later so the move animation isn't immediately covered.
     setAppts((prev) => prev.map((a) => moved.get(a.id) ?? a))
     setTotalRecovered((t) => t + minutesRecovered)
-    setPreviewOpen(false)
-    // Auto-open the "prepare messages" panel for the patients that moved.
-    setMsgChanges(preview?.changes ?? [])
+    window.setTimeout(() => setMsgChanges(changes), 900)
   }
 
   function handleReset() {
@@ -152,7 +155,6 @@ export function DemoCalendar() {
             <span className="text-muted-foreground">min of idle time recovered</span>
           </div>
           <Button variant="outline" onClick={handleReset}><RotateCcw className="mr-2 h-4 w-4" /> Reset demo</Button>
-          <Button onClick={handleOptimize}><Wand2 className="mr-2 h-4 w-4" /> {view === 'day' ? 'Optimize day' : 'Optimize'}</Button>
         </div>
       </div>
 
@@ -167,50 +169,15 @@ export function DemoCalendar() {
             </>
           )}
         </div>
-        <div className="inline-flex rounded-lg border border-border p-0.5">
-          {(['day', 'week'] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Voice add — free, in-memory (Web Speech API + local parser). Text input
-          is always available as fallback (mic needs HTTPS). */}
-      <div className="mb-4 rounded-xl border border-border bg-card p-4">
-        <div className="mb-1 flex items-center gap-2 text-sm font-medium"><Mic className="h-4 w-4 text-primary" /> Add an appointment by voice</div>
-        <p className="mb-3 text-sm text-muted-foreground">Dictate e.g. “Marco on Tuesday at 3pm”. Everything stays in memory — nothing is saved.</p>
-        <div className="flex flex-wrap items-center gap-3">
-          {micSupported ? (
-            <Button variant={listening ? 'destructive' : 'default'} onClick={toggleMic}>
-              {listening ? <><MicOff className="mr-2 h-4 w-4" /> Stop</> : <><Mic className="mr-2 h-4 w-4" /> Dictate</>}
-            </Button>
-          ) : (
-            <Badge variant="secondary">Microphone unavailable — use text</Badge>
-          )}
-          {listening && <span className="flex items-center gap-1.5 text-sm text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-destructive" /> Listening…</span>}
-        </div>
-        <div className="mt-3 flex gap-2">
-          <Input value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="e.g. Giulia on Friday at 10" />
-          <Button variant="outline" onClick={() => applyVoice(transcript)} disabled={!transcript.trim()}><Sparkles className="h-4 w-4" /></Button>
-        </div>
-        {draft && (
-          <div className="mt-3 grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-4">
-            <div className="space-y-1.5"><Label>Client</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Name" /></div>
-            <div className="space-y-1.5">
-              <Label>Day</Label>
-              <Select value={String(draft.dateOffset)} onValueChange={(v) => setDraft({ ...draft, dateOffset: Number(v) })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{days.slice(0, 5).map((d, i) => <SelectItem key={i} value={String(i)}>{DOW[i]} {d.getDate()}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5"><Label>Time</Label><Input type="time" value={draft.time} onChange={(e) => setDraft({ ...draft, time: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>Duration (min)</Label><Input type="number" value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: parseInt(e.target.value) || 30 })} /></div>
-            <div className="flex justify-end sm:col-span-4"><Button onClick={addDraft}><Plus className="mr-2 h-4 w-4" /> Add to calendar</Button></div>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-lg border border-border p-0.5">
+            {(['day', 'week'] as const).map((v) => (
+              <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
+            ))}
           </div>
-        )}
+          <Button onClick={handleOptimize}><Wand2 className="mr-2 h-4 w-4" /> {view === 'day' ? 'Optimize day' : 'Optimize'}</Button>
+        </div>
       </div>
-
-      {msgChanges && <DemoMovedMessages changes={msgChanges} onClose={() => setMsgChanges(null)} />}
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className={view === 'week' ? 'overflow-x-auto' : ''}>
@@ -247,7 +214,7 @@ export function DemoCalendar() {
                     )}
                     {(byDay[dateStr] || []).map((a) => {
                       const top = (a.startMin - START_HOUR * 60) / 60 * HOUR_H
-                      const height = Math.max(40, a.duration / 60 * HOUR_H - 2)
+                      const height = Math.max(34, a.duration / 60 * HOUR_H - 3)
                       return (
                         <div key={a.id}
                           className="absolute left-1 right-1 overflow-hidden rounded-md border-l-2 px-2 py-1.5 text-left shadow-sm transition-all duration-500 ease-out"
@@ -263,6 +230,46 @@ export function DemoCalendar() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Moved-messages panel appears below the calendar (and slightly delayed)
+          so it doesn't cover the appointment move animation. */}
+      {msgChanges && <DemoMovedMessages changes={msgChanges} onClose={() => setMsgChanges(null)} />}
+
+      {/* Voice add — moved below the calendar. Free, in-memory (Web Speech API +
+          local parser). Text input is always available as a fallback (HTTPS). */}
+      <div className="mt-4 rounded-xl border border-border bg-card p-4">
+        <div className="mb-1 flex items-center gap-2 text-sm font-medium"><Mic className="h-4 w-4 text-primary" /> Add an appointment by voice</div>
+        <p className="mb-3 text-sm text-muted-foreground">Dictate e.g. “Marco on Tuesday at 3pm”. Everything stays in memory — nothing is saved.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          {micSupported ? (
+            <Button variant={listening ? 'destructive' : 'default'} onClick={toggleMic}>
+              {listening ? <><MicOff className="mr-2 h-4 w-4" /> Stop</> : <><Mic className="mr-2 h-4 w-4" /> Dictate</>}
+            </Button>
+          ) : (
+            <Badge variant="secondary">Microphone unavailable — use text</Badge>
+          )}
+          {listening && <span className="flex items-center gap-1.5 text-sm text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-destructive" /> Listening…</span>}
+        </div>
+        <div className="mt-3 flex gap-2">
+          <Input value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="e.g. Giulia on Friday at 10" />
+          <Button variant="outline" onClick={() => applyVoice(transcript)} disabled={!transcript.trim()}><Sparkles className="h-4 w-4" /></Button>
+        </div>
+        {draft && (
+          <div className="mt-3 grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-4">
+            <div className="space-y-1.5"><Label>Client</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Name" /></div>
+            <div className="space-y-1.5">
+              <Label>Day</Label>
+              <Select value={String(draft.dateOffset)} onValueChange={(v) => setDraft({ ...draft, dateOffset: Number(v) })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{days.slice(0, 5).map((d, i) => <SelectItem key={i} value={String(i)}>{DOW[i]} {d.getDate()}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5"><Label>Time</Label><Input type="time" value={draft.time} onChange={(e) => setDraft({ ...draft, time: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Duration (min)</Label><Input type="number" value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: parseInt(e.target.value) || 30 })} /></div>
+            <div className="flex justify-end sm:col-span-4"><Button onClick={addDraft}><Plus className="mr-2 h-4 w-4" /> Add to calendar</Button></div>
+          </div>
+        )}
       </div>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

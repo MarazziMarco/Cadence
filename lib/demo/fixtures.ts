@@ -38,10 +38,11 @@ const FIXTURES: Record<number, FixtureItem[]> = {
     { id: 'demo-mon-2', patientName: 'Giulia Bianchi', color: PALETTE[1], startMin: 11 * 60 + 30, duration: 30 },
   ],
   1: [
-    // Martedì — giornata già quasi compatta, poco da ottimizzare.
+    // Martedì — buco in mattinata + un pomeriggio da anticipare.
     { id: 'demo-tue-1', patientName: 'Luca Verdi', color: PALETTE[2], startMin: 9 * 60, duration: 45 },
-    { id: 'demo-tue-2', patientName: 'Sara Neri', color: PALETTE[3], startMin: 9 * 60 + 45, duration: 30 },
+    { id: 'demo-tue-2', patientName: 'Sara Neri', color: PALETTE[3], startMin: 11 * 60, duration: 30 },
     { id: 'demo-tue-3', patientName: 'Elena Conti', color: PALETTE[4], startMin: 14 * 60, duration: 30 },
+    { id: 'demo-tue-4', patientName: 'Marco Gatti', color: PALETTE[0], startMin: 16 * 60, duration: 30 },
   ],
   2: [
     // Mercoledì — 3 appuntamenti sparsi con vuoti evidenti tra loro.
@@ -57,8 +58,9 @@ const FIXTURES: Record<number, FixtureItem[]> = {
     { id: 'demo-thu-4', patientName: 'Simone Greco', color: PALETTE[1], startMin: 17 * 60, duration: 45 },
   ],
   4: [
-    // Venerdì — giornata leggera, un solo appuntamento.
+    // Venerdì — due appuntamenti in mattinata con un buco tra loro.
     { id: 'demo-fri-1', patientName: 'Valentina Serra', color: PALETTE[2], startMin: 9 * 60, duration: 45 },
+    { id: 'demo-fri-2', patientName: 'Roberto Marino', color: PALETTE[1], startMin: 11 * 60, duration: 30 },
   ],
 }
 
