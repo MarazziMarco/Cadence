@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { OPTIMIZATION_MODE } from '@/lib/types/db'
+import { VoiceAppointment } from '@/components/ai/voice-appointment'
 import { cn } from '@/lib/utils'
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '—')
@@ -190,6 +191,10 @@ export function SchedulerClient() {
           <p className="mt-1.5 max-w-md text-sm text-muted-foreground">Cadence runs the optimizer and shows a full preview. You accept or reject each proposed change individually — nothing is applied until you say so.</p>
         </div>
       )}
+
+      <div className="mt-8">
+        <VoiceAppointment />
+      </div>
     </div>
   )
 }

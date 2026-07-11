@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Loader2, Trash2, Mic, MicOff } from 'lucide-react'
 import { createAppointment, updateAppointment, deleteAppointment, listPatientsForSelect, minToTime, timeToMin, type CalendarAppointment } from '@/lib/api/appointments'
 import { createPatient } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
+import { parseAppointment } from '@/lib/voice/parse-appointment'
+import { useSpeech, speechLang } from '@/lib/voice/use-speech'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,6 +29,25 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
 
   const { data: patients = [] } = useQuery({ queryKey: ['patients-select', businessId], queryFn: () => listPatientsForSelect(businessId), enabled: !!businessId && open })
   const { data: services = [] } = useQuery({ queryKey: ['services', businessId], queryFn: () => listServices(businessId), enabled: !!businessId && open })
+
+  const it = business?.language === 'it'
+  const { supported: micSupported, listening, start: startRec, stop: stopRec } = useSpeech(speechLang(business?.language))
+
+  // Dictate instead of typing: transcribe, parse locally, prefill the fields.
+  function applyVoice(text: string) {
+    const r = parseAppointment(text, patients as any, services as any)
+    if (r.patientId) { setPatientId(r.patientId); setNewClient('') }
+    if (r.serviceId) setServiceId(r.serviceId)
+    if (r.date) setDate(r.date)
+    if (r.time) setStart(r.time)
+    if (r.durationMinutes) setDuration(String(r.durationMinutes))
+    if (!r.patientId && !r.date && !r.time) toast(it ? 'Non ho capito. Riprova.' : "Didn't catch that. Try again.")
+  }
+
+  function toggleMic() {
+    if (listening) { stopRec(); return }
+    startRec(applyVoice, () => toast.error(it ? 'Permesso microfono negato.' : 'Microphone permission denied.'))
+  }
 
   useEffect(() => {
     if (open) {
@@ -80,6 +101,16 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>{editing ? 'Edit appointment' : 'New appointment'}</DialogTitle></DialogHeader>
+        {!editing && micSupported && (
+          <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
+            <Button type="button" size="sm" variant={listening ? 'destructive' : 'outline'} onClick={toggleMic}>
+              {listening ? <><MicOff className="mr-1.5 h-3.5 w-3.5" /> {it ? 'Stop' : 'Stop'}</> : <><Mic className="mr-1.5 h-3.5 w-3.5" /> {it ? 'Detta' : 'Dictate'}</>}
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {listening ? (it ? 'In ascolto…' : 'Listening…') : (it ? 'Detta invece di scrivere (es. “Marco domani alle 15 fisioterapia”)' : 'Dictate instead of typing (e.g. “Marco tomorrow at 3pm physiotherapy”)')}
+            </span>
+          </div>
+        )}
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label>Client *</Label>

@@ -80,8 +80,9 @@ function resolveDate(text: string, today = new Date()): string | null {
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return ymd(new Date(year, month - 1, day))
   }
 
-  // "il 15" -> day of current month (or next month if already past)
-  const dom = t.match(/\bil\s+(\d{1,2})\b/)
+  // "il 15" (IT) or "the 20th" / "20th" (EN ordinal) -> day of current month
+  // (or next month if the day has already passed).
+  const dom = t.match(/\bil\s+(\d{1,2})\b/) || t.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/)
   if (dom) {
     const day = parseInt(dom[1])
     let d = new Date(today.getFullYear(), today.getMonth(), day)

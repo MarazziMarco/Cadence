@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const { data: business } = await supabase
     .from('business')
-    .select('id, business_name, default_appointment_duration, slot_interval_minutes, currency, timezone, lunch_break_enabled, lunch_start, lunch_end')
+    .select('id, business_name, default_appointment_duration, slot_interval_minutes, currency, language, timezone, lunch_break_enabled, lunch_start, lunch_end')
     .eq('profile_id', user.id)
     .is('deleted_at', null)
     .order('created_at', { ascending: true })

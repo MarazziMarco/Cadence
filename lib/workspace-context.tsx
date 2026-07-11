@@ -8,6 +8,7 @@ export interface WorkspaceBusiness {
   default_appointment_duration: number
   slot_interval_minutes: number
   currency: string
+  language: string
   timezone: string
   lunch_break_enabled: boolean
   lunch_start: string | null
