@@ -23,8 +23,8 @@ export function Landing() {
         <div className="container flex h-16 items-center justify-between">
           <Logo />
           <div className="flex items-center gap-3">
-            <Link href="/demo"><Button variant="ghost" className="gap-1.5"><PlayCircle className="h-4 w-4" /> Prova la demo</Button></Link>
-            <Link href="/login"><Button variant="ghost"> in</Button></Link>
+            <Link href="/demo"><Button variant="ghost" className="gap-1.5"><PlayCircle className="h-4 w-4" /> Try the demo</Button></Link>
+            <Link href="/login"><Button variant="ghost">Log in</Button></Link>
             <Link href="/signup"><Button>Get started</Button></Link>
           </div>
         </div>
@@ -50,7 +50,7 @@ export function Landing() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.18 }}
             className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
             <Link href="/signup"><Button size="lg" className="h-12 px-7 text-base">Try free <ArrowRight className="ml-1 h-4 w-4" /></Button></Link>
-            <Link href="/demo"><Button size="lg" variant="outline" className="h-12 gap-2 px-7 text-base"><PlayCircle className="h-4 w-4" /> Prova senza account</Button></Link>
+            <Link href="/demo"><Button size="lg" variant="outline" className="h-12 gap-2 px-7 text-base"><PlayCircle className="h-4 w-4" /> Try without an account</Button></Link>
           </motion.div>
         </div>
       </section>
