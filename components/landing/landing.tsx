@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, CalendarDays, Wand2, Bot, ShieldCheck, Sparkles, BarChart3, PlayCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/brand/logo'
+import { ThemeToggle } from '@/components/app-shell/theme-toggle'
 import { BRAND } from '@/lib/brand'
 
 const features = [
@@ -22,7 +23,8 @@ export function Landing() {
       <header className="sticky top-0 z-40 glass border-b border-border">
         <div className="container flex h-16 items-center justify-between">
           <Logo />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle />
             <Link href="/demo" className="hidden sm:inline-flex"><Button variant="ghost" className="gap-1.5"><PlayCircle className="h-4 w-4" /> Try the demo</Button></Link>
             <Link href="/login"><Button variant="ghost">Log in</Button></Link>
             <Link href="/signup"><Button>Get started</Button></Link>

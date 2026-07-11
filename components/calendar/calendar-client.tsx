@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Plus, CalendarDays } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Info } from 'lucide-react'
 import { listAppointments, updateAppointment, minToTime, timeToMin, fmtTime, type CalendarAppointment } from '@/lib/api/appointments'
 import { useWorkspace } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
 import { AppointmentDialog } from './appointment-dialog'
 import { OptimizeDialog } from './optimize-dialog'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 const START_HOUR = 7, END_HOUR = 21, HOUR_H = 56
@@ -29,6 +30,8 @@ export function CalendarClient() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CalendarAppointment | null>(null)
   const [createCtx, setCreateCtx] = useState<{ date: string; start: string } | null>(null)
+  const [dragGrab, setDragGrab] = useState(0)
+  const [dragPreview, setDragPreview] = useState<{ date: string; startMin: number } | null>(null)
 
   const days = useMemo(() => {
     if (view === 'day') return [new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate())]
@@ -76,6 +79,7 @@ export function CalendarClient() {
 
   function colDrop(e: React.DragEvent, date: string) {
     e.preventDefault()
+    setDragPreview(null)
     const id = e.dataTransfer.getData('text/appt')
     const grab = parseInt(e.dataTransfer.getData('text/grab') || '0')
     const a = appts.find((x) => x.id === id)
@@ -96,7 +100,24 @@ export function CalendarClient() {
 
   return (
     <div>
-      <PageHeader title="Calendar" description="Your day at a glance. Drag to move, click a slot to book. Shortcuts: n, w, d, ← →, t."
+      <PageHeader title="Calendar"
+        info={
+          <Popover>
+            <PopoverTrigger asChild>
+              <button aria-label="Shortcuts & tips" className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Info className="h-3.5 w-3.5" /></button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64">
+              <p className="mb-2 text-sm font-semibold">Shortcuts & tips</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li><kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">n</kbd> New appointment</li>
+                <li><kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">w</kbd> / <kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">d</kbd> Week / day view</li>
+                <li><kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">←</kbd> <kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">→</kbd> Previous / next</li>
+                <li><kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">t</kbd> Jump to today</li>
+              </ul>
+              <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">Drag an appointment to move it, or click an empty slot to book.</p>
+            </PopoverContent>
+          </Popover>
+        }
         actions={<Button onClick={() => openNew()}><Plus className="mr-2 h-4 w-4" /> New</Button>} />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -142,7 +163,16 @@ export function CalendarClient() {
             const dateStr = ymd(d)
             return (
               <div key={dateStr} className="relative flex-1 border-l border-border" style={{ height: (END_HOUR - START_HOUR) * HOUR_H }}
-                onDragOver={(e) => e.preventDefault()} onDrop={(e) => colDrop(e, dateStr)}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                  const y = e.clientY - rect.top - dragGrab
+                  let sm = START_HOUR * 60 + Math.round((y / HOUR_H * 60) / SLOT) * SLOT
+                  sm = Math.max(START_HOUR * 60, Math.min(sm, END_HOUR * 60 - SLOT))
+                  if (!dragPreview || dragPreview.date !== dateStr || dragPreview.startMin !== sm) setDragPreview({ date: dateStr, startMin: sm })
+                }}
+                onDragLeave={(e) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) setDragPreview((p) => (p?.date === dateStr ? null : p)) }}
+                onDrop={(e) => colDrop(e, dateStr)}
                 onClick={(e) => {
                   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                   const y = e.clientY - rect.top
@@ -157,7 +187,8 @@ export function CalendarClient() {
                   const name = a.patients?.full_name || a.patients?.first_name || 'Client'
                   return (
                     <div key={a.id} draggable
-                      onDragStart={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); e.dataTransfer.setData('text/appt', a.id); e.dataTransfer.setData('text/grab', String(e.clientY - r.top)) }}
+                      onDragStart={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); const g = e.clientY - r.top; setDragGrab(g); e.dataTransfer.setData('text/appt', a.id); e.dataTransfer.setData('text/grab', String(g)) }}
+                      onDragEnd={() => setDragPreview(null)}
                       onClick={(e) => { e.stopPropagation(); openEdit(a) }}
                       className="absolute left-1 right-1 cursor-grab overflow-hidden rounded-md border-l-2 px-2 py-1.5 text-left shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
                       style={{ top, height, backgroundColor: color + '1f', borderColor: color }}>
@@ -166,6 +197,12 @@ export function CalendarClient() {
                     </div>
                   )
                 })}
+                {dragPreview && dragPreview.date === dateStr && (
+                  <div className="pointer-events-none absolute inset-x-0 z-30" style={{ top: (dragPreview.startMin - START_HOUR * 60) / 60 * HOUR_H }}>
+                    <div className="border-t-2 border-dashed border-primary" />
+                    <span className="absolute -top-2.5 left-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground shadow">{fmtTime(minToTime(dragPreview.startMin))}</span>
+                  </div>
+                )}
               </div>
             )
           })}

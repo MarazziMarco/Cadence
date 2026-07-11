@@ -4,7 +4,7 @@ import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,7 @@ function LoginForm() {
 
   return (
     <div>
+      <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Back to home</Link>
       <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
       <p className="mt-1.5 text-sm text-muted-foreground">Log in to your Cadence workspace.</p>
       <form onSubmit={onSubmit} className="mt-8 space-y-4">

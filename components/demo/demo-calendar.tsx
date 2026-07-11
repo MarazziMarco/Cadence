@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { Wand2, RotateCcw, Clock, ArrowRight, Sparkles, ArrowRightLeft, Check, Mic, MicOff, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -38,6 +39,8 @@ export function DemoCalendar() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [totalRecovered, setTotalRecovered] = useState(0)
   const [msgChanges, setMsgChanges] = useState<DemoChange[] | null>(null)
+  // Changes the user unticked in the preview — excluded from the apply.
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
 
   // Day / week view (demo only). Day view scopes the optimizer to that day so
   // it's clearer what the optimizer does.
@@ -67,20 +70,31 @@ export function DemoCalendar() {
   function handleOptimize() {
     const { changes, minutesRecovered } = compactWeek(scopeAppts())
     setPreview({ changes, minutesRecovered })
+    setExcluded(new Set())
     setPreviewOpen(true)
   }
 
+  function toggleExcluded(id: string) {
+    setExcluded((prev) => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
+  }
+
   function handleAccept() {
-    const { compacted, minutesRecovered } = compactWeek(scopeAppts())
-    const moved = new Map(compacted.map((a) => [a.id, a]))
-    const changes = preview?.changes ?? []
+    // Apply only the moves the user kept ticked. Each demo change is an
+    // independent pull-earlier within a block, so applying a subset is safe.
+    const applied = (preview?.changes ?? []).filter((c) => !excluded.has(c.id))
+    const moveMap = new Map(applied.map((c) => [c.id, c.newStart]))
+    const recovered = applied.reduce((s, c) => s + (c.oldStart - c.newStart), 0)
     setMsgChanges(null)
     setPreviewOpen(false)
     // Apply first so the cards slide (CSS transition), then reveal the messages
     // panel a beat later so the move animation isn't immediately covered.
-    setAppts((prev) => prev.map((a) => moved.get(a.id) ?? a))
-    setTotalRecovered((t) => t + minutesRecovered)
-    window.setTimeout(() => setMsgChanges(changes), 900)
+    setAppts((prev) => prev.map((a) => (moveMap.has(a.id) ? { ...a, startMin: moveMap.get(a.id)! } : a)))
+    setTotalRecovered((t) => t + recovered)
+    window.setTimeout(() => setMsgChanges(applied), 900)
   }
 
   function handleReset() {
@@ -303,12 +317,14 @@ export function DemoCalendar() {
 
                 {preview.changes.length > 0 && (
                   <div>
-                    <p className="mb-2 text-sm font-semibold">Proposed changes ({preview.changes.length})</p>
+                    <p className="mb-1 text-sm font-semibold">Proposed changes ({preview.changes.length})</p>
+                    <p className="mb-2 text-xs text-muted-foreground">Untick a move to keep that appointment where it is.</p>
                     <div className="space-y-2">
                       {preview.changes.map((c) => (
-                        <div key={c.id} className="rounded-lg border border-border p-3">
+                        <div key={c.id} className={cn('rounded-lg border border-border p-3 transition-opacity', excluded.has(c.id) && 'opacity-50')}>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
+                              <Checkbox checked={!excluded.has(c.id)} onCheckedChange={() => toggleExcluded(c.id)} aria-label={`Include moving ${c.patientName}`} />
                               <Badge variant="secondary"><ArrowRightLeft className="mr-1 h-3 w-3" /> Moved</Badge>
                               <span className="text-sm font-medium">{c.patientName}</span>
                             </div>
@@ -327,7 +343,7 @@ export function DemoCalendar() {
 
                 <div className="flex justify-end gap-2 pt-1">
                   <Button variant="outline" onClick={() => setPreviewOpen(false)}>Cancel</Button>
-                  <Button onClick={handleAccept} disabled={preview.changes.length === 0}><Check className="mr-2 h-4 w-4" /> Apply</Button>
+                  <Button onClick={handleAccept} disabled={preview.changes.filter((c) => !excluded.has(c.id)).length === 0}><Check className="mr-2 h-4 w-4" /> Apply{preview.changes.length ? ` (${preview.changes.filter((c) => !excluded.has(c.id)).length})` : ''}</Button>
                 </div>
               </div>
             )}

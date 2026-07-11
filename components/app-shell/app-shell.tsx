@@ -3,7 +3,6 @@
 import { type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Search } from 'lucide-react'
 import { Logo } from '@/components/brand/logo'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -45,10 +44,6 @@ export function AppShell({ user, business, children }: { user: { email: string; 
             <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" className="hidden gap-2 text-muted-foreground sm:flex">
-              <Search className="h-3.5 w-3.5" /> Quick find
-              <kbd className="ml-1 rounded border border-border bg-muted px-1.5 text-[10px] font-medium">⌘K</kbd>
-            </Button>
             <ThemeToggle />
             <UserMenu email={user.email} name={user.name} />
           </div>
