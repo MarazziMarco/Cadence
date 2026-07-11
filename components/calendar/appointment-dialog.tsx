@@ -5,16 +5,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, Trash2, Mic, MicOff } from 'lucide-react'
 import { createAppointment, updateAppointment, deleteAppointment, listPatientsForSelect, minToTime, timeToMin, type CalendarAppointment } from '@/lib/api/appointments'
-import { createPatient } from '@/lib/api/patients'
+import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
 import { parseAppointment } from '@/lib/voice/parse-appointment'
 import { useSpeech, speechLang } from '@/lib/voice/use-speech'
+import { WEEKDAYS, type Weekday } from '@/lib/types/db'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
+
+const DOW_SHORT: Record<'en' | 'it', string[]> = {
+  en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  it: ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'],
+}
 
 export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart, open, onOpenChange }: { businessId: string; appt?: CalendarAppointment | null; defaultDate?: string; defaultStart?: string; open: boolean; onOpenChange: (v: boolean) => void }) {
   const qc = useQueryClient()
@@ -26,6 +34,10 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
   const [date, setDate] = useState('')
   const [start, setStart] = useState('09:00')
   const [duration, setDuration] = useState(String(business?.default_appointment_duration ?? 30))
+  // Optional per-client availability the optimizer can use.
+  const [showAvail, setShowAvail] = useState(false)
+  const [availOnly, setAvailOnly] = useState<Set<Weekday>>(new Set())
+  const [availNever, setAvailNever] = useState<Set<Weekday>>(new Set())
 
   const { data: patients = [] } = useQuery({ queryKey: ['patients-select', businessId], queryFn: () => listPatientsForSelect(businessId), enabled: !!businessId && open })
   const { data: services = [] } = useQuery({ queryKey: ['services', businessId], queryFn: () => listServices(businessId), enabled: !!businessId && open })
@@ -57,8 +69,22 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
       setDate(appt?.appointment_date ?? defaultDate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })())
       setStart(appt ? appt.start_time.slice(0, 5) : (defaultStart ?? '09:00'))
       setDuration(String(appt?.duration_minutes ?? business?.default_appointment_duration ?? 30))
+      setShowAvail(false); setAvailOnly(new Set()); setAvailNever(new Set())
     }
   }, [open])
+
+  // Resolve the two optional inputs to the concrete weekdays the client can come.
+  // "Only on" wins; otherwise it's every day except the "never" ones. Null = no
+  // constraint (client stays flexible).
+  function resolveAvail(): Weekday[] | null {
+    if (!showAvail) return null
+    if (availOnly.size) return WEEKDAYS.filter((w) => availOnly.has(w) && !availNever.has(w))
+    if (availNever.size) return WEEKDAYS.filter((w) => !availNever.has(w))
+    return null
+  }
+  function toggle(set: Set<Weekday>, setter: (s: Set<Weekday>) => void, w: Weekday) {
+    const n = new Set(set); n.has(w) ? n.delete(w) : n.add(w); setter(n)
+  }
 
   function onServiceChange(id: string) {
     setServiceId(id)
@@ -70,6 +96,9 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
     mutationFn: async () => {
       let pid = patientId
       if (!pid && newClient.trim()) { const np = await createPatient(businessId, { first_name: newClient.trim() }); pid = np.id }
+      // Persist optional client availability for the optimizer to use.
+      const availDays = resolveAvail()
+      if (pid && availDays && availDays.length) await setPatientWeekdayAvailability(pid, availDays)
       const startMin = timeToMin(start + ':00')
       const dur = parseInt(duration) || 30
       const svc = services.find((s: any) => s.id === serviceId)
@@ -131,6 +160,43 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
             <div className="space-y-2"><Label>Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div className="space-y-2"><Label>Start</Label><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             <div className="space-y-2"><Label>Min</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
+          </div>
+
+          <div className="rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm">{it ? 'Disponibilità cliente (opzionale)' : 'Client availability (optional)'}</Label>
+                <p className="text-xs text-muted-foreground">{it ? "L'ottimizzatore la userà per spostare gli appuntamenti solo quando il cliente c'è." : 'The optimizer uses this to only place the client when they can actually come.'}</p>
+              </div>
+              <Switch checked={showAvail} onCheckedChange={setShowAvail} />
+            </div>
+            {showAvail && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <p className="mb-1.5 text-xs font-medium">{it ? 'Disponibile SOLO in questi giorni' : 'Available ONLY on these days'}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map((w, i) => (
+                      <button key={w} type="button" onClick={() => toggle(availOnly, setAvailOnly, w)}
+                        className={cn('rounded-md border px-2.5 py-1 text-xs font-medium transition-colors', availOnly.has(w) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-accent')}>
+                        {DOW_SHORT[it ? 'it' : 'en'][i]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-medium">{it ? 'Mai disponibile in questi giorni' : 'Never available on these days'}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map((w, i) => (
+                      <button key={w} type="button" onClick={() => toggle(availNever, setAvailNever, w)}
+                        className={cn('rounded-md border px-2.5 py-1 text-xs font-medium transition-colors', availNever.has(w) ? 'border-destructive bg-destructive text-destructive-foreground' : 'border-border bg-card hover:bg-accent')}>
+                        {DOW_SHORT[it ? 'it' : 'en'][i]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{it ? 'Lascia vuoto se il cliente è flessibile.' : 'Leave empty if the client is flexible.'}</p>
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter className="flex items-center justify-between sm:justify-between">
