@@ -6,7 +6,7 @@ import { DemoCalendar } from '@/components/demo/demo-calendar'
 
 export const metadata = {
   title: 'Demo — Cadence',
-  description: "Prova Cadence senza registrarti: ottimizza un'agenda finta in tempo reale.",
+  description: 'Try Cadence without signing up: optimize a sample schedule in real time.',
 }
 
 // Public route — intentionally NOT under app/(app) or app/(auth), and not
@@ -18,9 +18,9 @@ export default function DemoPage() {
       <div className="border-b border-primary/20 bg-primary/10 px-4 py-2.5 text-center text-sm">
         <span className="inline-flex flex-wrap items-center justify-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span>Stai provando Cadence in modalità demo —</span>
-          <Link href="/signup" className="font-semibold text-primary underline underline-offset-2">registrati</Link>
-          <span>per usarla con i tuoi dati.</span>
+          <span>You're trying Cadence in demo mode —</span>
+          <Link href="/signup" className="font-semibold text-primary underline underline-offset-2">sign up</Link>
+          <span>to use it with your own data.</span>
         </span>
       </div>
 
@@ -28,8 +28,8 @@ export default function DemoPage() {
         <div className="container flex h-16 items-center justify-between">
           <Link href="/"><Logo /></Link>
           <div className="flex items-center gap-3">
-            <Link href="/login"><Button variant="ghost">Accedi</Button></Link>
-            <Link href="/signup"><Button>Registrati</Button></Link>
+            <Link href="/login"><Button variant="ghost">Log in</Button></Link>
+            <Link href="/signup"><Button>Sign up</Button></Link>
           </div>
         </div>
       </header>

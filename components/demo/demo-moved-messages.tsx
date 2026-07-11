@@ -16,14 +16,14 @@ function fmt(min: number) {
 
 function dayLabel(date: string) {
   try {
-    return new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(date + 'T00:00:00'))
+    return new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(date + 'T00:00:00'))
   } catch {
     return date
   }
 }
 
 function buildText(c: DemoChange) {
-  return `Ciao ${c.patientName}, il tuo appuntamento di ${dayLabel(c.date)} è stato anticipato dalle ${fmt(c.oldStart)} alle ${fmt(c.newStart)}. Fammi sapere se ti va bene!`
+  return `Hi ${c.patientName}, your appointment on ${dayLabel(c.date)} has been moved earlier from ${fmt(c.oldStart)} to ${fmt(c.newStart)}. Let me know if that works for you!`
 }
 
 export function DemoMovedMessages({ changes, onClose }: { changes: DemoChange[]; onClose: () => void }) {
@@ -38,7 +38,7 @@ export function DemoMovedMessages({ changes, onClose }: { changes: DemoChange[];
       try { document.execCommand('copy') } catch {}
       document.body.removeChild(ta)
     }
-    setCopiedId(id); toast.success('Copiato ✓')
+    setCopiedId(id); toast.success('Copied ✓')
     setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1800)
   }
 
@@ -49,7 +49,7 @@ export function DemoMovedMessages({ changes, onClose }: { changes: DemoChange[];
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm">
           <MessageSquare className="h-4 w-4 shrink-0 text-primary" />
-          <span><span className="font-semibold">{changes.length} appuntamenti spostati.</span> Copia i messaggi da inviare ai pazienti.</span>
+          <span><span className="font-semibold">{changes.length} appointment{changes.length === 1 ? '' : 's'} moved.</span> Copy the messages to send to your clients.</span>
         </div>
         <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={onClose}><X className="h-4 w-4" /></Button>
       </div>
@@ -59,7 +59,7 @@ export function DemoMovedMessages({ changes, onClose }: { changes: DemoChange[];
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-sm font-medium">{m.name}</span>
               <Button size="sm" variant={copiedId === m.id ? 'secondary' : 'outline'} onClick={() => copy(m.id, m.text)}>
-                {copiedId === m.id ? <><Check className="mr-1 h-3.5 w-3.5 text-success" /> Copiato ✓</> : <><Copy className="mr-1 h-3.5 w-3.5" /> Copia</>}
+                {copiedId === m.id ? <><Check className="mr-1 h-3.5 w-3.5 text-success" /> Copied ✓</> : <><Copy className="mr-1 h-3.5 w-3.5" /> Copy</>}
               </Button>
             </div>
             <p className="whitespace-pre-wrap rounded-md bg-muted/50 p-2.5 text-sm text-muted-foreground">{m.text}</p>
