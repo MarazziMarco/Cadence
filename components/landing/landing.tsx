@@ -19,7 +19,7 @@ const VALUE = [
 // Visual walkthrough — real product screenshots.
 const STEPS: { img: string; title: string; desc: string; imgMax?: string }[] = [
   { img: '/landing/voice.png', title: 'Book by voice', desc: 'Add clients and appointments just by talking. Say “Marco on Tuesday at 3pm” and Cadence fills in the rest — perfect for capturing when clients are available.' },
-  { img: '/landing/calendar-before.png', title: 'A week full of gaps', desc: "This is how most weeks look: appointments scattered with dead time in between — hours you're paying for but not using." },
+  { img: '/landing/calendar-before.png', title: 'A week full of gaps', desc: "This is how most weeks look: appointments scattered with dead time in between — hours you're paying for but not using.", imgMax: 'max-w-[440px]' },
   { img: '/landing/optimizer.png', title: 'Smart suggestions, your call', desc: 'One click and Cadence proposes exactly which appointments to pull earlier to close the gaps. Keep or skip each move — nothing changes until you say so.', imgMax: 'max-w-[300px]' },
   { img: '/landing/calendar-after.png', title: 'A tight, optimized week', desc: 'Same appointments, hundreds of minutes of idle time recovered — automatically, and always within the rules you set.' },
   { img: '/landing/messages.png', title: 'Messages ready to send', desc: 'For every appointment that moved, Cadence writes a friendly message you can copy and send to the client in one tap.' },
@@ -97,19 +97,25 @@ export function Landing() {
           </div>
 
           <div className="mt-20 space-y-16 lg:space-y-24">
-            {STEPS.map((s, i) => (
-              <motion.div key={s.title} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }}
-                className="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
-                <div className={cn(i % 2 === 1 && 'lg:order-2')}>
-                  <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">{i + 1}</div>
-                  <h3 className="text-2xl font-bold tracking-tight">{s.title}</h3>
-                  <p className="mt-3 text-muted-foreground">{s.desc}</p>
+            {STEPS.map((s, i) => {
+              const imgLeft = i % 2 === 1
+              return (
+                <div key={s.title} className="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
+                  <motion.div initial={{ opacity: 0, x: imgLeft ? 24 : -24 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }}
+                    className={cn(imgLeft && 'lg:order-2')}>
+                    <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">{i + 1}</div>
+                    <h3 className="text-2xl font-bold tracking-tight">{s.title}</h3>
+                    <p className="mt-3 text-muted-foreground">{s.desc}</p>
+                  </motion.div>
+                  <motion.div initial={{ opacity: 0, x: imgLeft ? -32 : 32, scale: 0.96 }} whileInView={{ opacity: 1, x: 0, scale: 1 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                    className={cn('group relative', imgLeft && 'lg:order-1')}>
+                    <div className="pointer-events-none absolute -inset-4 -z-10 rounded-3xl bg-gradient-to-tr from-primary/20 via-primary/5 to-transparent opacity-70 blur-2xl transition-opacity duration-500 group-hover:opacity-100" />
+                    <img src={s.img} alt={s.title} loading="lazy"
+                      className={cn('w-full rounded-xl border border-border object-contain shadow-lg transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl', s.imgMax, s.imgMax && 'mx-auto')} />
+                  </motion.div>
                 </div>
-                <div className={cn(i % 2 === 1 && 'lg:order-1')}>
-                  <img src={s.img} alt={s.title} className="w-full rounded-xl border border-border object-contain shadow-lg" loading="lazy" />
-                </div>
-              </motion.div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="mt-16 flex justify-center">
