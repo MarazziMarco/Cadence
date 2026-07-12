@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Wand2, Loader2, Clock, DollarSign, ListChecks, ArrowRightLeft, ShieldCheck, Check, X, ArrowRight, Sparkles, PlusCircle, Star, CalendarClock, MoveHorizontal, ChevronsUp } from 'lucide-react'
 import { runOptimization, fetchRun, acceptChange, rejectChange, ensureAlgorithmSettings, getAlgorithmSettings, saveAlgorithmSettings, saveAlgorithmMetadata } from '@/lib/api/scheduler'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
 import { PageHeader } from '@/components/common/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,7 @@ const MODES = [
 
 export function SchedulerClient() {
   const { business } = useWorkspace()
+  const { t } = useT()
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
   const [range, setRange] = useState<Range>('day')
@@ -103,52 +105,52 @@ export function SchedulerClient() {
       await acceptChange(businessId, run.id, c)
       setChanges((prev) => prev.map((x) => (x.id === c.id ? { ...x, accepted: true } : x)))
       qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); qc.invalidateQueries({ queryKey: ['waiting'] })
-      toast.success('Applied')
+      toast.success(t('sched.applied'))
     } catch (e: any) { toast.error(e.message) } finally { setBusyId(null) }
   }
   async function onReject(c: any) {
     setBusyId(c.id)
-    try { await rejectChange(c); setChanges((prev) => prev.filter((x) => x.id !== c.id)); toast('Change dismissed') }
+    try { await rejectChange(c); setChanges((prev) => prev.filter((x) => x.id !== c.id)); toast(t('sched.dismissed')) }
     catch (e: any) { toast.error(e.message) } finally { setBusyId(null) }
   }
 
   const idleSaved = run ? Math.max(0, (run.idle_minutes_before ?? 0) - (run.idle_minutes_after ?? 0)) : 0
   const revImpact = run ? Number(run.estimated_revenue_after ?? 0) - Number(run.estimated_revenue_before ?? 0) : 0
   const kpis = run ? [
-    { label: 'Idle time saved', value: `${Math.floor(idleSaved / 60)}h ${idleSaved % 60}m`, icon: Clock, tone: 'text-success' },
-    { label: 'Revenue impact', value: `+${formatMoney(revImpact, business?.currency)}`, icon: DollarSign, tone: 'text-success' },
-    { label: 'Waiting list filled', value: String(run.created_appointments ?? 0), icon: ListChecks, tone: 'text-primary' },
-    { label: 'Appointments moved', value: String(run.moved_appointments ?? 0), icon: ArrowRightLeft, tone: 'text-primary' },
+    { label: t('sched.kpi.idleSaved'), value: `${Math.floor(idleSaved / 60)}h ${idleSaved % 60}m`, icon: Clock, tone: 'text-success' },
+    { label: t('sched.kpi.revenueImpact'), value: `+${formatMoney(revImpact, business?.currency)}`, icon: DollarSign, tone: 'text-success' },
+    { label: t('sched.kpi.waitingFilled'), value: String(run.created_appointments ?? 0), icon: ListChecks, tone: 'text-primary' },
+    { label: t('sched.kpi.apptsMoved'), value: String(run.moved_appointments ?? 0), icon: ArrowRightLeft, tone: 'text-primary' },
   ] : []
 
   const toggles = [
-    { on: includeWaitingList, set: changeWaiting, icon: ListChecks, title: 'Fill from waiting list', desc: 'Insert waiting-list clients into freed slots.' },
-    { on: protectVips, set: changeVips, icon: Star, title: 'Protect VIPs', desc: 'Avoid moving your VIP clients when possible.' },
-    { on: respectPreferred, set: changePreferred, icon: CalendarClock, title: 'Respect preferred times', desc: "Keep clients within their preferred hours where they set them." },
-    { on: prioritizeAdvance, set: changeAdvance, icon: ChevronsUp, title: 'Prioritize move-up requests', desc: 'When a gap frees up, first pull in clients who asked to be moved earlier.' },
+    { on: includeWaitingList, set: changeWaiting, icon: ListChecks, title: t('sched.tg.waiting.title'), desc: t('sched.tg.waiting.desc') },
+    { on: protectVips, set: changeVips, icon: Star, title: t('sched.tg.vips.title'), desc: t('sched.tg.vips.desc') },
+    { on: respectPreferred, set: changePreferred, icon: CalendarClock, title: t('sched.tg.preferred.title'), desc: t('sched.tg.preferred.desc') },
+    { on: prioritizeAdvance, set: changeAdvance, icon: ChevronsUp, title: t('sched.tg.advance.title'), desc: t('sched.tg.advance.desc') },
   ]
 
   return (
     <div>
-      <PageHeader title="Scheduler" description="Tune how the optimizer works, then preview and apply — nothing changes until you accept." />
+      <PageHeader title={t('sched.title')} description={t('sched.subtitle')} />
 
       {/* Legend — what it does and the rules it never breaks */}
       <Card className="mb-6 border-primary/20 bg-accent/20 shadow-sm">
         <CardContent className="grid gap-4 p-5 sm:grid-cols-2">
           <div>
-            <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> What it does</p>
+            <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> {t('sched.whatItDoes')}</p>
             <ul className="space-y-1.5 text-sm text-muted-foreground">
-              <li className="flex gap-2"><MoveHorizontal className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> Pulls appointments earlier to close the gaps between them.</li>
-              <li className="flex gap-2"><ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> Optionally fills the freed slots with waiting-list clients.</li>
-              <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> Every change is a preview — you accept or reject each one.</li>
+              <li className="flex gap-2"><MoveHorizontal className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> {t('sched.wd1')}</li>
+              <li className="flex gap-2"><ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> {t('sched.wd2')}</li>
+              <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> {t('sched.wd3')}</li>
             </ul>
           </div>
           <div>
-            <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-success" /> Rules it never breaks</p>
+            <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-success" /> {t('sched.rulesNeverBreak')}</p>
             <ul className="space-y-1.5 text-sm text-muted-foreground">
-              <li className="flex gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-success" /> Working hours &amp; lunch break.</li>
-              <li className="flex gap-2"><CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-success" /> Each client's availability — the days/hours they can (or can't) come.</li>
-              <li className="flex gap-2"><ArrowRightLeft className="mt-0.5 h-4 w-4 shrink-0 text-success" /> No overlaps; idle time never increases.</li>
+              <li className="flex gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {t('sched.rb1')}</li>
+              <li className="flex gap-2"><CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {t('sched.rb2')}</li>
+              <li className="flex gap-2"><ArrowRightLeft className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {t('sched.rb3')}</li>
             </ul>
           </div>
         </CardContent>
@@ -159,33 +161,33 @@ export function SchedulerClient() {
           {/* Time range */}
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="space-y-2">
-              <Label>Range</Label>
+              <Label>{t('sched.range')}</Label>
               <div className="inline-flex rounded-lg border border-border p-0.5">
                 {RANGES.map((r) => (
-                  <button key={r.value} onClick={() => setRange(r.value)} className={cn('rounded-md px-3 py-1.5 text-sm font-medium transition-colors', range === r.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{r.label}</button>
+                  <button key={r.value} onClick={() => setRange(r.value)} className={cn('rounded-md px-3 py-1.5 text-sm font-medium transition-colors', range === r.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{t('sched.range.' + r.value)}</button>
                 ))}
               </div>
             </div>
             {range === 'custom' ? (
               <>
-                <div className="space-y-2"><Label>From</Label><Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="sm:w-44" /></div>
-                <div className="space-y-2"><Label>To</Label><Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-44" /></div>
+                <div className="space-y-2"><Label>{t('sched.from')}</Label><Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="sm:w-44" /></div>
+                <div className="space-y-2"><Label>{t('sched.to')}</Label><Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-44" /></div>
               </>
             ) : (
-              <div className="space-y-2"><Label>{range === 'week' ? 'Week of' : 'Day to optimize'}</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:w-48" /></div>
+              <div className="space-y-2"><Label>{range === 'week' ? t('sched.weekOf') : t('sched.dayToOptimize')}</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:w-48" /></div>
             )}
-            <Button onClick={optimize} disabled={loading || !businessId || (range === 'custom' && (!customFrom || !customTo || customFrom > customTo))} className="sm:ml-auto">{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Optimize</Button>
+            <Button onClick={optimize} disabled={loading || !businessId || (range === 'custom' && (!customFrom || !customTo || customFrom > customTo))} className="sm:ml-auto">{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} {t('sched.optimize')}</Button>
           </div>
 
           {/* Mode */}
           <div className="space-y-2 border-t border-border pt-4">
-            <Label>How aggressive?</Label>
+            <Label>{t('sched.howAggressive')}</Label>
             <div className="grid gap-2 sm:grid-cols-3">
               {MODES.map((m) => (
                 <button key={m.value} onClick={() => changeMode(m.value)}
                   className={cn('rounded-xl border p-3 text-left transition-colors', mode === m.value ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent')}>
-                  <p className={cn('text-sm font-semibold', mode === m.value && 'text-primary')}>{m.label}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{m.desc}</p>
+                  <p className={cn('text-sm font-semibold', mode === m.value && 'text-primary')}>{t('sched.mode.' + m.value)}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t('sched.mode.' + m.value + '.desc')}</p>
                 </button>
               ))}
             </div>
@@ -193,19 +195,19 @@ export function SchedulerClient() {
 
           {/* Toggles */}
           <div className="space-y-2 border-t border-border pt-4">
-            <Label>Rules &amp; priorities</Label>
+            <Label>{t('sched.rulesPriorities')}</Label>
             <div className="divide-y divide-border rounded-xl border border-border">
-              {toggles.map((t) => (
-                <div key={t.title} className="flex items-center justify-between gap-3 p-3">
+              {toggles.map((tg) => (
+                <div key={tg.title} className="flex items-center justify-between gap-3 p-3">
                   <div className="flex items-start gap-2">
-                    <t.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <div><p className="text-sm font-medium">{t.title}</p><p className="text-xs text-muted-foreground">{t.desc}</p></div>
+                    <tg.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div><p className="text-sm font-medium">{tg.title}</p><p className="text-xs text-muted-foreground">{tg.desc}</p></div>
                   </div>
-                  <Switch checked={t.on} onCheckedChange={t.set} />
+                  <Switch checked={tg.on} onCheckedChange={tg.set} />
                 </div>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">These settings are saved and reused everywhere — including the quick “Optimize” from the calendar and dashboard.</p>
+            <p className="text-xs text-muted-foreground">{t('sched.savedNote')}</p>
           </div>
         </CardContent>
       </Card>
@@ -214,8 +216,8 @@ export function SchedulerClient() {
         {run && (
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
             <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-accent/40 px-4 py-3 text-sm">
-              <Sparkles className="h-4 w-4 text-primary" /><span className="font-medium">Preview ready.</span>
-              <span className="text-muted-foreground">{run.ai_summary || 'Accept or reject each change below. Nothing changes until you accept.'}</span>
+              <Sparkles className="h-4 w-4 text-primary" /><span className="font-medium">{t('sched.previewReady')}</span>
+              <span className="text-muted-foreground">{run.ai_summary || t('sched.previewDefault')}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -225,18 +227,18 @@ export function SchedulerClient() {
             </div>
 
             <Card className="shadow-sm">
-              <CardHeader><CardTitle className="text-base">Proposed changes ({changes.length})</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{t('sched.proposedChanges', { n: changes.length })}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                {changes.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">No changes proposed.</p> : changes.map((c) => {
+                {changes.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">{t('sched.noChanges')}</p> : changes.map((c) => {
                   const isMove = !!c.appointment_id
-                  const name = c.patients?.full_name || c.patients?.first_name || 'Client'
+                  const name = c.patients?.full_name || c.patients?.first_name || t('dash.client')
                   return (
                     <div key={c.id} className="rounded-lg border border-border p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <Badge variant={isMove ? 'secondary' : 'default'} className={isMove ? '' : 'bg-success/15 text-success hover:bg-success/15'}>
                             {isMove ? <ArrowRightLeft className="mr-1 h-3 w-3" /> : <PlusCircle className="mr-1 h-3 w-3" />}
-                            {isMove ? 'Moved' : 'Added from waiting list'}
+                            {isMove ? t('sched.moved') : t('sched.addedFromWaiting')}
                           </Badge>
                           <span className="font-medium">{name}</span>
                         </div>
@@ -248,10 +250,10 @@ export function SchedulerClient() {
                       </div>
                       {c.ai_reason && <p className="mt-1.5 text-xs text-muted-foreground">{c.ai_reason}</p>}
                       <div className="mt-2 flex justify-end gap-2">
-                        {c.accepted ? <Badge className="bg-success/15 text-success hover:bg-success/15"><Check className="mr-1 h-3 w-3" /> Applied</Badge> : (
+                        {c.accepted ? <Badge className="bg-success/15 text-success hover:bg-success/15"><Check className="mr-1 h-3 w-3" /> {t('sched.applied')}</Badge> : (
                           <>
-                            <Button size="sm" variant="outline" onClick={() => onReject(c)} disabled={busyId === c.id}><X className="mr-1 h-3.5 w-3.5" /> Reject</Button>
-                            <Button size="sm" onClick={() => onAccept(c)} disabled={busyId === c.id}>{busyId === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />} Accept</Button>
+                            <Button size="sm" variant="outline" onClick={() => onReject(c)} disabled={busyId === c.id}><X className="mr-1 h-3.5 w-3.5" /> {t('sched.reject')}</Button>
+                            <Button size="sm" onClick={() => onAccept(c)} disabled={busyId === c.id}>{busyId === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />} {t('sched.accept')}</Button>
                           </>
                         )}
                       </div>
