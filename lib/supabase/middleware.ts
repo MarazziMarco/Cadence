@@ -13,7 +13,7 @@ const AUTH_PREFIXES = ['/login', '/signup', '/forgot-password']
 // so it must never touch Supabase — we short-circuit here BEFORE creating the
 // server client, which also keeps /demo reachable even when Supabase env vars
 // are absent (e.g. a fresh local checkout with no .env).
-const PUBLIC_PREFIXES = ['/demo']
+const PUBLIC_PREFIXES = ['/demo', '/terms', '/privacy']
 
 export async function updateSession(request: NextRequest) {
   if (PUBLIC_PREFIXES.some((p) => request.nextUrl.pathname.startsWith(p))) {

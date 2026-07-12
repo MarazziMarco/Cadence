@@ -18,12 +18,19 @@ export function useSpeech(lang: string) {
     const rec = new SR()
     rec.interimResults = false
     rec.maxAlternatives = 1
-    rec.onresult = (e: any) => { onResultRef.current(e.results[0][0].transcript as string) }
+    rec.onresult = (e: any) => {
+      // Stop + reset immediately so the mic UI never stays "listening" after an
+      // auto-finalized result (some browsers fire onresult without a prompt onend).
+      setListening(false)
+      try { rec.stop() } catch {}
+      onResultRef.current(e.results[0][0].transcript as string)
+    }
     rec.onerror = (e: any) => {
       setListening(false)
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { setSupported(false); onDeniedRef.current() }
     }
     rec.onend = () => setListening(false)
+    rec.onaudioend = () => setListening(false)
     recRef.current = rec
     return () => { try { rec.abort() } catch {} }
   }, [])

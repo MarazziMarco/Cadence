@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Check, ChevronLeft, ChevronRight, Loader2, Building2, Clock, Timer, Globe } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Logo } from '@/components/brand/logo'
+import { Disclaimer } from '@/components/legal/disclaimer'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -257,6 +258,10 @@ export function OnboardingWizard({ defaultFirstName, defaultLastName }: { defaul
           ) : (
             <Button onClick={finish} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Finish setup</Button>
           )}
+        </div>
+
+        <div className="mt-6">
+          <Disclaimer lang={language === 'it' ? 'it' : 'en'} />
         </div>
       </div>
     </div>

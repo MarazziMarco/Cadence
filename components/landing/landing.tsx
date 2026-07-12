@@ -6,13 +6,12 @@ import { ArrowRight, CalendarDays, Wand2, Bot, ShieldCheck, Sparkles, BarChart3,
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/app-shell/theme-toggle'
+import { Disclaimer } from '@/components/legal/disclaimer'
 import { cn } from '@/lib/utils'
 
-// The three headline value props.
+// Headline value prop.
 const VALUE = [
-  { icon: Wand2, title: 'Time & money, your way', desc: 'Optimize within your own rules — working hours, priorities, how tightly to pack the day. Cadence turns wasted gaps into billable time.' },
   { icon: Mic, title: 'Natural language & voice', desc: 'Register clients and appointments just by speaking. No forms, no typing — dictate when clients are free and Cadence writes it down.' },
-  { icon: MessageSquare, title: 'Clients kept in the loop', desc: 'Every schedule change comes with a ready-to-send message, so no client is ever left guessing about their new time.' },
 ]
 
 // Visual walkthrough — real product screenshots.
@@ -28,19 +27,18 @@ const features = [
   { icon: Wand2, title: 'Auto-optimized schedule', desc: 'One click builds the best possible day — respecting every rule you set.' },
   { icon: Bot, title: 'Natural language AI', desc: 'Type "Paola can come Wed or Fri" and Cadence turns it into a plan.' },
   { icon: ShieldCheck, title: 'You stay in control', desc: 'Every change is a preview. Accept, reject, compare, undo. Always.' },
-  { icon: CalendarDays, title: 'Beautiful calendar', desc: 'Drag, drop, resize. Day, week, month, agenda. Fast as thought.' },
   { icon: BarChart3, title: 'Revenue insights', desc: 'Occupancy, idle time, revenue — the metrics that actually matter.' },
   { icon: Sparkles, title: 'Works for any business', desc: 'Clinics, salons, trainers, consultants, vets. Not tailored to one.' },
 ]
 
 export function Landing() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       <header className="sticky top-0 z-40 glass border-b border-border">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-3 sm:h-16 sm:px-6">
           <Logo />
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            <span className="hidden sm:inline-flex"><ThemeToggle /></span>
             <Link href="/demo" className="hidden sm:inline-flex"><Button variant="ghost" className="gap-1.5"><PlayCircle className="h-4 w-4" /> Try the demo</Button></Link>
             <Link href="/login"><Button variant="ghost">Log in</Button></Link>
             <Link href="/signup"><Button>Get started</Button></Link>
@@ -55,14 +53,14 @@ export function Landing() {
         <div className="container flex flex-col items-center py-24 text-center">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
             className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm text-muted-foreground shadow-sm">
-            <Sparkles className="h-4 w-4 text-primary" /> AI-powered scheduling, finally done right
+            <Sparkles className="h-4 w-4 text-primary" /> AI scheduling
           </motion.div>
           <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.05 }}
-            className="max-w-4xl text-balance text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl">
+            className="max-w-4xl text-balance text-4xl font-extrabold tracking-tight sm:text-6xl md:text-7xl">
             Stop losing your Sunday to next week&apos;s schedule
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.12 }}
-            className="mt-6 max-w-3xl text-balance text-xl font-medium text-foreground sm:text-2xl">
+            className="mt-5 max-w-3xl text-pretty text-base font-normal text-foreground sm:mt-6 sm:text-2xl sm:font-medium">
             If your week runs on appointments, you know the pain — nights and weekends spent arranging them by hand. Cadence rebuilds your whole week, the best way possible, in one click.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.18 }}
@@ -75,17 +73,17 @@ export function Landing() {
 
       {/* Value + product walkthrough */}
       <section className="border-y border-border bg-muted/20">
-        <div className="container py-20 sm:py-28">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Let Cadence build your week for you</h2>
-            <p className="mt-4 text-balance text-lg text-muted-foreground">
+        <div className="container flex flex-col py-16 sm:py-28">
+          <div className="order-2 mx-auto mt-12 max-w-2xl text-center sm:order-1 sm:mt-0">
+            <h2 className="hidden text-balance text-3xl font-bold tracking-tight sm:block sm:text-4xl">Let Cadence build your week for you</h2>
+            <p className="text-balance text-base text-muted-foreground sm:mt-4 sm:text-lg">
               Physiotherapists, osteopaths, salons, trainers, freelancers — millions of small businesses and
               self-employed pros burn nights and weekends shuffling appointments to close the gaps. It&apos;s a
               real, exhausting weekly puzzle. Cadence solves it: talk to it, optimize, done.
             </p>
           </div>
 
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
+          <div className="order-3 mx-auto mt-10 grid w-full max-w-md gap-6 sm:mt-14">
             {VALUE.map((v, i) => (
               <motion.div key={v.title} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.06 }}
                 className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -96,7 +94,7 @@ export function Landing() {
             ))}
           </div>
 
-          <div className="mt-20 space-y-16 lg:space-y-24">
+          <div className="order-1 mt-0 space-y-14 sm:order-2 sm:mt-20 sm:space-y-16 lg:space-y-24">
             {STEPS.map((s, i) => {
               const imgLeft = i % 2 === 1
               return (
@@ -118,7 +116,7 @@ export function Landing() {
             })}
           </div>
 
-          <div className="mt-16 flex justify-center">
+          <div className="order-4 mt-14 flex justify-center sm:mt-16">
             <Link href="/demo"><Button size="lg" className="h-12 gap-2 px-7 text-base"><PlayCircle className="h-4 w-4" /> Try it yourself — no account needed</Button></Link>
           </div>
         </div>
@@ -140,9 +138,17 @@ export function Landing() {
       </section>
 
       <footer className="border-t border-border">
-        <div className="container flex flex-col items-center justify-between gap-4 py-10 sm:flex-row">
-          <Logo />
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Cadence.. Crafted for modern businesses.</p>
+        <div className="container flex flex-col gap-6 py-10">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <Logo />
+            <nav className="flex items-center gap-5 text-sm text-muted-foreground">
+              <Link href="/terms" className="transition-colors hover:text-foreground">Terms</Link>
+              <Link href="/privacy" className="transition-colors hover:text-foreground">Privacy</Link>
+              <a href="mailto:marazzi.marco@yahoo.com" className="transition-colors hover:text-foreground">Contact</a>
+            </nav>
+            <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Cadence — Built by Marco Marazzi</p>
+          </div>
+          <Disclaimer variant="compact" />
         </div>
       </footer>
     </div>
