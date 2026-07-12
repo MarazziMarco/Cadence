@@ -36,12 +36,11 @@ export type OptimizationMode = (typeof OPTIMIZATION_MODE)[number]
 export const OPTIMIZATION_RESULT = ['preview', 'accepted', 'discarded'] as const
 export type OptimizationResult = (typeof OPTIMIZATION_RESULT)[number]
 
+// Only languages with a full interface translation (lib/i18n) are offered.
 export const LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'it', label: 'Italiano' },
   { value: 'es', label: 'Español' },
-  { value: 'fr', label: 'Français' },
-  { value: 'de', label: 'Deutsch' },
 ] as const
 
 // Supported currencies. `locale` drives Intl number formatting so amounts read

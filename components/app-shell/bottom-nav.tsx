@@ -5,27 +5,30 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { LayoutDashboard, CalendarDays, Users, Wand2, Plus, CalendarPlus, UserPlus, Mic } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { navKey } from '@/lib/i18n'
+import { useT } from '@/lib/i18n/use-t'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
 export type QuickKind = 'appointment' | 'client' | 'voice'
 
 const LEFT = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { href: '/dashboard', icon: LayoutDashboard },
+  { href: '/calendar', icon: CalendarDays },
 ]
 const RIGHT = [
-  { href: '/patients', label: 'Clients', icon: Users },
-  { href: '/scheduler', label: 'Scheduler', icon: Wand2 },
+  { href: '/patients', icon: Users },
+  { href: '/scheduler', icon: Wand2 },
 ]
 // The "+" opens these — each triggers a MODAL directly (faster than a page).
-const CREATE: { kind: QuickKind; label: string; icon: any; hint: string }[] = [
-  { kind: 'voice', label: 'Speak', icon: Mic, hint: 'Dictate an appointment' },
-  { kind: 'appointment', label: 'New appointment', icon: CalendarPlus, hint: 'Open the appointment form' },
-  { kind: 'client', label: 'New client', icon: UserPlus, hint: 'Open the client form' },
+const CREATE: { kind: QuickKind; icon: any; labelKey: string; hintKey: string }[] = [
+  { kind: 'voice', icon: Mic, labelKey: 'create.speak', hintKey: 'create.speakHint' },
+  { kind: 'appointment', icon: CalendarPlus, labelKey: 'create.appointment', hintKey: 'create.appointmentHint' },
+  { kind: 'client', icon: UserPlus, labelKey: 'create.client', hintKey: 'create.clientHint' },
 ]
 
 export function BottomNav({ onQuickCreate }: { onQuickCreate: (kind: QuickKind) => void }) {
   const pathname = usePathname()
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const pick = (kind: QuickKind) => { setOpen(false); onQuickCreate(kind) }
 
@@ -44,7 +47,7 @@ export function BottomNav({ onQuickCreate }: { onQuickCreate: (kind: QuickKind) 
         <span className={cn('flex h-8 w-12 items-center justify-center rounded-full transition-all duration-200', active ? 'bg-primary/10' : 'bg-transparent')}>
           <it.icon className={cn('h-5 w-5 transition-transform duration-200', active ? 'scale-110' : 'group-active:scale-90')} />
         </span>
-        {it.label}
+        {navKey(it.href) ? t(navKey(it.href)!) : ''}
       </Link>
     )
   }
@@ -60,14 +63,14 @@ export function BottomNav({ onQuickCreate }: { onQuickCreate: (kind: QuickKind) 
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <button
-              aria-label="Crea nuovo"
+              aria-label={t('create.newAria')}
               className="-mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-background transition-transform duration-200 active:scale-90"
             >
               <Plus className={cn('h-6 w-6 transition-transform duration-300', open && 'rotate-45')} />
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl border-border pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-            <SheetHeader className="text-left"><SheetTitle>Create new</SheetTitle></SheetHeader>
+            <SheetHeader className="text-left"><SheetTitle>{t('create.new')}</SheetTitle></SheetHeader>
             <div className="mt-4 space-y-2">
               {CREATE.map((c) => (
                 <button
@@ -76,7 +79,7 @@ export function BottomNav({ onQuickCreate }: { onQuickCreate: (kind: QuickKind) 
                   className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left transition-all duration-200 hover:bg-accent active:scale-[0.98]"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><c.icon className="h-5 w-5" /></span>
-                  <span className="min-w-0"><span className="block font-medium">{c.label}</span><span className="block text-xs text-muted-foreground">{c.hint}</span></span>
+                  <span className="min-w-0"><span className="block font-medium">{t(c.labelKey)}</span><span className="block text-xs text-muted-foreground">{t(c.hintKey)}</span></span>
                 </button>
               ))}
             </div>

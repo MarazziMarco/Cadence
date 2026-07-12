@@ -4,16 +4,19 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { NAV_SECTIONS } from '@/lib/brand'
+import { navKey } from '@/lib/i18n'
+import { useT } from '@/lib/i18n/use-t'
 import { ICON_MAP } from './icon-map'
 
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
+  const { t } = useT()
   return (
     <nav className="flex flex-col gap-6 px-3 py-4">
       {NAV_SECTIONS.map((section) => (
         <div key={section.label}>
           <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
-            {section.label}
+            {t('nav.menu')}
           </p>
           <div className="space-y-0.5">
             {section.items.map((item) => {
@@ -32,7 +35,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   )}
                 >
                   {Icon && <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-primary')} />}
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate">{navKey(item.href) ? t(navKey(item.href)!) : item.label}</span>
                 </Link>
               )
             })}

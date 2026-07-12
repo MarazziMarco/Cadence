@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
 import { updateBusinessSettings } from '@/lib/api/working-hours'
 import { CURRENCIES, LANGUAGES } from '@/lib/types/db'
 import { PageHeader } from '@/components/common/page-header'
@@ -19,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 // server components so amounts re-render in the chosen currency everywhere.
 export function PreferencesClient() {
   const { business } = useWorkspace()
+  const { t } = useT()
   const router = useRouter()
   const businessId = business?.id ?? ''
   const [currency, setCurrency] = useState(business?.currency || 'EUR')
@@ -32,10 +34,10 @@ export function PreferencesClient() {
     setSaving(true)
     try {
       await updateBusinessSettings(businessId, { currency, language })
-      toast.success('Preferences saved')
+      toast.success(t('prefs.saved'))
       router.refresh()
     } catch (e: any) {
-      toast.error(e.message || 'Save failed')
+      toast.error(e.message || t('common.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -43,28 +45,28 @@ export function PreferencesClient() {
 
   return (
     <div>
-      <Link href="/settings" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Settings</Link>
-      <PageHeader title="Preferences" description="Language and currency for your workspace. Applied across the app." />
+      <Link href="/settings" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {t('nav.settings')}</Link>
+      <PageHeader title={t('prefs.title')} description={t('prefs.subtitle')} />
       <Card className="max-w-lg shadow-sm">
-        <CardHeader><CardTitle className="text-base">Language & currency</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t('prefs.cardTitle')}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Interface language</Label>
+            <Label>{t('prefs.language')}</Label>
             <Select value={language} onValueChange={setLanguage}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{LANGUAGES.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Business currency</Label>
+            <Label>{t('prefs.currency')}</Label>
             <Select value={currency} onValueChange={setCurrency}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{CURRENCIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">Preview: {formatMoney(1234.5, currency)}</p>
+            <p className="text-xs text-muted-foreground">{t('prefs.preview')}: {formatMoney(1234.5, currency)}</p>
           </div>
           <Button onClick={save} disabled={saving || !dirty}>
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {t('common.save')}
           </Button>
         </CardContent>
       </Card>
