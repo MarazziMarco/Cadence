@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Mic, MicOff, Loader2, CalendarPlus, Sparkles } from 'lucide-react'
 import { listPatientsForSelect, createAppointment } from '@/lib/api/appointments'
-import { createPatient } from '@/lib/api/patients'
+import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
 import { parseAppointment, type ParsedAppt } from '@/lib/voice/parse-appointment'
@@ -36,7 +36,10 @@ const STR = {
     created: 'Appointment created', createErr: 'Could not create the appointment',
     micDenied: 'Microphone permission denied. Type the text below.',
     micFail: 'Could not start the microphone.',
-    exampleList: ['Marco tomorrow at 3pm physiotherapy', 'Giulia on Friday at 10 checkup', 'Anna on the 20th at 2pm'],
+    prefs: 'Detected preferences', prefMorning: 'Prefers mornings', prefAfternoon: 'Prefers afternoons',
+    availOnly: 'Available only', clearPref: 'Clear',
+    days: { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' } as Record<string, string>,
+    exampleList: ['Marco tomorrow at 3pm physiotherapy', 'Giulia on Friday at 10 checkup', 'Anna, only Mondays, prefers mornings'],
   },
   it: {
     title: 'Crea appuntamento a voce',
@@ -53,7 +56,10 @@ const STR = {
     created: 'Appuntamento creato', createErr: 'Errore nella creazione',
     micDenied: 'Permesso microfono negato. Scrivi il testo qui sotto.',
     micFail: 'Impossibile avviare il microfono.',
-    exampleList: ['Marco domani alle 15 fisioterapia', 'Giulia venerdì alle 10 visita di controllo', 'Anna il 20 alle 14'],
+    prefs: 'Preferenze rilevate', prefMorning: 'Preferisce la mattina', prefAfternoon: 'Preferisce il pomeriggio',
+    availOnly: 'Disponibile solo', clearPref: 'Rimuovi',
+    days: { monday: 'Lun', tuesday: 'Mar', wednesday: 'Mer', thursday: 'Gio', friday: 'Ven', saturday: 'Sab', sunday: 'Dom' } as Record<string, string>,
+    exampleList: ['Marco domani alle 15 fisioterapia', 'Giulia venerdì alle 10 visita di controllo', 'Anna solo il lunedì, preferisce la mattina'],
   },
 } as const
 
@@ -64,7 +70,7 @@ function endTime(start: string, dur: number): string {
 }
 
 function emptyParsed(): ParsedAppt {
-  return { patientId: null, patientName: null, date: null, time: null, serviceId: null, serviceName: null, durationMinutes: null }
+  return { patientId: null, patientName: null, date: null, time: null, serviceId: null, serviceName: null, durationMinutes: null, preferredPartOfDay: null, availableWeekdays: null }
 }
 
 // Voice-driven appointment creation. Browser Web Speech API for transcription
@@ -120,6 +126,10 @@ export function VoiceAppointment() {
         duration_minutes: dur,
         price: services.find((s) => s.id === parsed.serviceId)?.price ?? null,
       })
+      // Persist any availability / preference the phrase carried about this client.
+      if (pid && (parsed.availableWeekdays?.length || parsed.preferredPartOfDay)) {
+        await setPatientWeekdayAvailability(pid, (parsed.availableWeekdays ?? []) as any, parsed.preferredPartOfDay)
+      }
       toast.success(t.created)
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
@@ -188,6 +198,24 @@ export function VoiceAppointment() {
               <div className="space-y-1.5"><Label>{t.date}</Label><Input type="date" value={parsed.date ?? ''} onChange={(e) => set('date', e.target.value || null)} /></div>
               <div className="space-y-1.5"><Label>{t.time}</Label><Input type="time" value={parsed.time ?? ''} onChange={(e) => set('time', e.target.value || null)} /></div>
             </div>
+
+            {(parsed.preferredPartOfDay || parsed.availableWeekdays?.length) && (
+              <div className="rounded-md border border-dashed border-border bg-muted/30 p-2.5">
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t.prefs}</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {parsed.preferredPartOfDay && (
+                    <Badge variant="secondary" className="cursor-pointer font-normal" onClick={() => set('preferredPartOfDay', null)}>
+                      {parsed.preferredPartOfDay === 'morning' ? t.prefMorning : t.prefAfternoon} ✕
+                    </Badge>
+                  )}
+                  {parsed.availableWeekdays?.length ? (
+                    <Badge variant="secondary" className="cursor-pointer font-normal" onClick={() => set('availableWeekdays', null)}>
+                      {t.availOnly}: {parsed.availableWeekdays.map((d) => t.days[d] ?? d).join(', ')} ✕
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+            )}
             <div className="flex justify-end">
               <Button onClick={create} disabled={creating}>{creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarPlus className="mr-2 h-4 w-4" />} {t.create}</Button>
             </div>

@@ -2,6 +2,10 @@
 // into appointment fields. No paid AI / no network — pure string logic, IT + EN.
 // Deliberately forgiving: whatever it can't find stays null and the user fills it.
 
+// Weekday names as stored in the DB (Weekday type). Index = ISO Mon..Sun.
+const WEEKDAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
+export type WeekdayName = (typeof WEEKDAY_NAMES)[number]
+
 export interface ParsedAppt {
   patientId: string | null
   patientName: string | null
@@ -10,6 +14,9 @@ export interface ParsedAppt {
   serviceId: string | null
   serviceName: string | null
   durationMinutes: number | null
+  // Everything else the phrase says about *this* appointment / client:
+  preferredPartOfDay: 'morning' | 'afternoon' | null // soft nudge (weight_patient_preference)
+  availableWeekdays: WeekdayName[] | null // hard restriction ("only Mondays") — null = no limit
 }
 
 interface PatientLite { id: string; first_name?: string | null; last_name?: string | null; full_name?: string | null }
@@ -137,12 +144,40 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// dow from WEEKDAYS (0=Sun..6=Sat) -> ISO name index (0=Mon..6=Sun)
+function dowToName(dow: number): WeekdayName {
+  return WEEKDAY_NAMES[(dow + 6) % 7]
+}
+
+// Preferred part of day (soft) — "di mattina", "prefers afternoons", "presto"/"tardi".
+function resolvePartOfDay(t: string): 'morning' | 'afternoon' | null {
+  if (/\bmattin[ao]\b|\bmorning\b|\bpresto\b|\bearly\b/.test(t)) return 'morning'
+  if (/\bpomeriggio\b|\bafternoon\b|\bsera\b|\bevening\b|\btardi\b|\blate\b/.test(t)) return 'afternoon'
+  return null
+}
+
+// Hard weekday availability ("solo il lunedì", "only on mondays and fridays").
+// Only weekdays mentioned AFTER an availability trigger count, so the appointment
+// day itself ("venerdì alle 10") isn't mistaken for a recurring restriction.
+const AVAIL_TRIGGER = /\b(?:solo|soltanto|disponibil[ei]|disponibilità|only|available|puo?\s+venire|viene solo)\b/iu
+function resolveAvailableWeekdays(t: string): WeekdayName[] | null {
+  const m = AVAIL_TRIGGER.exec(t)
+  if (!m) return null
+  const tail = t.slice(m.index + m[0].length)
+  const found = new Set<WeekdayName>()
+  for (const [name, dow] of Object.entries(WEEKDAYS)) {
+    if (wordRe(name).test(tail)) found.add(dowToName(dow))
+  }
+  return found.size ? [...found] : null
+}
+
 export function parseAppointment(text: string, patients: PatientLite[], services: ServiceLite[], today = new Date()): ParsedAppt {
   const patient = matchPatient(text, patients)
   const service = matchService(text, services)
 
   // Explicit "45 minuti/minutes" duration overrides the service default.
-  const durMatch = text.toLowerCase().match(/\b(\d{2,3})\s*(?:min|minuti|minutes)\b/)
+  const lower = text.toLowerCase()
+  const durMatch = lower.match(/\b(\d{2,3})\s*(?:min|minuti|minutes)\b/)
   const duration = durMatch ? parseInt(durMatch[1]) : service?.duration_minutes ?? null
 
   return {
@@ -153,5 +188,7 @@ export function parseAppointment(text: string, patients: PatientLite[], services
     serviceId: service?.id ?? null,
     serviceName: service?.name ?? null,
     durationMinutes: duration,
+    preferredPartOfDay: resolvePartOfDay(lower),
+    availableWeekdays: resolveAvailableWeekdays(lower),
   }
 }
