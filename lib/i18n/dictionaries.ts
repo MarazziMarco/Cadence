@@ -337,6 +337,16 @@ const en: Dict = {
   'opt.kpi.moved': 'Moved',
   'opt.alreadyOptimal': 'Schedule already optimal for the selected period.',
   'opt.fromWaiting': 'From waiting list',
+
+  // Moved-clients messages
+  'mv.movedCount': '{n} clients moved.',
+  'mv.prepareQuestion': 'Prepare the messages to send?',
+  'mv.prepare': 'Prepare messages',
+  'mv.toCopy': 'Messages to copy ({n})',
+  'mv.preparing': 'Preparing the messages…',
+  'mv.copy': 'Copy',
+  'mv.copied': 'Copied ✓',
+  'mv.prepareError': 'Could not prepare the messages',
 }
 
 const it: Dict = {
@@ -655,6 +665,15 @@ const it: Dict = {
   'opt.kpi.moved': 'Spostati',
   'opt.alreadyOptimal': 'Agenda già ottimale nel periodo selezionato.',
   'opt.fromWaiting': 'Da lista d’attesa',
+
+  'mv.movedCount': '{n} pazienti spostati.',
+  'mv.prepareQuestion': 'Vuoi preparare i messaggi da inviare?',
+  'mv.prepare': 'Prepara messaggi',
+  'mv.toCopy': 'Messaggi da copiare ({n})',
+  'mv.preparing': 'Preparo i messaggi…',
+  'mv.copy': 'Copia',
+  'mv.copied': 'Copiato ✓',
+  'mv.prepareError': 'Errore nel preparare i messaggi',
 }
 
 const es: Dict = {
@@ -973,6 +992,15 @@ const es: Dict = {
   'opt.kpi.moved': 'Movidas',
   'opt.alreadyOptimal': 'La agenda ya es óptima para el periodo seleccionado.',
   'opt.fromWaiting': 'De la lista de espera',
+
+  'mv.movedCount': '{n} clientes movidos.',
+  'mv.prepareQuestion': '¿Preparar los mensajes para enviar?',
+  'mv.prepare': 'Preparar mensajes',
+  'mv.toCopy': 'Mensajes para copiar ({n})',
+  'mv.preparing': 'Preparando los mensajes…',
+  'mv.copy': 'Copiar',
+  'mv.copied': 'Copiado ✓',
+  'mv.prepareError': 'No se pudieron preparar los mensajes',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }
