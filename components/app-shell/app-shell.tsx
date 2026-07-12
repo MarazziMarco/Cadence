@@ -72,6 +72,10 @@ export function AppShell({ user, business, children }: { user: { email: string; 
           </main>
         </div>
 
+        {/* Soft blur behind/around the floating bottom nav so page content peeking
+            below it isn't distracting (mobile only). Sits under the nav (z-40). */}
+        <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 z-40 h-24 backdrop-blur-md [mask-image:linear-gradient(to_top,black_40%,transparent)] lg:hidden" />
+
         {/* Native mobile bottom navigation (hidden on desktop) */}
         <BottomNav onQuickCreate={openQuick} />
       </div>

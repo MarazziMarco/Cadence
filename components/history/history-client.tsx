@@ -30,7 +30,7 @@ function fmtRange(from: string | null, to: string | null): string | null {
   return from === to || !to ? f(from) : `${f(from)} – ${f(to)}`
 }
 
-export function HistoryClient() {
+export function HistoryClient({ embedded = false }: { embedded?: boolean } = {}) {
   const { business } = useWorkspace()
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
@@ -53,33 +53,38 @@ export function HistoryClient() {
     onError: (e: any) => toast.error(e.message || 'Undo failed'),
   })
 
+  const undoButton = (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" disabled={!canUndo || undo.isPending}>
+          {undo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />} Undo last optimization
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Undo the last optimization?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This moves every appointment from the most recent applied optimization back to its previous time. Waiting-list inserts from that run are removed. This can't be redone automatically.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => undo.mutate()}>Undo</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+
   return (
     <div>
-      <PageHeader
-        title="Optimization history"
-        description="Every optimization Cadence has run for your business."
-        actions={
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" disabled={!canUndo || undo.isPending}>
-                {undo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />} Undo last optimization
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Undo the last optimization?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This moves every appointment from the most recent applied optimization back to its previous time. Waiting-list inserts from that run are removed. This can't be redone automatically.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => undo.mutate()}>Undo</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        }
-      />
+      {embedded ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xl font-bold tracking-tight">Optimization history</h2>
+          {undoButton}
+        </div>
+      ) : (
+        <PageHeader title="Optimization history" description="Every optimization Cadence has run for your business." actions={undoButton} />
+      )}
 
       {/* Aggregate summary */}
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { HistoryClient } from '@/components/history/history-client'
 import { cn } from '@/lib/utils'
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '—')
@@ -258,6 +259,11 @@ export function SchedulerClient() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Optimization history + undo, right here on the Scheduler */}
+      <div className="mt-10 border-t border-border pt-6">
+        <HistoryClient embedded />
+      </div>
     </div>
   )
 }
