@@ -51,8 +51,8 @@ export function BottomNav({ onQuickCreate }: { onQuickCreate: (kind: QuickKind) 
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch justify-around border-t border-border bg-background/95 backdrop-blur lg:hidden"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed inset-x-3 z-50 flex h-16 items-stretch justify-around rounded-2xl border border-border bg-background/95 shadow-lg backdrop-blur lg:hidden"
+      style={{ bottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
       {LEFT.map(Item)}
 

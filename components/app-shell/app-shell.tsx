@@ -66,7 +66,7 @@ export function AppShell({ user, business, children }: { user: { email: string; 
           </header>
 
           <main className="flex-1 overflow-y-auto">
-            <div key={pathname} className="mx-auto w-full max-w-7xl animate-fade-up p-4 pb-28 sm:p-6 sm:pb-28 lg:p-8 lg:pb-8">
+            <div key={pathname} className="mx-auto w-full max-w-7xl animate-fade-up p-4 pb-32 sm:p-6 sm:pb-32 lg:p-8 lg:pb-8">
               {children}
             </div>
           </main>
