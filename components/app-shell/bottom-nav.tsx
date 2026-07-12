@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { LayoutDashboard, CalendarDays, Users, Wand2, Plus, CalendarPlus, UserPlus, Sparkles } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, Users, Wand2, Plus, CalendarPlus, UserPlus, Mic } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+
+export type QuickKind = 'appointment' | 'client' | 'voice'
 
 const LEFT = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,17 +17,17 @@ const RIGHT = [
   { href: '/patients', label: 'Clients', icon: Users },
   { href: '/scheduler', label: 'Scheduler', icon: Wand2 },
 ]
-const CREATE = [
-  { href: '/calendar?new=1', label: 'Nuovo appuntamento', icon: CalendarPlus },
-  { href: '/patients?new=1', label: 'Nuovo cliente', icon: UserPlus },
-  { href: '/services?new=1', label: 'Nuovo servizio', icon: Sparkles },
+// The "+" opens these — each triggers a MODAL directly (faster than a page).
+const CREATE: { kind: QuickKind; label: string; icon: any; hint: string }[] = [
+  { kind: 'voice', label: 'Speak', icon: Mic, hint: 'Dictate an appointment' },
+  { kind: 'appointment', label: 'New appointment', icon: CalendarPlus, hint: 'Open the appointment form' },
+  { kind: 'client', label: 'New client', icon: UserPlus, hint: 'Open the client form' },
 ]
 
-export function BottomNav() {
+export function BottomNav({ onQuickCreate }: { onQuickCreate: (kind: QuickKind) => void }) {
   const pathname = usePathname()
-  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const go = (href: string) => { setOpen(false); router.push(href) }
+  const pick = (kind: QuickKind) => { setOpen(false); onQuickCreate(kind) }
 
   const Item = (it: any) => {
     const active = pathname === it.href || pathname.startsWith(it.href + '/')
@@ -65,16 +67,16 @@ export function BottomNav() {
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl border-border pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-            <SheetHeader className="text-left"><SheetTitle>Crea nuovo</SheetTitle></SheetHeader>
+            <SheetHeader className="text-left"><SheetTitle>Create new</SheetTitle></SheetHeader>
             <div className="mt-4 space-y-2">
               {CREATE.map((c) => (
                 <button
-                  key={c.href}
-                  onClick={() => go(c.href)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left font-medium transition-all duration-200 hover:bg-accent active:scale-[0.98]"
+                  key={c.kind}
+                  onClick={() => pick(c.kind)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left transition-all duration-200 hover:bg-accent active:scale-[0.98]"
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><c.icon className="h-5 w-5" /></span>
-                  {c.label}
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><c.icon className="h-5 w-5" /></span>
+                  <span className="min-w-0"><span className="block font-medium">{c.label}</span><span className="block text-xs text-muted-foreground">{c.hint}</span></span>
                 </button>
               ))}
             </div>
