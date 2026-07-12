@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { History, Clock, ArrowRightLeft, PlusCircle, Undo2, Loader2, Sparkles } from 'lucide-react'
+import { History, Clock, Undo2, Loader2, Sparkles, ChevronRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { getOptimizationHistory, undoLastOptimization } from '@/lib/api/optimization-history'
 import { useWorkspace } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
@@ -39,6 +41,8 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
   const runs = data?.runs ?? []
   const summary = data?.summary
   const canUndo = runs.some((r) => r.appliedCount > 0)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggle = (id: string) => setExpanded((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const undo = useMutation({
     mutationFn: () => undoLastOptimization(businessId),
@@ -56,8 +60,8 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
   const undoButton = (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" disabled={!canUndo || undo.isPending}>
-          {undo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />} Undo last optimization
+        <Button size="lg" className="w-full font-bold tracking-wide sm:w-auto" disabled={!canUndo || undo.isPending}>
+          {undo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />} UNDO last optimization
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -78,13 +82,16 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
   return (
     <div>
       {embedded ? (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xl font-bold tracking-tight">Optimization history</h2>
-          {undoButton}
-        </div>
+        <h2 className="mb-4 text-xl font-bold tracking-tight">Optimization history</h2>
       ) : (
-        <PageHeader title="Optimization history" description="Every optimization Cadence has run for your business." actions={undoButton} />
+        <PageHeader title="Optimization history" description="Every optimization Cadence has run for your business." />
       )}
+
+      {/* Undo — prominent, right above the history */}
+      <div className="mb-6">
+        {undoButton}
+        {!canUndo && <p className="mt-2 text-xs text-muted-foreground">Nothing to undo yet — apply an optimization first.</p>}
+      </div>
 
       {/* Aggregate summary */}
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -105,31 +112,37 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
       ) : runs.length === 0 ? (
         <EmptyState icon={History} title="No optimizations yet" description="Once you run an optimization from the Scheduler or Calendar, it will show up here." />
       ) : (
-        <div className="space-y-3">
-          {runs.map((r) => (
-            <Card key={r.id} className="shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold">{fmtDateTime(r.created_at)}</span>
-                    {fmtRange(r.rangeFrom, r.rangeTo) && <Badge variant="secondary">{fmtRange(r.rangeFrom, r.rangeTo)}</Badge>}
-                    <Badge variant="secondary" className="capitalize">{r.mode}</Badge>
-                    {r.appliedCount > 0 && <Badge className="bg-success/15 text-success hover:bg-success/15">Applied</Badge>}
+        <div className="space-y-2">
+          {runs.map((r) => {
+            const open = expanded.has(r.id)
+            return (
+              <div key={r.id} className="rounded-xl border border-border bg-card shadow-sm">
+                {/* Compact summary — click to expand this run's details */}
+                <button onClick={() => toggle(r.id)} className="flex w-full items-center justify-between gap-2 p-3 text-left">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <ChevronRight className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{fmtDateTime(r.created_at)}</p>
+                      <p className="truncate text-xs text-muted-foreground">{fmtMinutes(r.idleRecovered)} recovered · {r.moved} moved{r.created > 0 ? ` · ${r.created} from waiting list` : ''}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-sm">
-                    <Clock className="h-3.5 w-3.5 text-primary" />
-                    <span className="font-semibold tabular-nums">{fmtMinutes(r.idleRecovered)}</span>
-                    <span className="text-muted-foreground">recovered</span>
+                  {r.appliedCount > 0 && <Badge className="shrink-0 bg-success/15 text-success hover:bg-success/15">Applied</Badge>}
+                </button>
+                {open && (
+                  <div className="border-t border-border p-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {fmtRange(r.rangeFrom, r.rangeTo) && <Badge variant="secondary">{fmtRange(r.rangeFrom, r.rangeTo)}</Badge>}
+                      <Badge variant="secondary" className="capitalize">{r.mode}</Badge>
+                      <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" /> {fmtMinutes(r.idleRecovered)} recovered</Badge>
+                      <Badge variant="secondary">{r.moved} moved</Badge>
+                      {r.created > 0 && <Badge variant="secondary">{r.created} from waiting list</Badge>}
+                    </div>
+                    {r.ai_summary && <p className="mt-2 text-sm text-muted-foreground">{r.ai_summary}</p>}
                   </div>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><ArrowRightLeft className="h-3.5 w-3.5" /> {r.moved} moved</span>
-                  {r.created > 0 && <span className="inline-flex items-center gap-1"><PlusCircle className="h-3.5 w-3.5" /> {r.created} from waiting list</span>}
-                </div>
-                {r.ai_summary && <p className="mt-2 text-sm text-muted-foreground">{r.ai_summary}</p>}
-              </CardContent>
-            </Card>
-          ))}
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

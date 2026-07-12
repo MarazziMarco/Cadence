@@ -22,15 +22,20 @@ export default function CalendarPage() {
             <PopoverTrigger asChild>
               <button aria-label="Shortcuts & tips" className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Info className="h-3.5 w-3.5" /></button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-64">
-              <p className="mb-2 text-sm font-semibold">Shortcuts & tips</p>
-              <ul className="space-y-1.5 text-sm text-muted-foreground">
-                <li><kbd className={kbd}>n</kbd> New appointment</li>
-                <li><kbd className={kbd}>w</kbd> / <kbd className={kbd}>d</kbd> Week / day view</li>
-                <li><kbd className={kbd}>←</kbd> <kbd className={kbd}>→</kbd> Previous / next</li>
-                <li><kbd className={kbd}>t</kbd> Jump to today</li>
-              </ul>
-              <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">On desktop drag an appointment to move it; on touch, press and hold to grab it. Tap an empty slot to book.</p>
+            <PopoverContent align="start" className="w-72">
+              {/* Always shown: what the Waiting list is + how to reach it */}
+              <p className="text-sm"><span className="font-semibold">Waiting list</span> (the tab above): clients ready to fill any gap. The optimizer slots them in automatically when a spot frees up — switch to it with the tab, and back to Calendar the same way.</p>
+              {/* Keyboard shortcuts only make sense on desktop */}
+              <div className="mt-3 hidden border-t border-border pt-3 sm:block">
+                <p className="mb-2 text-sm font-semibold">Shortcuts</p>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  <li><kbd className={kbd}>n</kbd> New appointment</li>
+                  <li><kbd className={kbd}>w</kbd> / <kbd className={kbd}>d</kbd> Week / day view</li>
+                  <li><kbd className={kbd}>←</kbd> <kbd className={kbd}>→</kbd> Previous / next</li>
+                  <li><kbd className={kbd}>t</kbd> Jump to today</li>
+                </ul>
+              </div>
+              <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">Drag an appointment to move it (on phone, press &amp; hold to grab). Tap an empty slot to book.</p>
             </PopoverContent>
           </Popover>
         )}
