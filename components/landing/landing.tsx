@@ -63,7 +63,7 @@ export function Landing() {
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.12 }}
             className="mt-6 max-w-3xl text-balance text-xl font-medium text-foreground sm:text-2xl">
-            Small clinics and solo pros burn nights and weekends arranging appointments by hand. Cadence rebuilds your entire week — the best way possible — in one click.
+            If your week runs on appointments, you know the pain — nights and weekends spent arranging them by hand. Cadence rebuilds your whole week, the best way possible, in one click.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.18 }}
             className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
@@ -77,7 +77,7 @@ export function Landing() {
       <section className="border-y border-border bg-muted/20">
         <div className="container py-20 sm:py-28">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Stop rebuilding your week by hand</h2>
+            <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Let Cadence build your week for you</h2>
             <p className="mt-4 text-balance text-lg text-muted-foreground">
               Physiotherapists, osteopaths, salons, trainers, freelancers — millions of small businesses and
               self-employed pros burn nights and weekends shuffling appointments to close the gaps. It&apos;s a
