@@ -222,6 +222,22 @@ const en: Dict = {
   'sched.reject': 'Reject',
   'sched.accept': 'Accept',
   'sched.dismissed': 'Change dismissed',
+
+  // Calendar
+  'cal.tab': 'Calendar',
+  'cal.tabWaiting': 'Waiting list',
+  'cal.new': 'New appointment',
+  'cal.today': 'Today',
+  'cal.view.day': 'Day',
+  'cal.view.week': 'Week',
+  'cal.shortcutsAria': 'Shortcuts & tips',
+  'cal.wlInfo': 'Waiting list (the tab above): clients ready to fill any gap. The optimizer slots them in automatically when a spot frees up — switch to it with the tab, and back to Calendar the same way.',
+  'cal.shortcuts': 'Shortcuts',
+  'cal.sc.new': 'New appointment',
+  'cal.sc.weekDay': 'Week / day view',
+  'cal.sc.prevNext': 'Previous / next',
+  'cal.sc.today': 'Jump to today',
+  'cal.dragTip': 'Drag an appointment to move it (on phone, press & hold to grab). Tap an empty slot to book.',
 }
 
 const it: Dict = {
@@ -431,6 +447,21 @@ const it: Dict = {
   'sched.reject': 'Rifiuta',
   'sched.accept': 'Accetta',
   'sched.dismissed': 'Modifica scartata',
+
+  'cal.tab': 'Calendario',
+  'cal.tabWaiting': 'Lista d’attesa',
+  'cal.new': 'Nuovo appuntamento',
+  'cal.today': 'Oggi',
+  'cal.view.day': 'Giorno',
+  'cal.view.week': 'Settimana',
+  'cal.shortcutsAria': 'Scorciatoie e consigli',
+  'cal.wlInfo': 'Lista d’attesa (la scheda qui sopra): clienti pronti a riempire ogni buco. L’ottimizzatore li inserisce automaticamente quando si libera un posto — passa a quella scheda, e torna al Calendario allo stesso modo.',
+  'cal.shortcuts': 'Scorciatoie',
+  'cal.sc.new': 'Nuovo appuntamento',
+  'cal.sc.weekDay': 'Vista settimana / giorno',
+  'cal.sc.prevNext': 'Precedente / successivo',
+  'cal.sc.today': 'Vai a oggi',
+  'cal.dragTip': 'Trascina un appuntamento per spostarlo (su telefono, tieni premuto per afferrarlo). Tocca uno slot vuoto per prenotare.',
 }
 
 const es: Dict = {
@@ -640,6 +671,21 @@ const es: Dict = {
   'sched.reject': 'Rechazar',
   'sched.accept': 'Aceptar',
   'sched.dismissed': 'Cambio descartado',
+
+  'cal.tab': 'Calendario',
+  'cal.tabWaiting': 'Lista de espera',
+  'cal.new': 'Nueva cita',
+  'cal.today': 'Hoy',
+  'cal.view.day': 'Día',
+  'cal.view.week': 'Semana',
+  'cal.shortcutsAria': 'Atajos y consejos',
+  'cal.wlInfo': 'Lista de espera (la pestaña de arriba): clientes listos para llenar cualquier hueco. El optimizador los coloca automáticamente cuando se libera un sitio — cambia a ella con la pestaña, y vuelve al Calendario igual.',
+  'cal.shortcuts': 'Atajos',
+  'cal.sc.new': 'Nueva cita',
+  'cal.sc.weekDay': 'Vista semana / día',
+  'cal.sc.prevNext': 'Anterior / siguiente',
+  'cal.sc.today': 'Ir a hoy',
+  'cal.dragTip': 'Arrastra una cita para moverla (en el móvil, mantén pulsado para agarrarla). Toca un hueco vacío para reservar.',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }

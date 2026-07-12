@@ -12,6 +12,12 @@ export function normalizeLocale(lang?: string | null): Locale {
   return (LOCALES as string[]).includes(l) ? (l as Locale) : 'en'
 }
 
+// BCP-47 tag for Intl date/number formatting per app locale.
+const BCP47: Record<Locale, string> = { en: 'en-US', it: 'it-IT', es: 'es-ES' }
+export function bcp47(locale: Locale): string {
+  return BCP47[locale] || 'en-US'
+}
+
 // Map a nav href to its translation key (shared by sidebar, bottom nav, title).
 const NAV_KEYS: Record<string, string> = {
   '/dashboard': 'nav.dashboard', '/calendar': 'nav.calendar', '/patients': 'nav.patients',

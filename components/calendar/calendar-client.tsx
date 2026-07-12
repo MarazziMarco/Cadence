@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { listAppointments, updateAppointment, minToTime, timeToMin, fmtTime, type CalendarAppointment } from '@/lib/api/appointments'
 import { useWorkspace } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
+import { bcp47 } from '@/lib/i18n'
 import { AppointmentDialog } from './appointment-dialog'
 import { OptimizeDialog } from './optimize-dialog'
 import { Button } from '@/components/ui/button'
@@ -21,6 +23,8 @@ const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export function CalendarClient() {
   const { business } = useWorkspace()
+  const { t, locale } = useT()
+  const dloc = bcp47(locale)
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
   const [view, setView] = useState<'week' | 'day'>('week')
@@ -144,15 +148,15 @@ export function CalendarClient() {
 
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
   const label = view === 'day'
-    ? days[0].toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-    : `${days[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    ? days[0].toLocaleDateString(dloc, { weekday: 'long', month: 'long', day: 'numeric' })
+    : `${days[0].toLocaleDateString(dloc, { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString(dloc, { month: 'short', day: 'numeric' })}`
   const todayStr = ymd(new Date())
 
   return (
     <div>
       {/* Centered primary actions (page owns the Calendar / Waiting-list tabs) */}
       <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
-        <Button size="lg" onClick={() => openNew()}><Plus className="mr-2 h-4 w-4" /> New appointment</Button>
+        <Button size="lg" onClick={() => openNew()}><Plus className="mr-2 h-4 w-4" /> {t('cal.new')}</Button>
         {businessId && <OptimizeDialog businessId={businessId} dateFrom={rangeStart} dateTo={rangeEnd} />}
       </div>
 
@@ -160,13 +164,13 @@ export function CalendarClient() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? -1 : -7))}><ChevronLeft className="h-4 w-4" /></Button>
-          <Button variant="outline" size="sm" onClick={() => setAnchor(new Date())}>Today</Button>
+          <Button variant="outline" size="sm" onClick={() => setAnchor(new Date())}>{t('cal.today')}</Button>
           <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? 1 : 7))}><ChevronRight className="h-4 w-4" /></Button>
           <span className="ml-1 text-sm font-semibold">{label}</span>
         </div>
         <div className="inline-flex rounded-lg border border-border p-0.5">
           {(['day', 'week'] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
+            <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1.5 text-sm font-medium transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{t('cal.view.' + v)}</button>
           ))}
         </div>
       </div>
@@ -182,7 +186,7 @@ export function CalendarClient() {
             const isToday = ymd(d) === todayStr
             return (
               <div key={ymd(d)} className="flex-1 border-l border-border py-2 text-center">
-                <div className="text-xs text-muted-foreground">{DOW[(d.getDay() + 6) % 7]}</div>
+                <div className="text-xs text-muted-foreground">{d.toLocaleDateString(dloc, { weekday: 'short' })}</div>
                 <div className={cn('mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold', isToday && 'bg-primary text-primary-foreground')}>{d.getDate()}</div>
               </div>
             )
@@ -218,7 +222,7 @@ export function CalendarClient() {
                   const top = (timeToMin(a.start_time) - START_HOUR * 60) / 60 * HOUR_H
                   const height = Math.max(30, a.duration_minutes / 60 * HOUR_H - 3)
                   const color = a.color || a.services?.color || a.patients?.color || '#4f46e5'
-                  const name = a.patients?.full_name || a.patients?.first_name || 'Client'
+                  const name = a.patients?.full_name || a.patients?.first_name || t('dash.client')
                   const grabbed = touchDragId === a.id
                   return (
                     <div key={a.id} draggable
