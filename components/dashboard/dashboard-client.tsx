@@ -59,45 +59,38 @@ export function DashboardClient({ name }: { name?: string }) {
 
   return (
     <div>
-      <PageHeader title={`${greeting}${name ? ', ' + name.split(' ')[0] : ''}`} description="Here's what's happening across your schedule today."
-        actions={<Button onClick={goOptimize} disabled={optimizing}>{optimizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} {optimizing ? 'Optimizing…' : 'Optimize'}</Button>} />
+      <PageHeader title={`${greeting}${name ? ', ' + name.split(' ')[0] : ''}`} description="Here's what's happening across your schedule today." />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Schedule health — slim bar on top (recoverable dead time). */}
+      {health && (health.idleToday > 0 || health.idleWeek > 0) ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-accent/40 px-4 py-2.5 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <Clock className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate"><span className="font-semibold">{fmtIdle(health.idleToday)} of dead time today</span><span className="hidden text-muted-foreground sm:inline"> · {fmtIdle(health.idleWeek)} recoverable this week</span></span>
+          </div>
+          <Button size="sm" onClick={goOptimize} disabled={optimizing} className="shrink-0">{optimizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Optimize now</Button>
+        </div>
+      ) : health ? (
+        <div className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-2.5 text-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <Check className="h-4 w-4 shrink-0 text-success" />
+          <span className="font-semibold">Schedule looks tight</span>
+          <span className="text-muted-foreground">— no recoverable dead time this week.</span>
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((k, i) => (
           <motion.div key={k.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.05 }}>
-            <Card className="shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"><CardContent className="flex items-center justify-between p-5">
-              <div><p className="text-sm text-muted-foreground">{k.label}</p>{isLoading ? <Skeleton className="mt-2 h-7 w-16" /> : <p className="mt-1 text-2xl font-bold tracking-tight">{k.value}</p>}</div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground"><k.icon className="h-5 w-5" /></div>
+            <Card className="h-full shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"><CardContent className="p-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs text-muted-foreground">{k.label}</p>
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"><k.icon className="h-4 w-4" /></div>
+              </div>
+              {isLoading ? <Skeleton className="mt-2 h-6 w-14" /> : <p className="mt-1.5 text-xl font-bold tracking-tight">{k.value}</p>}
             </CardContent></Card>
           </motion.div>
         ))}
       </div>
-
-      {/* Schedule health — recoverable dead time (same notion as the optimizer). */}
-      {health && (health.idleToday > 0 || health.idleWeek > 0) ? (
-        <Card className="mt-6 border-primary/30 bg-accent/30 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock className="h-5 w-5" /></div>
-              <div>
-                <p className="text-lg font-bold tracking-tight">{fmtIdle(health.idleToday)} of dead time today</p>
-                <p className="text-sm text-muted-foreground">{fmtIdle(health.idleWeek)} recoverable this week — gaps between appointments the optimizer can close.</p>
-              </div>
-            </div>
-            <Button onClick={goOptimize} disabled={optimizing} className="shrink-0">{optimizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Optimize now</Button>
-          </CardContent>
-        </Card>
-      ) : health ? (
-        <Card className="mt-6 border-success/30 bg-success/5 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <CardContent className="flex items-center gap-3 p-5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success/15 text-success"><Check className="h-5 w-5" /></div>
-            <div>
-              <p className="text-lg font-bold tracking-tight">Schedule looks tight</p>
-              <p className="text-sm text-muted-foreground">No recoverable dead time in this week&apos;s agenda.</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2 shadow-sm transition-shadow duration-200 hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -130,14 +123,6 @@ export function DashboardClient({ name }: { name?: string }) {
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card className="shadow-sm transition-shadow duration-200 hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500 [animation-delay:120ms] fill-mode-both"><CardHeader className="flex flex-row items-center justify-between"><CardTitle className="text-base">Upcoming</CardTitle></CardHeader>
-          <CardContent className="space-y-2">{isLoading ? [...Array(2)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />) : (data?.upcoming.length ?? 0) === 0 ? <EmptyState icon={CalendarDays} title="Nothing upcoming" className="border-0" /> : data!.upcoming.map((a: any) => <ApptRow key={a.id} a={a} />)}</CardContent>
-        </Card>
-        <Card className="shadow-sm transition-shadow duration-200 hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500 [animation-delay:160ms] fill-mode-both"><CardHeader><CardTitle className="text-base">Recent activity</CardTitle></CardHeader>
-          <CardContent className="space-y-2">{isLoading ? [...Array(2)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />) : (data?.recent.length ?? 0) === 0 ? <EmptyState icon={Activity} title="Nothing yet" className="border-0" /> : data!.recent.map((a: any) => <ApptRow key={a.id} a={a} />)}</CardContent>
-        </Card>
-      </div>
     </div>
   )
 }
