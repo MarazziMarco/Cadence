@@ -159,16 +159,14 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
           </div>
           <div className="space-y-3">
             <div className="space-y-2"><Label>Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-            <div className="flex gap-3">
-              <div className="flex-1 space-y-2"><Label>Start</Label><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-              <div className="w-24 space-y-2 sm:w-28">
-                <Label>Min</Label>
-                {/* Native select → an iOS wheel; not keyboard-editable, stays compact. */}
-                <select value={duration} onChange={(e) => setDuration(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm">
-                  {Array.from({ length: 200 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </div>
+            <div className="space-y-2"><Label>Start</Label><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-2">
+              <Label>Duration (min)</Label>
+              {/* Native select → an iOS wheel; not keyboard-editable, stays compact. */}
+              <select value={duration} onChange={(e) => setDuration(e.target.value)}
+                className="flex h-9 w-24 rounded-md border border-input bg-transparent px-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm">
+                {Array.from({ length: 200 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
           </div>
 
