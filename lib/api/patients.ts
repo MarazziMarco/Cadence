@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/client'
-import type { Patient, Weekday } from '@/lib/types/db'
+import { WEEKDAYS, type Patient, type Weekday } from '@/lib/types/db'
 
 const sb = () => createClient()
+
+const PERIOD_WINDOW: Record<'morning' | 'afternoon', [string, string]> = {
+  morning: ['09:00:00', '13:00:00'],
+  afternoon: ['14:00:00', '18:00:00'],
+}
 export type PatientFilter = 'all' | 'vip' | 'archived'
 
 export async function listPatients(businessId: string, search: string, filter: PatientFilter): Promise<Patient[]> {
@@ -55,20 +60,27 @@ export async function setPatientFlag(id: string, patch: Partial<Pick<Patient, 'i
  * empty list clears the constraint (patient becomes flexible again). Uses the
  * existing patient_availability table — no schema change.
  */
-export async function setPatientWeekdayAvailability(patientId: string, weekdays: Weekday[]): Promise<void> {
+export async function setPatientWeekdayAvailability(patientId: string, weekdays: Weekday[], preferred: 'morning' | 'afternoon' | null = null): Promise<void> {
   const client = sb()
   // Soft-delete any existing recurring availability so we don't stack duplicates.
   await client.from('patient_availability').update({ deleted_at: new Date().toISOString() })
     .eq('patient_id', patientId).is('deleted_at', null)
-  if (weekdays.length === 0) return
-  const rows = weekdays.map((w) => ({
-    patient_id: patientId,
-    weekday: w,
-    start_time: '00:00:00',
-    end_time: '23:59:00',
-    priority: 'normal',
-    recurring: true,
+
+  // Days the client can come. If none are restricted but a preferred time is set,
+  // apply the preference across all weekdays (kept soft by the full-day rows).
+  const days = weekdays.length ? weekdays : (preferred ? [...WEEKDAYS] : [])
+  if (days.length === 0) return
+
+  const rows: any[] = days.map((w) => ({
+    patient_id: patientId, weekday: w, start_time: '00:00:00', end_time: '23:59:00', priority: 'normal', recurring: true,
   }))
+  // A high-priority window = a *preferred* time. It's a soft nudge for the
+  // optimizer (weight_patient_preference), not a hard limit — the full-day rows
+  // above still allow any time.
+  if (preferred) {
+    const [s, e] = PERIOD_WINDOW[preferred]
+    for (const w of days) rows.push({ patient_id: patientId, weekday: w, start_time: s, end_time: e, priority: 'high', recurring: true })
+  }
   const { error } = await client.from('patient_availability').insert(rows)
   if (error) throw error
 }

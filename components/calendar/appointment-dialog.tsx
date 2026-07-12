@@ -38,6 +38,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
   const [showAvail, setShowAvail] = useState(false)
   const [availOnly, setAvailOnly] = useState<Set<Weekday>>(new Set())
   const [availNever, setAvailNever] = useState<Set<Weekday>>(new Set())
+  const [preferred, setPreferred] = useState<'morning' | 'afternoon' | null>(null)
 
   const { data: patients = [] } = useQuery({ queryKey: ['patients-select', businessId], queryFn: () => listPatientsForSelect(businessId), enabled: !!businessId && open })
   const { data: services = [] } = useQuery({ queryKey: ['services', businessId], queryFn: () => listServices(businessId), enabled: !!businessId && open })
@@ -69,7 +70,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
       setDate(appt?.appointment_date ?? defaultDate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })())
       setStart(appt ? appt.start_time.slice(0, 5) : (defaultStart ?? '09:00'))
       setDuration(String(appt?.duration_minutes ?? business?.default_appointment_duration ?? 30))
-      setShowAvail(false); setAvailOnly(new Set()); setAvailNever(new Set())
+      setShowAvail(false); setAvailOnly(new Set()); setAvailNever(new Set()); setPreferred(null)
     }
   }, [open])
 
@@ -98,7 +99,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
       if (!pid && newClient.trim()) { const np = await createPatient(businessId, { first_name: newClient.trim() }); pid = np.id }
       // Persist optional client availability for the optimizer to use.
       const availDays = resolveAvail()
-      if (pid && availDays && availDays.length) await setPatientWeekdayAvailability(pid, availDays)
+      if (pid && showAvail && ((availDays && availDays.length) || preferred)) await setPatientWeekdayAvailability(pid, availDays ?? [], preferred)
       const startMin = timeToMin(start + ':00')
       const dur = parseInt(duration) || 30
       const svc = services.find((s: any) => s.id === serviceId)
@@ -196,7 +197,21 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
                     ))}
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">{it ? 'Lascia vuoto se il cliente è flessibile.' : 'Leave empty if the client is flexible.'}</p>
+                <div>
+                  <p className="mb-1.5 text-xs font-medium">{it ? 'Orario preferito (opzionale)' : 'Preferred time (optional)'}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {([['any', 'Any', 'Qualsiasi'], ['morning', 'Morning', 'Mattina'], ['afternoon', 'Afternoon', 'Pomeriggio']] as const).map(([val, en, itl]) => {
+                      const active = (val === 'any' && !preferred) || preferred === val
+                      return (
+                        <button key={val} type="button" onClick={() => setPreferred(val === 'any' ? null : (val as 'morning' | 'afternoon'))}
+                          className={cn('rounded-md border px-2.5 py-1 text-xs font-medium transition-colors', active ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-accent')}>
+                          {it ? itl : en}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{it ? 'La disponibilità è un vincolo; l’orario preferito è solo una preferenza soft. Lascia vuoto se flessibile.' : 'Availability is a hard limit; preferred time is only a soft preference. Leave empty if flexible.'}</p>
               </div>
             )}
           </div>
