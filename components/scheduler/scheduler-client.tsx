@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Wand2, Loader2, Clock, DollarSign, ListChecks, ArrowRightLeft, ShieldCheck, Check, X, ArrowRight, Sparkles, PlusCircle } from 'lucide-react'
-import { runOptimization, fetchRun, acceptChange, rejectChange, ensureAlgorithmSettings } from '@/lib/api/scheduler'
+import { Wand2, Loader2, Clock, DollarSign, ListChecks, ArrowRightLeft, ShieldCheck, Check, X, ArrowRight, Sparkles, PlusCircle, Star, CalendarClock, MoveHorizontal } from 'lucide-react'
+import { runOptimization, fetchRun, acceptChange, rejectChange, ensureAlgorithmSettings, getAlgorithmSettings, saveAlgorithmSettings } from '@/lib/api/scheduler'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
 import { Button } from '@/components/ui/button'
@@ -13,10 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { OPTIMIZATION_MODE } from '@/lib/types/db'
-import { VoiceAppointment } from '@/components/ai/voice-appointment'
 import { cn } from '@/lib/utils'
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '—')
@@ -27,11 +24,17 @@ const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.get
 const todayStr = () => ymd(new Date())
 
 const RANGES = [
-  { value: 'day', label: 'Giorno' },
-  { value: 'week', label: 'Settimana' },
-  { value: 'custom', label: 'Intervallo' },
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'custom', label: 'Custom' },
 ] as const
 type Range = (typeof RANGES)[number]['value']
+
+const MODES = [
+  { value: 'conservative', label: 'Conservative', desc: 'Move as few appointments as possible.' },
+  { value: 'balanced', label: 'Balanced', desc: 'A sensible trade-off (recommended).' },
+  { value: 'aggressive', label: 'Aggressive', desc: 'Pack the day as tight as possible.' },
+]
 
 export function SchedulerClient() {
   const { business } = useWorkspace()
@@ -41,17 +44,38 @@ export function SchedulerClient() {
   const [date, setDate] = useState(todayStr())
   const [customFrom, setCustomFrom] = useState(todayStr())
   const [customTo, setCustomTo] = useState(todayStr())
+
+  // Saved algorithm knobs — reused by the quick "Optimize" everywhere.
   const [mode, setMode] = useState('balanced')
   const [includeWaitingList, setIncludeWaitingList] = useState(false)
+  const [protectVips, setProtectVips] = useState(true)
+  const [respectPreferred, setRespectPreferred] = useState(true)
+
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [run, setRun] = useState<any>(null)
   const [changes, setChanges] = useState<any[]>([])
 
-  // Ensure the business has an active algorithm_settings row on first access.
+  // Load saved settings so the page reflects (and edits) what the optimizer uses.
   useEffect(() => {
-    if (businessId) ensureAlgorithmSettings(businessId).catch(() => {})
+    if (!businessId) return
+    ensureAlgorithmSettings(businessId)
+      .then(() => getAlgorithmSettings(businessId))
+      .then((s: any) => {
+        if (!s) return
+        if (s.optimization_mode) setMode(s.optimization_mode)
+        setIncludeWaitingList(!!s.allow_waiting_list)
+        setProtectVips((s.weight_vip ?? 100) > 0)
+        setRespectPreferred((s.weight_patient_preference ?? 5) > 0)
+      })
+      .catch(() => {})
   }, [businessId])
+
+  function persist(patch: Record<string, unknown>) { saveAlgorithmSettings(businessId, patch).catch(() => {}) }
+  const changeMode = (m: string) => { setMode(m); persist({ optimization_mode: m }) }
+  const changeWaiting = (v: boolean) => { setIncludeWaitingList(v); persist({ allow_waiting_list: v }) }
+  const changeVips = (v: boolean) => { setProtectVips(v); persist({ weight_vip: v ? 100 : 0 }) }
+  const changePreferred = (v: boolean) => { setRespectPreferred(v); persist({ weight_patient_preference: v ? 5 : 0 }) }
 
   const [dateFrom, dateTo] = range === 'day' ? [date, date]
     : range === 'week' ? (() => { const s = startOfWeek(parseYmd(date)); return [ymd(s), ymd(addDays(s, 6))] })()
@@ -60,7 +84,8 @@ export function SchedulerClient() {
   async function optimize() {
     setLoading(true); setRun(null); setChanges([])
     try {
-      const runId = await runOptimization(businessId, dateFrom, dateTo, { mode, allowWaitingList: includeWaitingList })
+      // Settings already persisted on change; the Edge Function reads them.
+      const runId = await runOptimization(businessId, dateFrom, dateTo)
       const res = await fetchRun(runId)
       setRun(res.run); setChanges(res.changes)
       if (res.changes.length === 0) toast.info('Already optimal — no beneficial changes found.')
@@ -90,16 +115,44 @@ export function SchedulerClient() {
     { label: 'Revenue impact', value: `+${formatMoney(revImpact, business?.currency)}`, icon: DollarSign, tone: 'text-success' },
     { label: 'Waiting list filled', value: String(run.created_appointments ?? 0), icon: ListChecks, tone: 'text-primary' },
     { label: 'Appointments moved', value: String(run.moved_appointments ?? 0), icon: ArrowRightLeft, tone: 'text-primary' },
-    { label: 'Constraint violations', value: '0', icon: ShieldCheck, tone: 'text-success' },
   ] : []
+
+  const toggles = [
+    { on: includeWaitingList, set: changeWaiting, icon: ListChecks, title: 'Fill from waiting list', desc: 'Insert waiting-list clients into freed slots.' },
+    { on: protectVips, set: changeVips, icon: Star, title: 'Protect VIPs', desc: 'Avoid moving your VIP clients when possible.' },
+    { on: respectPreferred, set: changePreferred, icon: CalendarClock, title: 'Respect preferred times', desc: "Keep clients within their preferred hours where they set them." },
+  ]
 
   return (
     <div>
-      <PageHeader title="Scheduler" description="Build the best possible day. Every optimization is a preview — you decide, row by row." />
+      <PageHeader title="Scheduler" description="Tune how the optimizer works, then preview and apply — nothing changes until you accept." />
+
+      {/* Legend — what it does and the rules it never breaks */}
+      <Card className="mb-6 border-primary/20 bg-accent/20 shadow-sm">
+        <CardContent className="grid gap-4 p-5 sm:grid-cols-2">
+          <div>
+            <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> What it does</p>
+            <ul className="space-y-1.5 text-sm text-muted-foreground">
+              <li className="flex gap-2"><MoveHorizontal className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> Pulls appointments earlier to close the gaps between them.</li>
+              <li className="flex gap-2"><ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> Optionally fills the freed slots with waiting-list clients.</li>
+              <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> Every change is a preview — you accept or reject each one.</li>
+            </ul>
+          </div>
+          <div>
+            <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-success" /> Rules it never breaks</p>
+            <ul className="space-y-1.5 text-sm text-muted-foreground">
+              <li className="flex gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0 text-success" /> Working hours &amp; lunch break.</li>
+              <li className="flex gap-2"><CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-success" /> Each client's availability — the days/hours they can (or can't) come.</li>
+              <li className="flex gap-2"><ArrowRightLeft className="mt-0.5 h-4 w-4 shrink-0 text-success" /> No overlaps; idle time never increases.</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="mb-6 shadow-sm">
-        <CardContent className="flex flex-col gap-4 p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+        <CardContent className="space-y-5 p-5">
+          {/* Time range */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="space-y-2">
               <Label>Range</Label>
               <div className="inline-flex rounded-lg border border-border p-0.5">
@@ -108,24 +161,46 @@ export function SchedulerClient() {
                 ))}
               </div>
             </div>
-
             {range === 'custom' ? (
               <>
-                <div className="space-y-2"><Label>Da</Label><Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="sm:w-44" /></div>
-                <div className="space-y-2"><Label>A</Label><Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-44" /></div>
+                <div className="space-y-2"><Label>From</Label><Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="sm:w-44" /></div>
+                <div className="space-y-2"><Label>To</Label><Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-44" /></div>
               </>
             ) : (
-              <div className="space-y-2"><Label>{range === 'week' ? 'Settimana di' : 'Giorno da ottimizzare'}</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:w-48" /></div>
+              <div className="space-y-2"><Label>{range === 'week' ? 'Week of' : 'Day to optimize'}</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:w-48" /></div>
             )}
-
-            <div className="space-y-2"><Label>Mode</Label><Select value={mode} onValueChange={setMode}><SelectTrigger className="sm:w-44"><SelectValue /></SelectTrigger><SelectContent>{OPTIMIZATION_MODE.map((o) => <SelectItem key={o} value={o} className="capitalize">{o}</SelectItem>)}</SelectContent></Select></div>
-
             <Button onClick={optimize} disabled={loading || !businessId || (range === 'custom' && (!customFrom || !customTo || customFrom > customTo))} className="sm:ml-auto">{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Optimize</Button>
           </div>
 
-          <div className="flex items-center gap-2 border-t border-border pt-4">
-            <Switch checked={includeWaitingList} onCheckedChange={setIncludeWaitingList} id="include-waiting-list" />
-            <Label htmlFor="include-waiting-list" className="cursor-pointer font-normal">Includi pazienti dalla lista d'attesa</Label>
+          {/* Mode */}
+          <div className="space-y-2 border-t border-border pt-4">
+            <Label>How aggressive?</Label>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {MODES.map((m) => (
+                <button key={m.value} onClick={() => changeMode(m.value)}
+                  className={cn('rounded-xl border p-3 text-left transition-colors', mode === m.value ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent')}>
+                  <p className={cn('text-sm font-semibold', mode === m.value && 'text-primary')}>{m.label}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{m.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Toggles */}
+          <div className="space-y-2 border-t border-border pt-4">
+            <Label>Rules &amp; priorities</Label>
+            <div className="divide-y divide-border rounded-xl border border-border">
+              {toggles.map((t) => (
+                <div key={t.title} className="flex items-center justify-between gap-3 p-3">
+                  <div className="flex items-start gap-2">
+                    <t.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div><p className="text-sm font-medium">{t.title}</p><p className="text-xs text-muted-foreground">{t.desc}</p></div>
+                  </div>
+                  <Switch checked={t.on} onCheckedChange={t.set} />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">These settings are saved and reused everywhere — including the quick “Optimize” from the calendar and dashboard.</p>
           </div>
         </CardContent>
       </Card>
@@ -138,9 +213,9 @@ export function SchedulerClient() {
               <span className="text-muted-foreground">{run.ai_summary || 'Accept or reject each change below. Nothing changes until you accept.'}</span>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               {kpis.map((k) => (
-                <Card key={k.label} className="shadow-sm"><CardContent className="p-4"><div className="flex items-center justify-between"><p className="text-xs text-muted-foreground">{k.label}</p><k.icon className={`h-4 w-4 ${k.tone}`} /></div><p className={`mt-1 text-xl font-bold ${k.tone}`}>{k.value}</p></CardContent></Card>
+                <Card key={k.label} className="shadow-sm"><CardContent className="p-3.5"><div className="flex items-start justify-between gap-2"><p className="text-xs text-muted-foreground">{k.label}</p><k.icon className={`h-4 w-4 shrink-0 ${k.tone}`} /></div><p className={`mt-1.5 text-lg font-bold ${k.tone}`}>{k.value}</p></CardContent></Card>
               ))}
             </div>
 
@@ -156,7 +231,7 @@ export function SchedulerClient() {
                         <div className="flex items-center gap-2">
                           <Badge variant={isMove ? 'secondary' : 'default'} className={isMove ? '' : 'bg-success/15 text-success hover:bg-success/15'}>
                             {isMove ? <ArrowRightLeft className="mr-1 h-3 w-3" /> : <PlusCircle className="mr-1 h-3 w-3" />}
-                            {isMove ? 'Spostato' : "Aggiunto dalla lista d'attesa"}
+                            {isMove ? 'Moved' : 'Added from waiting list'}
                           </Badge>
                           <span className="font-medium">{name}</span>
                         </div>
@@ -168,7 +243,7 @@ export function SchedulerClient() {
                       </div>
                       {c.ai_reason && <p className="mt-1.5 text-xs text-muted-foreground">{c.ai_reason}</p>}
                       <div className="mt-2 flex justify-end gap-2">
-                        {c.accepted ? <Badge className="bg-success/15 text-success hover:bg-success/15"><Check className="mr-1 h-3 w-3" /> Applicato</Badge> : (
+                        {c.accepted ? <Badge className="bg-success/15 text-success hover:bg-success/15"><Check className="mr-1 h-3 w-3" /> Applied</Badge> : (
                           <>
                             <Button size="sm" variant="outline" onClick={() => onReject(c)} disabled={busyId === c.id}><X className="mr-1 h-3.5 w-3.5" /> Reject</Button>
                             <Button size="sm" onClick={() => onAccept(c)} disabled={busyId === c.id}>{busyId === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />} Accept</Button>
@@ -183,18 +258,6 @@ export function SchedulerClient() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {!run && !loading && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground"><Wand2 className="h-6 w-6" /></div>
-          <h3 className="font-semibold">Ready to optimize</h3>
-          <p className="mt-1.5 max-w-md text-sm text-muted-foreground">Cadence runs the optimizer and shows a full preview. You accept or reject each proposed change individually — nothing is applied until you say so.</p>
-        </div>
-      )}
-
-      <div className="mt-8">
-        <VoiceAppointment />
-      </div>
     </div>
   )
 }

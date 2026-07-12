@@ -29,6 +29,25 @@ export async function ensureAlgorithmSettings(businessId: string): Promise<void>
   }
 }
 
+// Read the business's saved algorithm settings (the knobs on the Scheduler page).
+// These persist and are reused by every optimization — including the quick
+// "Optimize" from the calendar/dashboard, which reads this same row.
+export async function getAlgorithmSettings(businessId: string) {
+  const { data } = await sb()
+    .from('algorithm_settings')
+    .select('optimization_mode, allow_waiting_list, weight_vip, weight_patient_preference')
+    .eq('business_id', businessId).eq('active', true).is('deleted_at', null)
+    .limit(1).maybeSingle()
+  return data
+}
+
+export async function saveAlgorithmSettings(businessId: string, patch: Record<string, unknown>): Promise<void> {
+  if (!businessId) return
+  await ensureAlgorithmSettings(businessId)
+  const { error } = await sb().from('algorithm_settings').update(patch).eq('business_id', businessId).eq('active', true)
+  if (error) throw error
+}
+
 export async function runOptimization(businessId: string, dateFrom: string, dateTo: string, opts?: { mode?: string; allowWaitingList?: boolean }): Promise<string> {
   // Make sure the required settings row exists before invoking the Edge Function.
   await ensureAlgorithmSettings(businessId)
