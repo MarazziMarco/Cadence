@@ -326,6 +326,17 @@ const en: Dict = {
   'waitd.updated': 'Updated',
   'waitd.added': 'Added to waiting list',
   'waitd.add': 'Add',
+
+  // Optimize dialog (calendar)
+  'opt.title': 'Smart optimization',
+  'opt.building': 'Building the best day…',
+  'opt.failed': 'Optimization failed',
+  'opt.kpi.idle': 'Idle time',
+  'opt.kpi.revenue': 'Revenue',
+  'opt.kpi.waiting': 'Waiting list',
+  'opt.kpi.moved': 'Moved',
+  'opt.alreadyOptimal': 'Schedule already optimal for the selected period.',
+  'opt.fromWaiting': 'From waiting list',
 }
 
 const it: Dict = {
@@ -634,6 +645,16 @@ const it: Dict = {
   'waitd.updated': 'Aggiornato',
   'waitd.added': 'Aggiunto alla lista d’attesa',
   'waitd.add': 'Aggiungi',
+
+  'opt.title': 'Ottimizzazione intelligente',
+  'opt.building': 'Sto costruendo la giornata migliore…',
+  'opt.failed': 'Ottimizzazione non riuscita',
+  'opt.kpi.idle': 'Tempo morto',
+  'opt.kpi.revenue': 'Ricavi',
+  'opt.kpi.waiting': 'Lista d’attesa',
+  'opt.kpi.moved': 'Spostati',
+  'opt.alreadyOptimal': 'Agenda già ottimale nel periodo selezionato.',
+  'opt.fromWaiting': 'Da lista d’attesa',
 }
 
 const es: Dict = {
@@ -942,6 +963,16 @@ const es: Dict = {
   'waitd.updated': 'Actualizado',
   'waitd.added': 'Añadido a la lista de espera',
   'waitd.add': 'Añadir',
+
+  'opt.title': 'Optimización inteligente',
+  'opt.building': 'Construyendo el mejor día…',
+  'opt.failed': 'La optimización falló',
+  'opt.kpi.idle': 'Tiempo muerto',
+  'opt.kpi.revenue': 'Ingresos',
+  'opt.kpi.waiting': 'Lista de espera',
+  'opt.kpi.moved': 'Movidas',
+  'opt.alreadyOptimal': 'La agenda ya es óptima para el periodo seleccionado.',
+  'opt.fromWaiting': 'De la lista de espera',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }
