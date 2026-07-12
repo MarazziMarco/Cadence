@@ -9,6 +9,7 @@ import { CalendarDays, Wand2, Bot, TrendingUp, Clock, Users, DollarSign, Activit
 import { getDashboard, getScheduleHealth } from '@/lib/api/dashboard'
 import { fmtTime } from '@/lib/api/appointments'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
 import { PageHeader } from '@/components/common/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,13 +23,14 @@ function fmtIdle(m: number): string {
 }
 
 function ApptRow({ a }: { a: any }) {
-  const name = a.patients?.full_name || a.patients?.first_name || 'Client'
+  const { t } = useT()
+  const name = a.patients?.full_name || a.patients?.first_name || t('dash.client')
   const color = a.color || a.patients?.color || '#4f46e5'
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border p-2.5">
       <div className="h-8 w-1 rounded" style={{ backgroundColor: color }} />
       <Avatar className="h-8 w-8"><AvatarFallback style={{ backgroundColor: color + '22', color }} className="text-[10px] font-semibold">{(a.patients?.first_name?.[0] || '') + (a.patients?.last_name?.[0] || '')}</AvatarFallback></Avatar>
-      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{name}</p><p className="truncate text-xs text-muted-foreground">{a.title || a.services?.name || 'Appointment'}</p></div>
+      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{name}</p><p className="truncate text-xs text-muted-foreground">{a.title || a.services?.name || t('dash.appointment')}</p></div>
       <div className="text-right text-xs text-muted-foreground"><p className="font-medium text-foreground">{fmtTime(a.start_time)}</p><p>{a.appointment_date}</p></div>
     </div>
   )
@@ -36,6 +38,7 @@ function ApptRow({ a }: { a: any }) {
 
 export function DashboardClient({ name }: { name?: string }) {
   const { business } = useWorkspace()
+  const { t } = useT()
   const businessId = business?.id ?? ''
   const router = useRouter()
   const [optimizing, setOptimizing] = useState(false)
@@ -48,33 +51,33 @@ export function DashboardClient({ name }: { name?: string }) {
   }
 
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+  const greeting = hour < 12 ? t('dash.morning') : hour < 18 ? t('dash.afternoon') : t('dash.evening')
 
   const kpis = useMemo(() => [
-    { label: "Today's appointments", value: data ? String(data.todayCount) : '—', icon: CalendarDays },
-    { label: 'Occupancy', value: data ? `${data.occupancy}%` : '—', icon: TrendingUp },
-    { label: 'Idle time today', value: data ? `${Math.floor(data.idleMin / 60)}h ${data.idleMin % 60}m` : '—', icon: Clock },
-    { label: 'Revenue (7d)', value: data ? formatMoney(data.revenue7, business?.currency) : '—', icon: DollarSign },
-  ], [data, business?.currency])
+    { label: t('dash.kpi.today'), value: data ? String(data.todayCount) : '—', icon: CalendarDays },
+    { label: t('dash.kpi.occupancy'), value: data ? `${data.occupancy}%` : '—', icon: TrendingUp },
+    { label: t('dash.kpi.idle'), value: data ? `${Math.floor(data.idleMin / 60)}h ${data.idleMin % 60}m` : '—', icon: Clock },
+    { label: t('dash.kpi.revenue7'), value: data ? formatMoney(data.revenue7, business?.currency) : '—', icon: DollarSign },
+  ], [data, business?.currency, t])
 
   return (
     <div>
-      <PageHeader title={`${greeting}${name ? ', ' + name.split(' ')[0] : ''}`} description="Here's what's happening across your schedule today." />
+      <PageHeader title={`${greeting}${name ? ', ' + name.split(' ')[0] : ''}`} description={t('dash.subtitle')} />
 
       {/* Schedule health — slim bar on top (recoverable dead time). */}
       {health && (health.idleToday > 0 || health.idleWeek > 0) ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-accent/40 px-4 py-2.5 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex min-w-0 items-center gap-2 text-sm">
             <Clock className="h-4 w-4 shrink-0 text-primary" />
-            <span className="truncate"><span className="font-semibold">{fmtIdle(health.idleToday)} of dead time today</span><span className="hidden text-muted-foreground sm:inline"> · {fmtIdle(health.idleWeek)} recoverable this week</span></span>
+            <span className="truncate"><span className="font-semibold">{t('dash.deadTimeToday', { v: fmtIdle(health.idleToday) })}</span><span className="hidden text-muted-foreground sm:inline">{t('dash.recoverableWeek', { v: fmtIdle(health.idleWeek) })}</span></span>
           </div>
-          <Button size="sm" onClick={goOptimize} disabled={optimizing} className="shrink-0">{optimizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Optimize now</Button>
+          <Button size="sm" onClick={goOptimize} disabled={optimizing} className="shrink-0">{optimizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} {t('dash.optimizeNow')}</Button>
         </div>
       ) : health ? (
         <div className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-2.5 text-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
           <Check className="h-4 w-4 shrink-0 text-success" />
-          <span className="font-semibold">Schedule looks tight</span>
-          <span className="text-muted-foreground">— no recoverable dead time this week.</span>
+          <span className="font-semibold">{t('dash.tight')}</span>
+          <span className="text-muted-foreground">{t('dash.tightSub')}</span>
         </div>
       ) : null}
 
@@ -94,23 +97,23 @@ export function DashboardClient({ name }: { name?: string }) {
 
       <div className="mt-6 flex flex-col-reverse gap-6 lg:grid lg:grid-cols-3">
         <Card className="lg:col-span-2 shadow-sm transition-shadow duration-200 hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <CardHeader className="flex flex-row items-center justify-between"><CardTitle className="text-base">Today&apos;s schedule</CardTitle><Link href="/calendar"><Button variant="ghost" size="sm">Calendar <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button></Link></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between"><CardTitle className="text-base">{t('dash.todaySchedule')}</CardTitle><Link href="/calendar"><Button variant="ghost" size="sm">{t('nav.calendar')} <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button></Link></CardHeader>
           <CardContent className="space-y-2">
             {isLoading ? [...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
-              : (data?.todays.length ?? 0) === 0 ? <EmptyState icon={CalendarDays} title="No appointments today" description="Enjoy the quiet — or book something from the calendar." className="border-0" />
+              : (data?.todays.length ?? 0) === 0 ? <EmptyState icon={CalendarDays} title={t('dash.noApptTitle')} description={t('dash.noApptDesc')} className="border-0" />
               : data!.todays.map((a: any) => <ApptRow key={a.id} a={a} />)}
           </CardContent>
         </Card>
 
         <Card className="shadow-sm transition-shadow duration-200 hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500 [animation-delay:80ms] fill-mode-both">
-          <CardHeader><CardTitle className="text-base">Quick actions</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('dash.quickActions')}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {[{ href: '/calendar', label: 'Open calendar', icon: CalendarDays }, { href: '/ai-assistant', label: 'Ask the AI', icon: Bot }, { href: '/scheduler', label: 'Optimize schedule', icon: Wand2 }, { href: '/patients', label: 'Add a client', icon: Plus }].map((a) => {
+            {[{ href: '/calendar', label: t('dash.openCalendar'), icon: CalendarDays }, { href: '/ai-assistant', label: t('dash.askAI'), icon: Bot }, { href: '/scheduler', label: t('dash.optimizeSchedule'), icon: Wand2 }, { href: '/patients', label: t('dash.addClient'), icon: Plus }].map((a) => {
               const cls = 'group flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:translate-x-0.5'
               if (a.href === '/scheduler') {
                 return (
                   <button key={a.href} type="button" onClick={goOptimize} disabled={optimizing} className={cls + ' disabled:opacity-70'}>
-                    {optimizing ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <a.icon className="h-4 w-4 text-primary transition-transform group-hover:scale-110" />} {optimizing ? 'Optimizing…' : a.label}
+                    {optimizing ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <a.icon className="h-4 w-4 text-primary transition-transform group-hover:scale-110" />} {optimizing ? t('dash.optimizing') : a.label}
                   </button>
                 )
               }
@@ -118,7 +121,7 @@ export function DashboardClient({ name }: { name?: string }) {
                 <Link key={a.href} href={a.href} className={cls}><a.icon className="h-4 w-4 text-primary transition-transform group-hover:scale-110" /> {a.label}</Link>
               )
             })}
-            <div className="!mt-4 rounded-lg bg-accent/50 p-3 text-center"><p className="text-2xl font-bold">{isLoading ? '—' : data?.waitingCount}</p><p className="text-xs text-muted-foreground">on the waiting list</p></div>
+            <div className="!mt-4 rounded-lg bg-accent/50 p-3 text-center"><p className="text-2xl font-bold">{isLoading ? '—' : data?.waitingCount}</p><p className="text-xs text-muted-foreground">{t('dash.onWaitingList')}</p></div>
           </CardContent>
         </Card>
       </div>
