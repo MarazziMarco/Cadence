@@ -118,6 +118,7 @@ export function VoiceAppointment() {
         start_time: `${parsed.time}:00`,
         end_time: endTime(parsed.time, dur),
         duration_minutes: dur,
+        price: services.find((s) => s.id === parsed.serviceId)?.price ?? null,
       })
       toast.success(t.created)
       qc.invalidateQueries({ queryKey: ['appointments'] })

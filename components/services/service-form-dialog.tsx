@@ -12,8 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
 const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6']
+const EMOJIS = ['💆', '💇', '✂️', '💅', '🧖', '🦷', '🩺', '💉', '🥗', '🏋️', '🧘', '🐾', '👁️', '💬', '⭐']
 
 export function ServiceFormDialog({ businessId, service, open, onOpenChange }: { businessId: string; service?: Service | null; open: boolean; onOpenChange: (v: boolean) => void }) {
   const qc = useQueryClient()
@@ -58,12 +60,18 @@ export function ServiceFormDialog({ businessId, service, open, onOpenChange }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>{editing ? 'Edit service' : 'New service'}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
-          <div className="grid grid-cols-[64px_1fr] gap-3">
-            <div className="space-y-2"><Label>Icon</Label><Input value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder="💜" className="text-center text-lg" /></div>
-            <div className="space-y-2"><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Deep tissue massage" /></div>
+          <div className="space-y-2"><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Deep tissue massage" /></div>
+          <div className="space-y-2">
+            <Label>Icon <span className="text-muted-foreground">(optional)</span></Label>
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" onClick={() => setEmoji('')} className={cn('flex h-9 w-9 items-center justify-center rounded-md border text-sm', !emoji ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent')}>—</button>
+              {EMOJIS.map((e) => (
+                <button key={e} type="button" onClick={() => setEmoji(e)} className={cn('flex h-9 w-9 items-center justify-center rounded-md border text-lg', emoji === e ? 'border-primary bg-primary/10' : 'border-border hover:bg-accent')}>{e}</button>
+              ))}
+            </div>
           </div>
           <div className="space-y-2"><Label>Category</Label><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Massage" /></div>
           <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} /></div>
@@ -76,12 +84,16 @@ export function ServiceFormDialog({ businessId, service, open, onOpenChange }: {
             <div className="space-y-2"><Label>Buffer before (min)</Label><Input type="number" value={bufferBefore} onChange={(e) => setBufferBefore(e.target.value)} /></div>
             <div className="space-y-2"><Label>Buffer after (min)</Label><Input type="number" value={bufferAfter} onChange={(e) => setBufferAfter(e.target.value)} /></div>
           </div>
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="flex gap-1.5">{COLORS.map((c) => <button key={c} type="button" onClick={() => setColor(c)} className={`h-6 w-6 rounded-full border-2 ${color === c ? 'border-foreground' : 'border-transparent'}`} style={{ backgroundColor: c }} />)}</div>
+          <div className="space-y-2">
+            <Label>Color</Label>
+            <div className="flex flex-wrap gap-1.5">{COLORS.map((c) => <button key={c} type="button" onClick={() => setColor(c)} className={`h-6 w-6 rounded-full border-2 ${color === c ? 'border-foreground' : 'border-transparent'}`} style={{ backgroundColor: c }} />)}</div>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Optimizer can reschedule this service</p>
+              <p className="text-xs text-muted-foreground">If off, appointments of this service are never moved by the optimizer.</p>
             </div>
-            <div className="flex items-center gap-2"><Switch checked={aiSchedule} onCheckedChange={setAiSchedule} /><Label>AI scheduling</Label></div>
+            <Switch checked={aiSchedule} onCheckedChange={setAiSchedule} />
           </div>
         </div>
         <DialogFooter>

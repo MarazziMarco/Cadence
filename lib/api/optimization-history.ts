@@ -82,13 +82,17 @@ export async function getOptimizationHistory(businessId: string): Promise<{ runs
     }
   })
 
+  // Only show runs the user actually applied and that moved at least one
+  // appointment — hide "already optimal" / previewed-but-not-applied noise.
+  const applied = rows.filter((r) => r.appliedCount > 0 && r.moved > 0)
+
   const weekStart = startOfWeek(new Date()).toISOString()
   const summary: OptimizationSummary = {
-    totalRecovered: rows.reduce((s, r) => s + r.idleRecovered, 0),
-    weekRecovered: rows.filter((r) => r.created_at >= weekStart).reduce((s, r) => s + r.idleRecovered, 0),
-    runCount: rows.length,
+    totalRecovered: applied.reduce((s, r) => s + r.idleRecovered, 0),
+    weekRecovered: applied.filter((r) => r.created_at >= weekStart).reduce((s, r) => s + r.idleRecovered, 0),
+    runCount: applied.length,
   }
-  return { runs: rows, summary }
+  return { runs: applied, summary }
 }
 
 /**
