@@ -9,6 +9,8 @@ import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients
 import { createAdvanceWaiting } from '@/lib/api/waiting-list'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
+import { bcp47 } from '@/lib/i18n'
 import { parseAppointment } from '@/lib/voice/parse-appointment'
 import { useSpeech, speechLang } from '@/lib/voice/use-speech'
 import { WEEKDAYS, type Weekday } from '@/lib/types/db'
@@ -20,14 +22,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
-const DOW_SHORT: Record<'en' | 'it', string[]> = {
-  en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-  it: ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'],
+// Short weekday labels (Mon-first) in the given date-locale.
+function dowShort(dloc: string): string[] {
+  // 2024-01-01 is a Monday.
+  return Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(dloc, { weekday: 'short' }))
 }
 
 export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart, defaultPatientId, open, onOpenChange }: { businessId: string; appt?: CalendarAppointment | null; defaultDate?: string; defaultStart?: string; defaultPatientId?: string; open: boolean; onOpenChange: (v: boolean) => void }) {
   const qc = useQueryClient()
   const { business } = useWorkspace()
+  const { t, locale } = useT()
+  const dow = dowShort(bcp47(locale))
   const editing = !!appt
   const [patientId, setPatientId] = useState('')
   const [newClient, setNewClient] = useState('')
@@ -45,7 +50,6 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
   const { data: patients = [] } = useQuery({ queryKey: ['patients-select', businessId], queryFn: () => listPatientsForSelect(businessId), enabled: !!businessId && open })
   const { data: services = [] } = useQuery({ queryKey: ['services', businessId], queryFn: () => listServices(businessId), enabled: !!businessId && open })
 
-  const it = business?.language === 'it'
   const { supported: micSupported, listening, start: startRec, stop: stopRec } = useSpeech(speechLang(business?.language))
 
   // Dictate instead of typing: transcribe, parse locally, prefill the fields.
@@ -56,12 +60,12 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
     if (r.date) setDate(r.date)
     if (r.time) setStart(r.time)
     if (r.durationMinutes) setDuration(String(r.durationMinutes))
-    if (!r.patientId && !r.date && !r.time) toast(it ? 'Non ho capito. Riprova.' : "Didn't catch that. Try again.")
+    if (!r.patientId && !r.date && !r.time) toast(t('appt.didntCatch'))
   }
 
   function toggleMic() {
     if (listening) { stopRec(); return }
-    startRec(applyVoice, () => toast.error(it ? 'Permesso microfono negato.' : 'Microphone permission denied.'))
+    startRec(applyVoice, () => toast.error(t('appt.micDenied')))
   }
 
   useEffect(() => {
@@ -123,51 +127,51 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
       }
       return created
     },
-    onSuccess: () => { toast.success(editing ? 'Appointment updated' : 'Appointment created'); qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['patients'] }); qc.invalidateQueries({ queryKey: ['patients-select'] }); qc.invalidateQueries({ queryKey: ['waiting'] }); onOpenChange(false) },
-    onError: (e: any) => toast.error(e.message || 'Failed to save'),
+    onSuccess: () => { toast.success(editing ? t('appt.updated') : t('appt.created')); qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['patients'] }); qc.invalidateQueries({ queryKey: ['patients-select'] }); qc.invalidateQueries({ queryKey: ['waiting'] }); onOpenChange(false) },
+    onError: (e: any) => toast.error(e.message || t('appt.saveFailed')),
   })
 
   const del = useMutation({
     mutationFn: () => deleteAppointment(appt!.id),
-    onSuccess: () => { toast.success('Appointment deleted'); qc.invalidateQueries({ queryKey: ['appointments'] }); onOpenChange(false) },
+    onSuccess: () => { toast.success(t('appt.deleted')); qc.invalidateQueries({ queryKey: ['appointments'] }); onOpenChange(false) },
     onError: (e: any) => toast.error(e.message),
   })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>{editing ? 'Edit appointment' : 'New appointment'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{editing ? t('appt.editTitle') : t('appt.newTitle')}</DialogTitle></DialogHeader>
         {!editing && micSupported && (
           <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
             <Button type="button" size="sm" variant={listening ? 'destructive' : 'outline'} onClick={toggleMic}>
-              {listening ? <><MicOff className="mr-1.5 h-3.5 w-3.5" /> {it ? 'Stop' : 'Stop'}</> : <><Mic className="mr-1.5 h-3.5 w-3.5" /> {it ? 'Detta' : 'Dictate'}</>}
+              {listening ? <><MicOff className="mr-1.5 h-3.5 w-3.5" /> {t('appt.stop')}</> : <><Mic className="mr-1.5 h-3.5 w-3.5" /> {t('appt.dictate')}</>}
             </Button>
             <span className="text-xs text-muted-foreground">
-              {listening ? (it ? 'In ascolto…' : 'Listening…') : (it ? 'Detta invece di scrivere (es. “Marco domani alle 15 fisioterapia”)' : 'Dictate instead of typing (e.g. “Marco tomorrow at 3pm physiotherapy”)')}
+              {listening ? t('appt.listening') : t('appt.dictateHint')}
             </span>
           </div>
         )}
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Client *</Label>
+            <Label>{t('appt.client')}</Label>
             <Select value={patientId} onValueChange={(v) => { setPatientId(v); setNewClient('') }}>
-              <SelectTrigger><SelectValue placeholder="Select a client" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('appt.selectClient')} /></SelectTrigger>
               <SelectContent>{patients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name || p.first_name}</SelectItem>)}</SelectContent>
             </Select>
-            {!editing && <Input placeholder="…or type a new client name" value={newClient} onChange={(e) => { setNewClient(e.target.value); if (e.target.value) setPatientId('') }} />}
+            {!editing && <Input placeholder={t('appt.newClientPh')} value={newClient} onChange={(e) => { setNewClient(e.target.value); if (e.target.value) setPatientId('') }} />}
           </div>
           <div className="space-y-2">
-            <Label>Service</Label>
+            <Label>{t('appt.service')}</Label>
             <Select value={serviceId} onValueChange={onServiceChange}>
-              <SelectTrigger><SelectValue placeholder="No service" /></SelectTrigger>
-              <SelectContent><SelectItem value="none">No service</SelectItem>{services.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.emoji ? s.emoji + ' ' : ''}{s.name} · {s.duration_minutes}m</SelectItem>)}</SelectContent>
+              <SelectTrigger><SelectValue placeholder={t('appt.noService')} /></SelectTrigger>
+              <SelectContent><SelectItem value="none">{t('appt.noService')}</SelectItem>{services.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.emoji ? s.emoji + ' ' : ''}{s.name} · {s.duration_minutes}m</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-3">
-            <div className="space-y-2"><Label>Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Start</Label><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('appt.date')}</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('appt.start')}</Label><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             <div className="space-y-2">
-              <Label>Duration (min)</Label>
+              <Label>{t('appt.duration')}</Label>
               {/* Native select → an iOS wheel; not keyboard-editable, stays compact. */}
               <select value={duration} onChange={(e) => setDuration(e.target.value)}
                 className="flex h-9 w-24 rounded-md border border-input bg-transparent px-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm">
@@ -179,58 +183,58 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
           <div className="rounded-lg border border-border p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <Label className="text-sm">{it ? 'Disponibilità cliente (opzionale)' : 'Client availability (optional)'}</Label>
-                <p className="text-xs text-muted-foreground">{it ? "L'ottimizzatore la userà per spostare gli appuntamenti solo quando il cliente c'è." : 'The optimizer uses this to only place the client when they can actually come.'}</p>
+                <Label className="text-sm">{t('appt.availTitle')}</Label>
+                <p className="text-xs text-muted-foreground">{t('appt.availHint')}</p>
               </div>
               <Switch checked={showAvail} onCheckedChange={setShowAvail} />
             </div>
             {showAvail && (
               <div className="mt-3 space-y-3">
                 <div>
-                  <p className="mb-1.5 text-xs font-medium">{it ? 'Disponibile SOLO in questi giorni' : 'Available ONLY on these days'}</p>
+                  <p className="mb-1.5 text-xs font-medium">{t('appt.onlyDays')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {WEEKDAYS.map((w, i) => (
                       <button key={w} type="button" onClick={() => toggle(availOnly, setAvailOnly, w)}
-                        className={cn('rounded-md border px-2.5 py-1 text-xs font-medium transition-colors', availOnly.has(w) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-accent')}>
-                        {DOW_SHORT[it ? 'it' : 'en'][i]}
+                        className={cn('rounded-md border px-2.5 py-1 text-xs font-medium capitalize transition-colors', availOnly.has(w) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-accent')}>
+                        {dow[i]}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-xs font-medium">{it ? 'Mai disponibile in questi giorni' : 'Never available on these days'}</p>
+                  <p className="mb-1.5 text-xs font-medium">{t('appt.neverDays')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {WEEKDAYS.map((w, i) => (
                       <button key={w} type="button" onClick={() => toggle(availNever, setAvailNever, w)}
-                        className={cn('rounded-md border px-2.5 py-1 text-xs font-medium transition-colors', availNever.has(w) ? 'border-destructive bg-destructive text-destructive-foreground' : 'border-border bg-card hover:bg-accent')}>
-                        {DOW_SHORT[it ? 'it' : 'en'][i]}
+                        className={cn('rounded-md border px-2.5 py-1 text-xs font-medium capitalize transition-colors', availNever.has(w) ? 'border-destructive bg-destructive text-destructive-foreground' : 'border-border bg-card hover:bg-accent')}>
+                        {dow[i]}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-xs font-medium">{it ? 'Orario preferito (opzionale)' : 'Preferred time (optional)'}</p>
+                  <p className="mb-1.5 text-xs font-medium">{t('appt.preferredTime')}</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {([['any', 'Any', 'Qualsiasi'], ['morning', 'Morning', 'Mattina'], ['afternoon', 'Afternoon', 'Pomeriggio']] as const).map(([val, en, itl]) => {
+                    {([['any', 'appt.any'], ['morning', 'appt.morning'], ['afternoon', 'appt.afternoon']] as const).map(([val, key]) => {
                       const active = (val === 'any' && !preferred) || preferred === val
                       return (
                         <button key={val} type="button" onClick={() => setPreferred(val === 'any' ? null : (val as 'morning' | 'afternoon'))}
                           className={cn('rounded-md border px-2.5 py-1 text-xs font-medium transition-colors', active ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:bg-accent')}>
-                          {it ? itl : en}
+                          {t(key)}
                         </button>
                       )
                     })}
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">{it ? 'La disponibilità è un vincolo; l’orario preferito è solo una preferenza soft. Lascia vuoto se flessibile.' : 'Availability is a hard limit; preferred time is only a soft preference. Leave empty if flexible.'}</p>
+                <p className="text-[11px] text-muted-foreground">{t('appt.availNote')}</p>
               </div>
             )}
           </div>
           {!editing && (
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
               <div>
-                <p className="text-sm font-medium">{it ? 'Anticipa se si libera prima' : 'Move up if an earlier slot frees'}</p>
-                <p className="text-xs text-muted-foreground">{it ? 'Se si libera un posto ≥3 giorni prima, l’ottimizzatore anticipa questo cliente per primo (senza spostare gli altri).' : 'If a slot opens ≥3 days earlier, the optimizer pulls this client up first — without shuffling everyone else.'}</p>
+                <p className="text-sm font-medium">{t('appt.advanceTitle')}</p>
+                <p className="text-xs text-muted-foreground">{t('appt.advanceHint')}</p>
               </div>
               <Switch checked={advanceUp} onCheckedChange={setAdvanceUp} />
             </div>
@@ -239,8 +243,8 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
         <DialogFooter className="flex items-center justify-between sm:justify-between">
           {editing ? <Button variant="ghost" size="icon" className="text-destructive" onClick={() => del.mutate()}><Trash2 className="h-4 w-4" /></Button> : <span />}
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={() => save.mutate()} disabled={(!patientId && !newClient.trim()) || save.isPending}>{save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? 'Save' : 'Create'}</Button>
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
+            <Button onClick={() => save.mutate()} disabled={(!patientId && !newClient.trim()) || save.isPending}>{save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? t('common.save') : t('common.create')}</Button>
           </div>
         </DialogFooter>
       </DialogContent>
