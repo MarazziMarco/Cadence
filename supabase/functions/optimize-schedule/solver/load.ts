@@ -28,6 +28,17 @@ export interface LoadArgs {
   mode?: Mode;
 }
 
+// "advance" waiting-list entries store {"advance_for":"<appointmentId>"} in notes.
+function parseAdvanceFor(notes: unknown): string | null {
+  if (typeof notes !== "string" || !notes) return null;
+  try {
+    const j = JSON.parse(notes);
+    return typeof j?.advance_for === "string" ? j.advance_for : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadInput(
   supabase: SupabaseClient,
   args: LoadArgs,
@@ -145,7 +156,7 @@ export async function loadInput(
   const { data: wlRows, error: wlErr } = await supabase
     .from("waiting_list")
     .select(
-      "id, patient_id, preferred_service_id, priority, earliest_date, latest_date, preferred_weekdays, earliest_time, latest_time, preferred_duration_minutes, flexible",
+      "id, patient_id, preferred_service_id, priority, earliest_date, latest_date, preferred_weekdays, earliest_time, latest_time, preferred_duration_minutes, flexible, notes",
     )
     .eq("business_id", business_id)
     .eq("active", true)
@@ -166,6 +177,7 @@ export async function loadInput(
     latest_time: w.latest_time ?? null,
     preferred_duration_minutes: w.preferred_duration_minutes ?? null,
     flexible: bool(w.flexible, true),
+    advance_for: parseAdvanceFor(w.notes),
   }));
 
   // --- patients referenced by appts or waiting list ---

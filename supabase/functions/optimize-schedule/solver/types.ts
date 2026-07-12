@@ -19,6 +19,8 @@ export interface Tuning {
   MOVE_BASE?: number; // default 15 — generic disturbance per move
   PRICE_UNIT?: number; // default 10 — normalizes revenue into points
   MIN_IDLE_GAP?: number; // default 5 — minimum gap (min) counted as idle
+  PRIORITIZE_ADVANCE?: boolean; // default true — pull "move me up" clients into freed slots first
+  ADVANCE_MIN_DAYS?: number; // default 3 — only advance if the new slot is >= this many days earlier
 }
 
 /** One active algorithm_settings row (§2 context.settings). */
@@ -133,6 +135,9 @@ export interface WaitingListEntry {
   latest_time: string | null;
   preferred_duration_minutes: number | null;
   flexible: boolean;
+  // When set, this entry is an existing appointment asking to be moved up into an
+  // earlier freed slot (not a brand-new booking). Holds that appointment's id.
+  advance_for?: string | null;
 }
 
 export interface SolverInput {

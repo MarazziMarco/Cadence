@@ -184,6 +184,25 @@ Deno.test("G: exact intra-block case (09:00-09:30 + 11:30-12:00, no buffer) comp
   assertBudgets(input, res);
 });
 
+Deno.test("H: advance pre-pass pulls a 'move me up' client into an earlier slot", async () => {
+  const input = await load("h_advance.json")
+  const res = runSolver(input)
+
+  assertEquals(findHardViolation(input, res.slots), null)
+
+  // pat-a's far appointment (2026-07-20) should be moved at least 3 days earlier.
+  const far = res.slots.find((s) => s.id === "appt-far")!
+  assert(far.date < "2026-07-20", `expected an earlier date, got ${far.date}`)
+  const dayMs = 86400000
+  const earlierBy = (Date.parse("2026-07-20") - Date.parse(far.date)) / dayMs
+  assert(earlierBy >= 3, `must be >= 3 days earlier, was ${earlierBy}`)
+
+  // It shows up as a move (not a waiting-list create) for that appointment.
+  const move = res.output.changes.find((c) => c.kind === "move" && c.appointment_id === "appt-far")
+  assert(move, "expected a move for the advanced appointment")
+  assertEquals(res.output.run.created_appointments, 0)
+})
+
 Deno.test("determinism: same input yields identical output", async () => {
   const input = await load("a_interstitial_gap.json");
   const r1 = runSolver(input);

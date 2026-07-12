@@ -98,6 +98,8 @@ function tuning(settings: Settings) {
     MOVE_BASE: m.MOVE_BASE ?? DEF_MOVE_BASE,
     PRICE_UNIT: m.PRICE_UNIT ?? DEF_PRICE_UNIT,
     MIN_IDLE_GAP: m.MIN_IDLE_GAP ?? DEF_MIN_IDLE_GAP,
+    PRIORITIZE_ADVANCE: m.PRIORITIZE_ADVANCE ?? true,
+    ADVANCE_MIN_DAYS: m.ADVANCE_MIN_DAYS ?? 3,
   };
 }
 
@@ -712,6 +714,44 @@ export function runSolver(input: SolverInput): SolverResult {
     findHardViolation(input, slots) === null &&
     budgetsOk(input, slots, origin);
 
+  // Phase 1.5 — advance pre-pass. Clients who asked to be moved up take a freed
+  // earlier slot FIRST (before general compaction), so we don't shuffle everyone
+  // else to fill it. A strong, opt-out priority (default on). Cross-day: the far
+  // appointment is pulled into the earliest feasible slot that is >= ADVANCE_MIN_DAYS
+  // earlier and still valid (hard constraints & the client's availability apply).
+  if (K.PRIORITIZE_ADVANCE !== false) {
+    const minDays = K.ADVANCE_MIN_DAYS ?? 3;
+    const advDates = dateRange(input.context.date_from, input.context.date_to);
+    // Advancing is a business priority, not a cost win — accept the move as long
+    // as it's valid, within budgets, and doesn't raise total idle (unlike the
+    // normal accept, we don't require the objective to strictly improve).
+    const acceptAdvance = (candidate: CostBreakdown): boolean =>
+      candidate.idle <= baselineIdle &&
+      findHardViolation(input, slots) === null &&
+      budgetsOk(input, slots, origin);
+    for (const w of input.waiting_list) {
+      if (!w.advance_for) continue;
+      const s = slots.find((x) => x.id === w.advance_for && x.movable);
+      if (!s) continue;
+      const curDate = s.date;
+      let placed = false;
+      for (const date of advDates) {
+        if (date >= curDate) break;
+        if (dayDiff(date, curDate) < minDays) continue;
+        for (const cand of candidateStarts(input, slots, s, date)) {
+          const prevDate = s.date, prevStart = s.start;
+          s.date = date;
+          s.start = cand;
+          const c2 = cost();
+          if (acceptAdvance(c2)) { cur = c2; placed = true; break; }
+          s.date = prevDate;
+          s.start = prevStart;
+        }
+        if (placed) break;
+      }
+    }
+  }
+
   // Phase 2 — compaction (fill_gaps_first): pull movable slots earlier
   if (S.fill_gaps_first && S.preserve_existing_schedule) {
     const days = dateRange(input.context.date_from, input.context.date_to);
@@ -744,6 +784,7 @@ export function runSolver(input: SolverInput): SolverResult {
     );
     const days = dateRange(input.context.date_from, input.context.date_to);
     for (const entry of wl) {
+      if (entry.advance_for) continue; // advance entries move an existing appt (pre-pass), never create
       const { service, dur, price } = wlServiceAndDur(input, entry);
       let placed = false;
       for (const date of days) {

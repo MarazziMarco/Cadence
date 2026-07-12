@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Wand2, Loader2, Clock, DollarSign, ListChecks, ArrowRightLeft, ShieldCheck, Check, X, ArrowRight, Sparkles, PlusCircle, Star, CalendarClock, MoveHorizontal } from 'lucide-react'
-import { runOptimization, fetchRun, acceptChange, rejectChange, ensureAlgorithmSettings, getAlgorithmSettings, saveAlgorithmSettings } from '@/lib/api/scheduler'
+import { Wand2, Loader2, Clock, DollarSign, ListChecks, ArrowRightLeft, ShieldCheck, Check, X, ArrowRight, Sparkles, PlusCircle, Star, CalendarClock, MoveHorizontal, ChevronsUp } from 'lucide-react'
+import { runOptimization, fetchRun, acceptChange, rejectChange, ensureAlgorithmSettings, getAlgorithmSettings, saveAlgorithmSettings, saveAlgorithmMetadata } from '@/lib/api/scheduler'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
 import { Button } from '@/components/ui/button'
@@ -51,6 +51,7 @@ export function SchedulerClient() {
   const [includeWaitingList, setIncludeWaitingList] = useState(false)
   const [protectVips, setProtectVips] = useState(true)
   const [respectPreferred, setRespectPreferred] = useState(true)
+  const [prioritizeAdvance, setPrioritizeAdvance] = useState(true)
 
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -68,6 +69,7 @@ export function SchedulerClient() {
         setIncludeWaitingList(!!s.allow_waiting_list)
         setProtectVips((s.weight_vip ?? 100) > 0)
         setRespectPreferred((s.weight_patient_preference ?? 5) > 0)
+        setPrioritizeAdvance((s.metadata?.PRIORITIZE_ADVANCE ?? true) !== false)
       })
       .catch(() => {})
   }, [businessId])
@@ -77,6 +79,7 @@ export function SchedulerClient() {
   const changeWaiting = (v: boolean) => { setIncludeWaitingList(v); persist({ allow_waiting_list: v }) }
   const changeVips = (v: boolean) => { setProtectVips(v); persist({ weight_vip: v ? 100 : 0 }) }
   const changePreferred = (v: boolean) => { setRespectPreferred(v); persist({ weight_patient_preference: v ? 5 : 0 }) }
+  const changeAdvance = (v: boolean) => { setPrioritizeAdvance(v); saveAlgorithmMetadata(businessId, { PRIORITIZE_ADVANCE: v }).catch(() => {}) }
 
   const [dateFrom, dateTo] = range === 'day' ? [date, date]
     : range === 'week' ? (() => { const s = startOfWeek(parseYmd(date)); return [ymd(s), ymd(addDays(s, 6))] })()
@@ -122,6 +125,7 @@ export function SchedulerClient() {
     { on: includeWaitingList, set: changeWaiting, icon: ListChecks, title: 'Fill from waiting list', desc: 'Insert waiting-list clients into freed slots.' },
     { on: protectVips, set: changeVips, icon: Star, title: 'Protect VIPs', desc: 'Avoid moving your VIP clients when possible.' },
     { on: respectPreferred, set: changePreferred, icon: CalendarClock, title: 'Respect preferred times', desc: "Keep clients within their preferred hours where they set them." },
+    { on: prioritizeAdvance, set: changeAdvance, icon: ChevronsUp, title: 'Prioritize move-up requests', desc: 'When a gap frees up, first pull in clients who asked to be moved earlier.' },
   ]
 
   return (

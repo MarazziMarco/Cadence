@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, ListChecks, MoreHorizontal, Pencil, Trash2, Star, CalendarClock } from 'lucide-react'
-import { listWaiting, deleteWaiting } from '@/lib/api/waiting-list'
+import { Plus, ListChecks, MoreHorizontal, Pencil, Trash2, Star, CalendarClock, ChevronsUp } from 'lucide-react'
+import { listWaiting, deleteWaiting, advanceApptId } from '@/lib/api/waiting-list'
 import { WEEKDAY_LABELS } from '@/lib/types/db'
 import { useWorkspace } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
@@ -54,6 +54,7 @@ export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean
         <div className="stagger-in space-y-3">
           {entries.map((e: any) => {
             const name = e.patients?.full_name || e.patients?.first_name || 'Client'
+            const adv = advanceApptId(e)
             return (
               <Card key={e.id} className="flex items-center justify-between p-4 shadow-sm">
                 <div className="flex items-center gap-4">
@@ -61,14 +62,19 @@ export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-semibold">{name}</p>
-                      <Badge className={PRIORITY_STYLE[e.priority] + ' capitalize hover:' + PRIORITY_STYLE[e.priority]}>{e.priority === 'high' && <Star className="mr-1 h-3 w-3" />}{e.priority}</Badge>
-                      {e.flexible && <Badge variant="secondary" className="font-normal">Flexible</Badge>}
+                      {adv ? (
+                        <Badge className="bg-primary/15 text-primary hover:bg-primary/15"><ChevronsUp className="mr-1 h-3 w-3" /> Advance</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="font-normal">New</Badge>
+                      )}
+                      {!adv && <Badge className={PRIORITY_STYLE[e.priority] + ' capitalize hover:' + PRIORITY_STYLE[e.priority]}>{e.priority === 'high' && <Star className="mr-1 h-3 w-3" />}{e.priority}</Badge>}
+                      {!adv && e.flexible && <Badge variant="secondary" className="font-normal">Flexible</Badge>}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {e.services?.name && <span>{e.services.emoji ? e.services.emoji + ' ' : ''}{e.services.name}</span>}
                       {e.preferred_weekdays?.length > 0 && <span>{e.preferred_weekdays.map((d: any) => WEEKDAY_LABELS[d as keyof typeof WEEKDAY_LABELS]?.slice(0, 3)).join(', ')}</span>}
                       {(e.earliest_time || e.latest_time) && <span className="inline-flex items-center gap-1"><CalendarClock className="h-3 w-3" />{e.earliest_time?.slice(0, 5) || '—'}–{e.latest_time?.slice(0, 5) || '—'}</span>}
-                      {e.notes && <span className="italic">“{e.notes}”</span>}
+                      {adv ? <span className="italic">Wants an earlier slot — will be moved up automatically</span> : (e.notes && <span className="italic">“{e.notes}”</span>)}
                     </div>
                   </div>
                 </div>

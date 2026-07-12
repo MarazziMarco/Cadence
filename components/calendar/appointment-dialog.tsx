@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Loader2, Trash2, Mic, MicOff } from 'lucide-react'
 import { createAppointment, updateAppointment, deleteAppointment, listPatientsForSelect, minToTime, timeToMin, type CalendarAppointment } from '@/lib/api/appointments'
 import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients'
+import { createAdvanceWaiting } from '@/lib/api/waiting-list'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
 import { parseAppointment } from '@/lib/voice/parse-appointment'
@@ -39,6 +40,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
   const [availOnly, setAvailOnly] = useState<Set<Weekday>>(new Set())
   const [availNever, setAvailNever] = useState<Set<Weekday>>(new Set())
   const [preferred, setPreferred] = useState<'morning' | 'afternoon' | null>(null)
+  const [advanceUp, setAdvanceUp] = useState(false)
 
   const { data: patients = [] } = useQuery({ queryKey: ['patients-select', businessId], queryFn: () => listPatientsForSelect(businessId), enabled: !!businessId && open })
   const { data: services = [] } = useQuery({ queryKey: ['services', businessId], queryFn: () => listServices(businessId), enabled: !!businessId && open })
@@ -70,7 +72,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
       setDate(appt?.appointment_date ?? defaultDate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })())
       setStart(appt ? appt.start_time.slice(0, 5) : (defaultStart ?? '09:00'))
       setDuration(String(appt?.duration_minutes ?? business?.default_appointment_duration ?? 30))
-      setShowAvail(false); setAvailOnly(new Set()); setAvailNever(new Set()); setPreferred(null)
+      setShowAvail(false); setAvailOnly(new Set()); setAvailNever(new Set()); setPreferred(null); setAdvanceUp(false)
     }
   }, [open])
 
@@ -115,9 +117,13 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
         title: svc?.name ?? null,
       }
       if (editing) return updateAppointment(appt!.id, values)
-      return createAppointment(businessId, values)
+      const created = await createAppointment(businessId, values)
+      if (advanceUp && created?.id) {
+        await createAdvanceWaiting(businessId, { patientId: pid, appointmentId: created.id, appointmentDate: date, serviceId: values.service_id, durationMinutes: dur })
+      }
+      return created
     },
-    onSuccess: () => { toast.success(editing ? 'Appointment updated' : 'Appointment created'); qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['patients'] }); qc.invalidateQueries({ queryKey: ['patients-select'] }); onOpenChange(false) },
+    onSuccess: () => { toast.success(editing ? 'Appointment updated' : 'Appointment created'); qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['patients'] }); qc.invalidateQueries({ queryKey: ['patients-select'] }); qc.invalidateQueries({ queryKey: ['waiting'] }); onOpenChange(false) },
     onError: (e: any) => toast.error(e.message || 'Failed to save'),
   })
 
@@ -220,6 +226,15 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
               </div>
             )}
           </div>
+          {!editing && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+              <div>
+                <p className="text-sm font-medium">{it ? 'Anticipa se si libera prima' : 'Move up if an earlier slot frees'}</p>
+                <p className="text-xs text-muted-foreground">{it ? 'Se si libera un posto ≥3 giorni prima, l’ottimizzatore anticipa questo cliente per primo (senza spostare gli altri).' : 'If a slot opens ≥3 days earlier, the optimizer pulls this client up first — without shuffling everyone else.'}</p>
+              </div>
+              <Switch checked={advanceUp} onCheckedChange={setAdvanceUp} />
+            </div>
+          )}
         </div>
         <DialogFooter className="flex items-center justify-between sm:justify-between">
           {editing ? <Button variant="ghost" size="icon" className="text-destructive" onClick={() => del.mutate()}><Trash2 className="h-4 w-4" /></Button> : <span />}

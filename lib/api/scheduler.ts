@@ -35,7 +35,7 @@ export async function ensureAlgorithmSettings(businessId: string): Promise<void>
 export async function getAlgorithmSettings(businessId: string) {
   const { data } = await sb()
     .from('algorithm_settings')
-    .select('optimization_mode, allow_waiting_list, weight_vip, weight_patient_preference')
+    .select('optimization_mode, allow_waiting_list, weight_vip, weight_patient_preference, metadata')
     .eq('business_id', businessId).eq('active', true).is('deleted_at', null)
     .limit(1).maybeSingle()
   return data
@@ -45,6 +45,16 @@ export async function saveAlgorithmSettings(businessId: string, patch: Record<st
   if (!businessId) return
   await ensureAlgorithmSettings(businessId)
   const { error } = await sb().from('algorithm_settings').update(patch).eq('business_id', businessId).eq('active', true)
+  if (error) throw error
+}
+
+// Merge into the jsonb metadata (solver tuning knobs like PRIORITIZE_ADVANCE).
+export async function saveAlgorithmMetadata(businessId: string, patch: Record<string, unknown>): Promise<void> {
+  if (!businessId) return
+  await ensureAlgorithmSettings(businessId)
+  const { data } = await sb().from('algorithm_settings').select('metadata').eq('business_id', businessId).eq('active', true).is('deleted_at', null).limit(1).maybeSingle()
+  const merged = { ...(((data as any)?.metadata) ?? {}), ...patch }
+  const { error } = await sb().from('algorithm_settings').update({ metadata: merged }).eq('business_id', businessId).eq('active', true)
   if (error) throw error
 }
 
@@ -114,6 +124,16 @@ export async function acceptChange(businessId: string, runId: string, change: an
     if (error) throw error
     const { error: aErr } = await client.from('optimization_changes').update({ accepted: true }).eq('id', change.id)
     if (aErr) throw aErr
+    // If this move fulfils an "advance" (move-me-up) request, close that entry.
+    const { data: wls } = await client.from('waiting_list')
+      .select('id, notes').eq('business_id', businessId).eq('patient_id', change.patient_id).eq('active', true).is('deleted_at', null)
+    for (const w of wls ?? []) {
+      let advFor: string | null = null
+      try { advFor = JSON.parse((w as any).notes || '')?.advance_for ?? null } catch {}
+      if (advFor === change.appointment_id) {
+        await client.from('waiting_list').update({ active: false, matched_appointment_id: change.appointment_id, matched_at: new Date().toISOString() }).eq('id', (w as any).id)
+      }
+    }
   } else {
     // Insert from waiting list
     const dur = change.new_start_time && change.new_end_time ? timeToMin(change.new_end_time) - timeToMin(change.new_start_time) : 30
