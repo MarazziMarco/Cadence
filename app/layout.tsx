@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description:
     'Cadence is the AI scheduling platform for appointment-based businesses. Fill every gap, protect your best clients, and save hours every week.',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/cadence-mark.png', shortcut: '/cadence-mark.png', apple: '/cadence-mark.png' },
+  icons: { icon: '/icon-192.png', shortcut: '/icon-192.png', apple: '/icon-192.png' },
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Cadence' },
 }
 

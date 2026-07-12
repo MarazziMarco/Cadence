@@ -156,7 +156,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
               <SelectContent><SelectItem value="none">No service</SelectItem>{services.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.emoji ? s.emoji + ' ' : ''}{s.name} · {s.duration_minutes}m</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="space-y-2"><Label>Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div className="space-y-2"><Label>Start</Label><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             <div className="space-y-2"><Label>Min</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>

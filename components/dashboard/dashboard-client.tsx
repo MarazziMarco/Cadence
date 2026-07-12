@@ -92,7 +92,7 @@ export function DashboardClient({ name }: { name?: string }) {
         ))}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 flex flex-col-reverse gap-6 lg:grid lg:grid-cols-3">
         <Card className="lg:col-span-2 shadow-sm transition-shadow duration-200 hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500">
           <CardHeader className="flex flex-row items-center justify-between"><CardTitle className="text-base">Today&apos;s schedule</CardTitle><Link href="/calendar"><Button variant="ghost" size="sm">Calendar <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button></Link></CardHeader>
           <CardContent className="space-y-2">

@@ -21,7 +21,7 @@ const PRIORITY_STYLE: Record<string, string> = {
   high: 'bg-destructive/10 text-destructive', normal: 'bg-primary/10 text-primary', low: 'bg-muted text-muted-foreground',
 }
 
-export function WaitingListClient() {
+export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const { business } = useWorkspace()
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
@@ -36,8 +36,15 @@ export function WaitingListClient() {
 
   return (
     <div>
-      <PageHeader title="Waiting List" description="Clients ready to fill any gap that opens — the scheduler uses these to auto-fill."
-        actions={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Add to list</Button>} />
+      {hideHeader ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">Clients ready to fill any gap that opens.</p>
+          <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Add to list</Button>
+        </div>
+      ) : (
+        <PageHeader title="Waiting List" description="Clients ready to fill any gap that opens — the scheduler uses these to auto-fill."
+          actions={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Add to list</Button>} />
+      )}
 
       {isLoading ? (
         <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}</div>

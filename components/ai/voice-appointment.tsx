@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Mic, MicOff, Loader2, CalendarPlus, Sparkles } from 'lucide-react'
 import { listPatientsForSelect, createAppointment } from '@/lib/api/appointments'
+import { createPatient } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
 import { parseAppointment, type ParsedAppt } from '@/lib/voice/parse-appointment'
@@ -30,7 +31,8 @@ const STR = {
     examples: 'Try an example',
     client: 'Client', service: 'Service', date: 'Date', time: 'Time',
     chooseClient: 'Choose client', none: 'None', create: 'Create appointment',
-    needClient: 'Select a client', needDateTime: 'Date and time are required',
+    newClientPh: '…or type a new client name',
+    needClient: 'Select or enter a client', needDateTime: 'Date and time are required',
     created: 'Appointment created', createErr: 'Could not create the appointment',
     micDenied: 'Microphone permission denied. Type the text below.',
     micFail: 'Could not start the microphone.',
@@ -46,7 +48,8 @@ const STR = {
     examples: 'Prova un esempio',
     client: 'Cliente', service: 'Servizio', date: 'Data', time: 'Ora',
     chooseClient: 'Scegli cliente', none: 'Nessuno', create: 'Crea appuntamento',
-    needClient: 'Seleziona un cliente', needDateTime: 'Data e ora sono obbligatorie',
+    newClientPh: '…o scrivi un nuovo cliente',
+    needClient: 'Seleziona o inserisci un cliente', needDateTime: 'Data e ora sono obbligatorie',
     created: 'Appuntamento creato', createErr: 'Errore nella creazione',
     micDenied: 'Permesso microfono negato. Scrivi il testo qui sotto.',
     micFail: 'Impossibile avviare il microfono.',
@@ -79,6 +82,7 @@ export function VoiceAppointment() {
   const { supported, listening, start, stop } = useSpeech(speechLang(business?.language))
   const [transcript, setTranscript] = useState('')
   const [parsed, setParsed] = useState<ParsedAppt | null>(null)
+  const [newClient, setNewClient] = useState('')
   const [creating, setCreating] = useState(false)
 
   function applyParse(text: string) {
@@ -87,7 +91,7 @@ export function VoiceAppointment() {
 
   function toggleMic() {
     if (listening) { stop(); return }
-    setTranscript(''); setParsed(null)
+    setTranscript(''); setParsed(null); setNewClient('')
     start(
       (text) => { setTranscript(text); applyParse(text) },
       () => toast.error(t.micDenied),
@@ -99,13 +103,16 @@ export function VoiceAppointment() {
   }
 
   async function create() {
-    if (!parsed?.patientId) { toast.error(t.needClient); return }
-    if (!parsed.date || !parsed.time) { toast.error(t.needDateTime); return }
+    if (!parsed?.date || !parsed?.time) { toast.error(t.needDateTime); return }
+    if (!parsed.patientId && !newClient.trim()) { toast.error(t.needClient); return }
     const dur = parsed.durationMinutes ?? business?.default_appointment_duration ?? 30
     setCreating(true)
     try {
+      // Existing client wins; otherwise create a new one from the typed name.
+      let pid = parsed.patientId
+      if (!pid && newClient.trim()) { const np = await createPatient(businessId, { first_name: newClient.trim() }); pid = np.id }
       await createAppointment(businessId, {
-        patient_id: parsed.patientId,
+        patient_id: pid,
         service_id: parsed.serviceId,
         appointment_date: parsed.date,
         start_time: `${parsed.time}:00`,
@@ -115,7 +122,9 @@ export function VoiceAppointment() {
       toast.success(t.created)
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
-      setTranscript(''); setParsed(null)
+      qc.invalidateQueries({ queryKey: ['patients'] })
+      qc.invalidateQueries({ queryKey: ['patients-select'] })
+      setTranscript(''); setParsed(null); setNewClient('')
     } catch (e: any) {
       toast.error(e.message || t.createErr)
     } finally {
@@ -162,10 +171,11 @@ export function VoiceAppointment() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>{t.client}</Label>
-                <Select value={parsed.patientId ?? ''} onValueChange={(v) => set('patientId', v)}>
+                <Select value={parsed.patientId ?? ''} onValueChange={(v) => { set('patientId', v); setNewClient('') }}>
                   <SelectTrigger><SelectValue placeholder={t.chooseClient} /></SelectTrigger>
                   <SelectContent>{patients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name || p.first_name}</SelectItem>)}</SelectContent>
                 </Select>
+                <Input value={newClient} onChange={(e) => { setNewClient(e.target.value); if (e.target.value) set('patientId', null) }} placeholder={t.newClientPh} />
               </div>
               <div className="space-y-1.5">
                 <Label>{t.service}</Label>
