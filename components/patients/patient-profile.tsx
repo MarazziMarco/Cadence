@@ -8,10 +8,11 @@ import { toast } from 'sonner'
 import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX, Wallet, ClipboardList, Plus, CalendarPlus, CalendarClock } from 'lucide-react'
 import { getPatient, setPatientFlag, softDeletePatient } from '@/lib/api/patients'
 import { listUpcomingByPatient, fmtTime } from '@/lib/api/appointments'
-import { getPatientPlans } from '@/lib/api/treatment-plans'
+import { getPatientPlans, deleteTreatmentPlan, type PatientPlan } from '@/lib/api/treatment-plans'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PatientFormDialog } from './patient-form-dialog'
 import { TreatmentPlanDialog } from './treatment-plan-dialog'
+import { TreatmentPlanEditDialog } from './treatment-plan-edit-dialog'
 import { PatientNotes } from './patient-notes'
 import { AppointmentDialog } from '@/components/calendar/appointment-dialog'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,7 @@ export function PatientProfile({ id }: { id: string }) {
   const [editOpen, setEditOpen] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
   const [apptOpen, setApptOpen] = useState(false)
+  const [editPlan, setEditPlan] = useState<PatientPlan | null>(null)
 
   const { data: p, isLoading } = useQuery({ queryKey: ['patient', id], queryFn: () => getPatient(id) })
   const { data: upcoming = [] } = useQuery({ queryKey: ['patient-upcoming', id], queryFn: () => listUpcomingByPatient(id) })
@@ -45,6 +47,16 @@ export function PatientProfile({ id }: { id: string }) {
   const delMut = useMutation({
     mutationFn: () => softDeletePatient(id),
     onSuccess: () => { toast.success('Client deleted'); router.push('/patients') },
+  })
+  const delPlanMut = useMutation({
+    mutationFn: (parentId: string) => deleteTreatmentPlan(parentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-plans', id] })
+      qc.invalidateQueries({ queryKey: ['patient-upcoming', id] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      toast.success('Plan deleted')
+    },
+    onError: (e: any) => toast.error(e.message),
   })
 
   if (isLoading) return <div className="space-y-4"><Skeleton className="h-8 w-40" /><Skeleton className="h-40 w-full" /></div>
@@ -144,7 +156,17 @@ export function PatientProfile({ id }: { id: string }) {
                         <p className="text-sm font-semibold">{plan.treatmentType}</p>
                         <p className="text-xs text-muted-foreground">{[plan.serviceName, plan.therapist].filter(Boolean).join('  ·  ') || '—'}</p>
                       </div>
-                      <Badge variant="secondary">{plan.completed}/{plan.total} done</Badge>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="secondary">{plan.completed}/{plan.total} done</Badge>
+                        <button onClick={() => setEditPlan(plan)} aria-label="Edit plan" className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild><button aria-label="Delete plan" className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button></AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader><AlertDialogTitle>Delete this plan?</AlertDialogTitle><AlertDialogDescription>All its sessions (past and future) will be removed.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => delPlanMut.mutate(plan.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                     <Progress value={pct} className="mt-2.5" />
                     <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
@@ -197,6 +219,7 @@ export function PatientProfile({ id }: { id: string }) {
       {business?.id && <PatientFormDialog businessId={business.id} patient={p} open={editOpen} onOpenChange={setEditOpen} />}
       {business?.id && <TreatmentPlanDialog businessId={business.id} patientId={id} open={planOpen} onOpenChange={setPlanOpen} />}
       {business?.id && <AppointmentDialog businessId={business.id} defaultPatientId={id} open={apptOpen} onOpenChange={setApptOpen} />}
+      <TreatmentPlanEditDialog plan={editPlan} patientId={id} open={!!editPlan} onOpenChange={(v) => { if (!v) setEditPlan(null) }} />
     </div>
   )
 }

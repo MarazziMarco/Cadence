@@ -156,6 +156,33 @@ export async function createTreatmentPlan(businessId: string, params: CreatePlan
   return parent.id as string
 }
 
+/** Edit a plan's metadata (label / therapist / notes) on its parent session. */
+export async function updateTreatmentPlan(parentId: string, patch: { treatmentType?: string; therapist?: string | null; notes?: string | null }): Promise<void> {
+  const client = sb()
+  const { data: parent } = await client.from('appointments').select('recurrence_rule').eq('id', parentId).single()
+  let meta: any = {}
+  try { meta = JSON.parse((parent as any)?.recurrence_rule || '{}') } catch {}
+  if (patch.treatmentType !== undefined) meta.treatment_type = patch.treatmentType
+  if (patch.therapist !== undefined) meta.therapist = patch.therapist
+  if (patch.notes !== undefined) meta.notes = patch.notes
+  const upd: any = { recurrence_rule: JSON.stringify(meta) }
+  if (patch.treatmentType !== undefined) upd.title = patch.treatmentType
+  const { error } = await client.from('appointments').update(upd).eq('id', parentId)
+  if (error) throw error
+  if (patch.treatmentType !== undefined) {
+    await client.from('appointments').update({ title: patch.treatmentType }).eq('parent_appointment_id', parentId)
+  }
+}
+
+/** Remove a whole plan: soft-delete the parent session and all its children. */
+export async function deleteTreatmentPlan(parentId: string): Promise<void> {
+  const client = sb()
+  const now = new Date().toISOString()
+  const { error } = await client.from('appointments').update({ deleted_at: now }).eq('id', parentId)
+  if (error) throw error
+  await client.from('appointments').update({ deleted_at: now }).eq('parent_appointment_id', parentId)
+}
+
 export interface PatientPlan {
   id: string
   treatmentType: string
