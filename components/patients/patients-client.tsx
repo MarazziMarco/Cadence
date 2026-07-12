@@ -9,6 +9,7 @@ import { listPatients, softDeletePatient, setPatientFlag, type PatientFilter } f
 import type { Patient } from '@/lib/types/db'
 import { useWorkspace } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
+import { ClientsServicesTabs } from '@/components/common/clients-services-tabs'
 import { EmptyState } from '@/components/common/empty-state'
 import { PatientFormDialog } from './patient-form-dialog'
 import { Button } from '@/components/ui/button'
@@ -55,6 +56,7 @@ export function PatientsClient() {
     <div>
       <PageHeader title="Clients" description="Everyone you serve — searchable, taggable, with full history."
         actions={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New client</Button>} />
+      <ClientsServicesTabs current="clients" />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-xs">

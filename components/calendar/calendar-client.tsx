@@ -1,19 +1,19 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, Plus, Info } from 'lucide-react'
 import { listAppointments, updateAppointment, minToTime, timeToMin, fmtTime, type CalendarAppointment } from '@/lib/api/appointments'
 import { useWorkspace } from '@/lib/workspace-context'
-import { PageHeader } from '@/components/common/page-header'
 import { AppointmentDialog } from './appointment-dialog'
 import { OptimizeDialog } from './optimize-dialog'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
-const START_HOUR = 7, END_HOUR = 21, HOUR_H = 56
+const START_HOUR = 7, END_HOUR = 21, HOUR_H = 64
 const SLOT = 15
 
 function startOfWeek(d: Date) { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x }
@@ -32,6 +32,11 @@ export function CalendarClient() {
   const [createCtx, setCreateCtx] = useState<{ date: string; start: string } | null>(null)
   const [dragGrab, setDragGrab] = useState(0)
   const [dragPreview, setDragPreview] = useState<{ date: string; startMin: number } | null>(null)
+  // Touch drag (long-press to grab), since HTML5 DnD doesn't work on touch.
+  const [touchDragId, setTouchDragId] = useState<string | null>(null)
+  const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const suppressClick = useRef(false)
 
   const days = useMemo(() => {
     if (view === 'day') return [new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate())]
@@ -92,6 +97,53 @@ export function CalendarClient() {
     moveMut.mutate({ id, date, startMin, dur: a.duration_minutes })
   }
 
+  // ---- touch drag (long-press) ------------------------------------------
+  function previewFromPoint(clientX: number, clientY: number) {
+    const col = ((document.elementFromPoint(clientX, clientY) as HTMLElement | null)?.closest('[data-date]')) as HTMLElement | null
+    if (!col) return
+    const date = col.getAttribute('data-date')!
+    const rect = col.getBoundingClientRect()
+    const y = clientY - rect.top - dragGrab
+    let sm = START_HOUR * 60 + Math.round((y / HOUR_H * 60) / SLOT) * SLOT
+    sm = Math.max(START_HOUR * 60, Math.min(sm, END_HOUR * 60 - SLOT))
+    setDragPreview({ date, startMin: sm })
+  }
+  function onApptTouchStart(e: React.TouchEvent, a: CalendarAppointment) {
+    const t = e.touches[0]
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const grabY = t.clientY - r.top
+    touchStart.current = { x: t.clientX, y: t.clientY }
+    if (lpTimer.current) clearTimeout(lpTimer.current)
+    lpTimer.current = setTimeout(() => {
+      setDragGrab(grabY)
+      setTouchDragId(a.id)
+      setDragPreview({ date: a.appointment_date, startMin: timeToMin(a.start_time) })
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(20)
+    }, 300)
+  }
+  function onApptTouchMove(e: React.TouchEvent, a: CalendarAppointment) {
+    const t = e.touches[0]
+    if (touchDragId === a.id) {
+      previewFromPoint(t.clientX, t.clientY)
+    } else {
+      const dx = Math.abs(t.clientX - touchStart.current.x), dy = Math.abs(t.clientY - touchStart.current.y)
+      if ((dx > 8 || dy > 8) && lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null }
+    }
+  }
+  function onApptTouchEnd(a: CalendarAppointment) {
+    if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null }
+    if (touchDragId === a.id && dragPreview) {
+      const { date, startMin } = dragPreview
+      if (!(date === a.appointment_date && startMin === timeToMin(a.start_time))) {
+        moveMut.mutate({ id: a.id, date, startMin, dur: a.duration_minutes })
+      }
+      suppressClick.current = true
+      setTimeout(() => { suppressClick.current = false }, 450)
+    }
+    setTouchDragId(null)
+    setDragPreview(null)
+  }
+
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
   const label = view === 'day'
     ? days[0].toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -100,8 +152,11 @@ export function CalendarClient() {
 
   return (
     <div>
-      <PageHeader title="Calendar"
-        info={
+      {/* Page tabs: current page big, the other clickable */}
+      <div className="mb-4">
+        <div className="flex items-center justify-center gap-3 sm:justify-start">
+          <h2 className="text-2xl font-bold tracking-tight">Calendar</h2>
+          <Link href="/waiting-list" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">Waiting list</Link>
           <Popover>
             <PopoverTrigger asChild>
               <button aria-label="Shortcuts & tips" className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Info className="h-3.5 w-3.5" /></button>
@@ -114,26 +169,29 @@ export function CalendarClient() {
                 <li><kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">←</kbd> <kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">→</kbd> Previous / next</li>
                 <li><kbd className="rounded border border-border bg-muted px-1 text-[11px] font-medium text-foreground">t</kbd> Jump to today</li>
               </ul>
-              <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">Drag an appointment to move it, or click an empty slot to book.</p>
+              <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">On desktop drag an appointment to move it; on touch, press and hold to grab it. Tap an empty slot to book.</p>
             </PopoverContent>
           </Popover>
-        }
-        actions={<Button onClick={() => openNew()}><Plus className="mr-2 h-4 w-4" /> New</Button>} />
+        </div>
+        {/* Centered primary actions */}
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <Button size="lg" onClick={() => openNew()}><Plus className="mr-2 h-4 w-4" /> New appointment</Button>
+          {businessId && <OptimizeDialog businessId={businessId} dateFrom={rangeStart} dateTo={rangeEnd} />}
+        </div>
+      </div>
 
+      {/* Date navigation + view toggle */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? -1 : -7))}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? -1 : -7))}><ChevronLeft className="h-4 w-4" /></Button>
           <Button variant="outline" size="sm" onClick={() => setAnchor(new Date())}>Today</Button>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? 1 : 7))}><ChevronRight className="h-4 w-4" /></Button>
-          <span className="ml-2 text-sm font-semibold">{label}</span>
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? 1 : 7))}><ChevronRight className="h-4 w-4" /></Button>
+          <span className="ml-1 text-sm font-semibold">{label}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {businessId && <OptimizeDialog businessId={businessId} dateFrom={rangeStart} dateTo={rangeEnd} />}
-          <div className="inline-flex rounded-lg border border-border p-0.5">
-            {(['day', 'week'] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
-            ))}
-          </div>
+        <div className="inline-flex rounded-lg border border-border p-0.5">
+          {(['day', 'week'] as const).map((v) => (
+            <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
+          ))}
         </div>
       </div>
 
@@ -162,7 +220,7 @@ export function CalendarClient() {
           {days.map((d) => {
             const dateStr = ymd(d)
             return (
-              <div key={dateStr} className="relative flex-1 border-l border-border" style={{ height: (END_HOUR - START_HOUR) * HOUR_H }}
+              <div key={dateStr} data-date={dateStr} className="relative flex-1 border-l border-border" style={{ height: (END_HOUR - START_HOUR) * HOUR_H }}
                 onDragOver={(e) => {
                   e.preventDefault()
                   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -182,16 +240,20 @@ export function CalendarClient() {
                 {hours.map((h) => <div key={h} className="border-b border-border/60" style={{ height: HOUR_H }} />)}
                 {(byDay[dateStr] || []).map((a) => {
                   const top = (timeToMin(a.start_time) - START_HOUR * 60) / 60 * HOUR_H
-                  const height = Math.max(40, a.duration_minutes / 60 * HOUR_H - 2)
+                  const height = Math.max(30, a.duration_minutes / 60 * HOUR_H - 3)
                   const color = a.color || a.services?.color || a.patients?.color || '#4f46e5'
                   const name = a.patients?.full_name || a.patients?.first_name || 'Client'
+                  const grabbed = touchDragId === a.id
                   return (
                     <div key={a.id} draggable
                       onDragStart={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); const g = e.clientY - r.top; setDragGrab(g); e.dataTransfer.setData('text/appt', a.id); e.dataTransfer.setData('text/grab', String(g)) }}
                       onDragEnd={() => setDragPreview(null)}
-                      onClick={(e) => { e.stopPropagation(); openEdit(a) }}
-                      className="absolute left-1 right-1 cursor-grab overflow-hidden rounded-md border-l-2 px-2 py-1.5 text-left shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
-                      style={{ top, height, backgroundColor: color + '1f', borderColor: color }}>
+                      onTouchStart={(e) => onApptTouchStart(e, a)}
+                      onTouchMove={(e) => onApptTouchMove(e, a)}
+                      onTouchEnd={() => onApptTouchEnd(a)}
+                      onClick={(e) => { e.stopPropagation(); if (suppressClick.current) return; openEdit(a) }}
+                      className={cn('absolute left-1 right-1 cursor-grab select-none overflow-hidden rounded-md border-l-2 px-2 py-1.5 text-left shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing', grabbed && 'z-40 scale-[1.03] opacity-90 shadow-lg ring-2 ring-primary')}
+                      style={{ top, height, backgroundColor: color + '1f', borderColor: color, touchAction: 'none' }}>
                       <p className="truncate text-[13px] font-semibold leading-tight sm:text-xs" style={{ color }}>{name}</p>
                       <p className="truncate text-[11px] leading-tight text-muted-foreground">{fmtTime(a.start_time)} · {a.title || a.services?.name || `${a.duration_minutes}m`}</p>
                     </div>

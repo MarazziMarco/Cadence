@@ -8,6 +8,7 @@ import { listServices, softDeleteService, toggleServiceActive } from '@/lib/api/
 import type { Service } from '@/lib/types/db'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PageHeader } from '@/components/common/page-header'
+import { ClientsServicesTabs } from '@/components/common/clients-services-tabs'
 import { EmptyState } from '@/components/common/empty-state'
 import { ServiceFormDialog } from './service-form-dialog'
 import { Button } from '@/components/ui/button'
@@ -46,6 +47,7 @@ export function ServicesClient() {
     <div>
       <PageHeader title="Services" description="Durations, prices, buffers and colors — the building blocks of every appointment."
         actions={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New service</Button>} />
+      <ClientsServicesTabs current="services" />
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-36 w-full" />)}</div>
