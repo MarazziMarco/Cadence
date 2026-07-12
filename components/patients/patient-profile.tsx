@@ -5,26 +5,34 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX, Wallet, ClipboardList, Plus } from 'lucide-react'
+import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX, Wallet, ClipboardList, Plus, CalendarPlus, CalendarClock } from 'lucide-react'
 import { getPatient, setPatientFlag, softDeletePatient } from '@/lib/api/patients'
 import { listUpcomingByPatient, fmtTime } from '@/lib/api/appointments'
 import { getPatientPlans } from '@/lib/api/treatment-plans'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PatientFormDialog } from './patient-form-dialog'
 import { TreatmentPlanDialog } from './treatment-plan-dialog'
+import { PatientNotes } from './patient-notes'
+import { AppointmentDialog } from '@/components/calendar/appointment-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 export function PatientProfile({ id }: { id: string }) {
   const { business } = useWorkspace()
+  const it = business?.language === 'it'
   const qc = useQueryClient()
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
+  const [apptOpen, setApptOpen] = useState(false)
 
   const { data: p, isLoading } = useQuery({ queryKey: ['patient', id], queryFn: () => getPatient(id) })
   const { data: upcoming = [] } = useQuery({ queryKey: ['patient-upcoming', id], queryFn: () => listUpcomingByPatient(id) })
@@ -53,54 +61,78 @@ export function PatientProfile({ id }: { id: string }) {
     <div>
       <Link href="/patients" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Clients</Link>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16"><AvatarFallback style={{ backgroundColor: (p.color || '#4f46e5') + '22', color: p.color || '#4f46e5' }} className="text-xl font-bold">{(p.first_name?.[0] || '') + (p.last_name?.[0] || '')}</AvatarFallback></Avatar>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-bold tracking-tight">{p.full_name || p.first_name}</h2>
-              {p.is_vip && <Badge className="gap-1 bg-warning/15 text-warning hover:bg-warning/15"><Star className="h-3 w-3 fill-warning" /> VIP</Badge>}
+              {/* VIP is just a star: lit when VIP, off otherwise */}
+              <button onClick={() => flagMut.mutate({ is_vip: !p.is_vip })} aria-label={p.is_vip ? 'Unset VIP' : 'Set VIP'} className="rounded-full p-1 transition-colors hover:bg-accent">
+                <Star className={p.is_vip ? 'h-5 w-5 fill-warning text-warning' : 'h-5 w-5 text-muted-foreground'} />
+              </button>
+              <button onClick={() => setEditOpen(true)} aria-label="Edit" className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Pencil className="h-4 w-4" /></button>
               {p.archived && <Badge variant="secondary">Archived</Badge>}
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">{[p.email, p.phone].filter(Boolean).join('  ·  ') || 'No contact info'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setEditOpen(true)}><Pencil className="mr-2 h-4 w-4" /> Edit</Button>
-          <Button variant="outline" onClick={() => flagMut.mutate({ is_vip: !p.is_vip })}><Star className="mr-2 h-4 w-4" /> {p.is_vip ? 'Unset VIP' : 'VIP'}</Button>
-          <Button variant="outline" onClick={() => flagMut.mutate({ archived: !p.archived })}><Archive className="mr-2 h-4 w-4" /> {p.archived ? 'Unarchive' : 'Archive'}</Button>
-          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => delMut.mutate()}><Trash2 className="h-4 w-4" /></Button>
+        {/* Primary actions, stacked */}
+        <div className="flex flex-col gap-2 sm:w-52">
+          <Button onClick={() => setApptOpen(true)}><CalendarPlus className="mr-2 h-4 w-4" /> New appointment</Button>
+          <Button variant="outline" onClick={() => setPlanOpen(true)}><ClipboardList className="mr-2 h-4 w-4" /> Treatment plan</Button>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Compact square-ish stats */}
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s) => (
-          <Card key={s.label} className="shadow-sm"><CardContent className="flex items-center justify-between p-4">
-            <div><p className="text-sm text-muted-foreground">{s.label}</p><p className="mt-1 text-xl font-bold tabular-nums">{s.value}</p></div>
-            <s.icon className="h-5 w-5 text-muted-foreground" />
+          <Card key={s.label} className="shadow-sm"><CardContent className="p-3.5">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{s.label}</p>
+              <s.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </div>
+            <p className="mt-1.5 text-xl font-bold tabular-nums">{s.value}</p>
           </CardContent></Card>
         ))}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2 shadow-sm">
-          <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
-          <CardContent><p className="whitespace-pre-wrap text-sm text-muted-foreground">{p.notes || 'No notes yet.'}</p></CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader><CardTitle className="text-base">Tags</CardTitle></CardHeader>
-          <CardContent><div className="flex flex-wrap gap-1.5">{(p.tags ?? []).length ? p.tags!.map((t) => <Badge key={t} variant="secondary">{t}</Badge>) : <span className="text-sm text-muted-foreground">No tags</span>}</div></CardContent>
-        </Card>
+      {/* Sticky notes */}
+      <div className="mt-6">
+        <PatientNotes patientId={id} initial={p.notes} />
       </div>
 
+      {/* Upcoming appointments (from today) */}
+      <Card className="mt-6 shadow-sm">
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-4 w-4 text-primary" /> Upcoming appointments</CardTitle></CardHeader>
+        <CardContent>
+          {upcoming.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No upcoming appointments.</p>
+          ) : (
+            <div className="space-y-2">
+              {upcoming.map((a: any) => (
+                <div key={a.id} className="flex items-center justify-between rounded-lg border border-border p-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{a.title || a.services?.name || 'Appointment'}</p>
+                    <p className="text-xs text-muted-foreground">{a.appointment_date} · {fmtTime(a.start_time)}</p>
+                  </div>
+                  <Badge variant="secondary" className="capitalize">{a.status}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Treatment plans */}
       <Card className="mt-6 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-primary" /> Piani di trattamento</CardTitle>
-          {business?.id && <Button size="sm" variant="outline" onClick={() => setPlanOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Nuovo piano</Button>}
+          <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-primary" /> Treatment plans</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setPlanOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> New plan</Button>
         </CardHeader>
         <CardContent>
           {plans.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nessun piano attivo. Crea un piano per generare sedute collegate.</p>
+            <p className="text-sm text-muted-foreground">No active plan. Create one to generate linked sessions.</p>
           ) : (
             <div className="space-y-4">
               {plans.map((plan) => {
@@ -112,12 +144,12 @@ export function PatientProfile({ id }: { id: string }) {
                         <p className="text-sm font-semibold">{plan.treatmentType}</p>
                         <p className="text-xs text-muted-foreground">{[plan.serviceName, plan.therapist].filter(Boolean).join('  ·  ') || '—'}</p>
                       </div>
-                      <Badge variant="secondary">{plan.completed}/{plan.total} completate</Badge>
+                      <Badge variant="secondary">{plan.completed}/{plan.total} done</Badge>
                     </div>
                     <Progress value={pct} className="mt-2.5" />
                     <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{plan.remaining} rimanenti</span>
-                      {plan.nextDate && <span>Prossima: {plan.nextDate}</span>}
+                      <span>{plan.remaining} remaining</span>
+                      {plan.nextDate && <span>Next: {plan.nextDate}</span>}
                     </div>
                   </div>
                 )
@@ -127,8 +159,44 @@ export function PatientProfile({ id }: { id: string }) {
         </CardContent>
       </Card>
 
+      {/* Destructive actions at the very bottom, with confirmation */}
+      <div className="mt-8 flex flex-col gap-2 border-t border-border pt-6 sm:flex-row sm:justify-end">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline"><Archive className="mr-2 h-4 w-4" /> {p.archived ? 'Unarchive client' : 'Archive client'}</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{p.archived ? 'Unarchive this client?' : 'Archive this client?'}</AlertDialogTitle>
+              <AlertDialogDescription>{p.archived ? 'They will appear in your active clients again.' : 'They will be hidden from your active clients. You can unarchive them anytime.'}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => flagMut.mutate({ archived: !p.archived })}>Confirm</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Delete client</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this client?</AlertDialogTitle>
+              <AlertDialogDescription>This removes the client from your list. This can’t be easily undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => delMut.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
       {business?.id && <PatientFormDialog businessId={business.id} patient={p} open={editOpen} onOpenChange={setEditOpen} />}
       {business?.id && <TreatmentPlanDialog businessId={business.id} patientId={id} open={planOpen} onOpenChange={setPlanOpen} />}
+      {business?.id && <AppointmentDialog businessId={business.id} defaultPatientId={id} open={apptOpen} onOpenChange={setApptOpen} />}
     </div>
   )
 }

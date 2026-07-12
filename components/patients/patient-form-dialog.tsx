@@ -23,7 +23,6 @@ export function PatientFormDialog({ businessId, patient, open, onOpenChange }: {
   const [email, setEmail] = useState(patient?.email ?? '')
   const [phone, setPhone] = useState(patient?.phone ?? '')
   const [notes, setNotes] = useState(patient?.notes ?? '')
-  const [tags, setTags] = useState((patient?.tags ?? []).join(', '))
   const [color, setColor] = useState(patient?.color ?? COLORS[0])
   const [isVip, setIsVip] = useState(patient?.is_vip ?? false)
 
@@ -37,7 +36,6 @@ export function PatientFormDialog({ businessId, patient, open, onOpenChange }: {
         notes: notes.trim() || null,
         color,
         is_vip: isVip,
-        tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       }
       if (editing) return updatePatient(patient!.id, values)
       return createPatient(businessId, values)
@@ -64,7 +62,6 @@ export function PatientFormDialog({ businessId, patient, open, onOpenChange }: {
             <div className="space-y-2"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             <div className="space-y-2"><Label>Phone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
           </div>
-          <div className="space-y-2"><Label>Tags <span className="text-muted-foreground">(comma separated)</span></Label><Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="returning, insurance, morning" /></div>
           <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></div>
           <div className="flex items-center justify-between">
             <div className="space-y-2">

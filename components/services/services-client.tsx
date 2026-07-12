@@ -45,9 +45,7 @@ export function ServicesClient() {
 
   return (
     <div>
-      <PageHeader title="Services" description="Durations, prices, buffers and colors — the building blocks of every appointment."
-        actions={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New service</Button>} />
-      <ClientsServicesTabs current="services" />
+      <ClientsServicesTabs current="services" action={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New service</Button>} />
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-36 w-full" />)}</div>

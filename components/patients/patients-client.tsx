@@ -54,9 +54,7 @@ export function PatientsClient() {
 
   return (
     <div>
-      <PageHeader title="Clients" description="Everyone you serve — searchable, taggable, with full history."
-        actions={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New client</Button>} />
-      <ClientsServicesTabs current="clients" />
+      <ClientsServicesTabs current="clients" action={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New client</Button>} />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-xs">

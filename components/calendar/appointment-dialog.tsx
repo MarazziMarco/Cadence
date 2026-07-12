@@ -24,7 +24,7 @@ const DOW_SHORT: Record<'en' | 'it', string[]> = {
   it: ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'],
 }
 
-export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart, open, onOpenChange }: { businessId: string; appt?: CalendarAppointment | null; defaultDate?: string; defaultStart?: string; open: boolean; onOpenChange: (v: boolean) => void }) {
+export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart, defaultPatientId, open, onOpenChange }: { businessId: string; appt?: CalendarAppointment | null; defaultDate?: string; defaultStart?: string; defaultPatientId?: string; open: boolean; onOpenChange: (v: boolean) => void }) {
   const qc = useQueryClient()
   const { business } = useWorkspace()
   const editing = !!appt
@@ -63,7 +63,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
 
   useEffect(() => {
     if (open) {
-      setPatientId(appt?.patient_id ?? '')
+      setPatientId(appt?.patient_id ?? defaultPatientId ?? '')
       setNewClient('')
       setServiceId(appt?.service_id ?? 'none')
       setDate(appt?.appointment_date ?? defaultDate ?? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })())
@@ -156,10 +156,12 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
               <SelectContent><SelectItem value="none">No service</SelectItem>{services.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.emoji ? s.emoji + ' ' : ''}{s.name} · {s.duration_minutes}m</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="space-y-3">
             <div className="space-y-2"><Label>Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Start</Label><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Min</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Start</Label><Input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+              <div className="space-y-2"><Label>Duration (min)</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
+            </div>
           </div>
 
           <div className="rounded-lg border border-border p-3">
