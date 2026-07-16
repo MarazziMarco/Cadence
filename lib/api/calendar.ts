@@ -25,7 +25,7 @@ export interface CalendarConfig {
   holidays: Array<{ start_date: string; end_date: string; is_closed: boolean }>
 }
 
-const AGENDA_SELECT = 'id, appointment_date, start_time, end_time, duration_minutes, status, color, title, price, patient_id, service_id, locked, manual_override, version, patients:patient_id ( first_name, last_name, full_name, color, phone, email ), services:service_id ( name, color, buffer_before_minutes, buffer_after_minutes, max_daily_bookings )'
+const AGENDA_SELECT = 'id, appointment_date, start_time, end_time, duration_minutes, status, color, title, price, patient_id, service_id, locked, manual_override, version, location_mode, location_address, location_city, location_postal_code, location_latitude, location_longitude, location_geocoding_status, location_address_hash, location_geocoded_at, patients:patient_id ( first_name, last_name, full_name, color, phone, email, address, city, postal_code ), services:service_id ( name, color, buffer_before_minutes, buffer_after_minutes, max_daily_bookings )'
 
 export async function listAgendaPage(
   businessId: string,

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { mutateCalendarOrThrow } from '@/lib/api/calendar'
+import type { AppointmentLocationMode } from '@/lib/types/db'
 
 const sb = () => createClient()
 
@@ -18,6 +19,15 @@ export interface CalendarAppointment {
   locked: boolean
   manual_override: boolean
   version: number
+  location_mode?: AppointmentLocationMode
+  location_address?: string | null
+  location_city?: string | null
+  location_postal_code?: string | null
+  location_latitude?: number | null
+  location_longitude?: number | null
+  location_geocoding_status?: string | null
+  location_address_hash?: string | null
+  location_geocoded_at?: string | null
   patients?: {
     first_name: string
     last_name: string | null
@@ -25,6 +35,9 @@ export interface CalendarAppointment {
     color: string | null
     phone: string | null
     email: string | null
+    address?: string | null
+    city?: string | null
+    postal_code?: string | null
   } | null
   services?: {
     name: string
@@ -35,7 +48,7 @@ export interface CalendarAppointment {
   } | null
 }
 
-const SELECT = 'id, appointment_date, start_time, end_time, duration_minutes, status, color, title, price, patient_id, service_id, locked, manual_override, version, patients:patient_id ( first_name, last_name, full_name, color, phone, email ), services:service_id ( name, color, buffer_before_minutes, buffer_after_minutes, max_daily_bookings )'
+const SELECT = 'id, appointment_date, start_time, end_time, duration_minutes, status, color, title, price, patient_id, service_id, locked, manual_override, version, location_mode, location_address, location_city, location_postal_code, location_latitude, location_longitude, location_geocoding_status, location_address_hash, location_geocoded_at, patients:patient_id ( first_name, last_name, full_name, color, phone, email, address, city, postal_code ), services:service_id ( name, color, buffer_before_minutes, buffer_after_minutes, max_daily_bookings )'
 
 export async function listAppointments(businessId: string, startDate: string, endDate: string): Promise<CalendarAppointment[]> {
   const { data, error } = await sb().from('appointments').select(SELECT)

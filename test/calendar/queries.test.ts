@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { listAppointments } from '@/lib/api/appointments'
-import { getCalendarConfig } from '@/lib/api/calendar'
+import { getCalendarConfig, listAgendaPage } from '@/lib/api/calendar'
 import { calendarKeys } from '@/lib/calendar/query-keys'
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -58,10 +58,41 @@ describe('calendar appointment range reads', () => {
     expect(select).toHaveBeenCalledWith(expect.stringMatching(/manual_override/))
     expect(select).toHaveBeenCalledWith(expect.stringMatching(/phone/))
     expect(select).toHaveBeenCalledWith(expect.stringMatching(/email/))
+    expect(select).toHaveBeenCalledWith(expect.stringMatching(/location_mode/))
+    expect(select).toHaveBeenCalledWith(expect.stringMatching(/location_address/))
+    expect(select).toHaveBeenCalledWith(expect.stringMatching(/location_latitude/))
+    expect(select).toHaveBeenCalledWith(expect.stringMatching(/postal_code/))
     expect(select).toHaveBeenCalledWith(expect.stringMatching(/buffer_before_minutes/))
     expect(select).toHaveBeenCalledWith(expect.stringMatching(/buffer_after_minutes/))
     expect(select).toHaveBeenCalledWith(expect.stringMatching(/max_daily_bookings/))
     expect(inStatus).toHaveBeenCalledWith('status', ['scheduled', 'confirmed'])
+  })
+
+  it('loads client and appointment location fields for agenda pages', async () => {
+    const select = vi.fn()
+    const query = {
+      eq: vi.fn(),
+      is: vi.fn(),
+      gte: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+    select.mockReturnValue(query)
+    query.eq.mockReturnValue(query)
+    query.is.mockReturnValue(query)
+    query.gte.mockReturnValue(query)
+    query.order.mockReturnValue(query)
+
+    const from = vi.fn(() => ({ select }))
+    const { createClient } = await import('@/lib/supabase/client')
+    vi.mocked(createClient).mockReturnValue({ from } as never)
+
+    await listAgendaPage(BUSINESS_ID, '2026-07-01', {}, null)
+
+    expect(select).toHaveBeenCalledWith(expect.stringMatching(/location_mode/))
+    expect(select).toHaveBeenCalledWith(expect.stringMatching(/location_address/))
+    expect(select).toHaveBeenCalledWith(expect.stringMatching(/location_geocoding_status/))
+    expect(select).toHaveBeenCalledWith(expect.stringMatching(/patients:patient_id.*address.*city.*postal_code/))
   })
 })
 

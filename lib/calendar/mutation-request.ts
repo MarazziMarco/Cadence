@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
 import { CALENDAR_CONSTRAINT_CODES } from '@/lib/calendar/constraints'
+import {
+  APPOINTMENT_LOCATION_MODES,
+  type AppointmentLocationMode,
+} from '@/lib/types/db'
 
 const DateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   const [year, month, day] = value.split('-').map(Number)
@@ -16,6 +20,19 @@ const TimeSchema = z.string().regex(
   /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?$/,
   'Invalid calendar time',
 )
+
+const NullableLocationTextSchema = z.string()
+  .trim()
+  .max(500)
+  .nullable()
+  .transform((value) => value === null || value === '' ? null : value)
+
+export interface AppointmentLocationValues {
+  location_mode?: AppointmentLocationMode
+  location_address?: string | null
+  location_city?: string | null
+  location_postal_code?: string | null
+}
 
 const AppointmentValuesSchema = z.object({
   patient_id: z.string().uuid().optional(),
@@ -33,6 +50,10 @@ const AppointmentValuesSchema = z.object({
   locked: z.boolean().optional(),
   color: z.string().trim().max(100).nullable().optional(),
   internal_notes: z.string().max(20_000).nullable().optional(),
+  location_mode: z.enum(APPOINTMENT_LOCATION_MODES).optional(),
+  location_address: NullableLocationTextSchema.optional(),
+  location_city: NullableLocationTextSchema.optional(),
+  location_postal_code: NullableLocationTextSchema.optional(),
 }).strict()
 
 const ALL_VALUE_FIELDS = Object.keys(AppointmentValuesSchema.shape)
@@ -104,6 +125,16 @@ export const CalendarMutationRequestSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['values', 'duration_minutes'],
       message: 'duration_minutes is required for resize',
+    })
+  }
+  if (
+    body.values.location_mode === 'custom'
+    && !body.values.location_address
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['values', 'location_address'],
+      message: 'Custom location requires an address',
     })
   }
 
