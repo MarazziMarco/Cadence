@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { undoOptimizationRun } from '@/lib/api/scheduler'
 
 const sb = () => createClient()
 
@@ -123,25 +124,6 @@ export async function undoLastOptimization(businessId: string): Promise<{ undone
   if (!applied || applied.length === 0) return { undone: 0, runId: null }
 
   const runId = (applied[0] as any).optimization_run_id
-  const changes = applied.filter((c: any) => c.optimization_run_id === runId)
-
-  let undone = 0
-  for (const c of changes as any[]) {
-    if (c.old_date) {
-      // A move — restore the previous slot.
-      const { error } = await client.from('appointments').update({
-        appointment_date: c.old_date, start_time: c.old_start_time, end_time: c.old_end_time,
-      }).eq('id', c.appointment_id)
-      if (error) throw error
-    } else {
-      // A waiting-list insert — remove the created appointment and re-activate it.
-      await client.from('appointments').update({ deleted_at: new Date().toISOString() }).eq('id', c.appointment_id)
-      await client.from('waiting_list').update({ active: true, matched_appointment_id: null, matched_at: null })
-        .eq('matched_appointment_id', c.appointment_id)
-    }
-    undone++
-  }
-  // Mark the changes as no longer applied so the run drops out of "undoable".
-  await client.from('optimization_changes').update({ accepted: false }).in('id', changes.map((c: any) => c.id))
-  return { undone, runId }
+  const result = await undoOptimizationRun(businessId, runId)
+  return { undone: Number(result?.undone ?? 0), runId }
 }

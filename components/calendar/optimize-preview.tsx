@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Clock, DollarSign, ListChecks, ArrowRightLeft, Check, ArrowRight, Sparkles, PlusCircle, Loader2 } from 'lucide-react'
-import { applyChanges } from '@/lib/api/scheduler'
+import { applyOptimizationBatch } from '@/lib/api/scheduler'
 import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
@@ -48,14 +48,22 @@ export function OptimizePreview({ businessId, run, changes, onApplied }: {
   async function apply() {
     setApplying(true)
     try {
-      const applied = await applyChanges(businessId, run.id, changes, excluded)
+      const selected = changes.filter((change) => !excluded.has(change.id))
+      await applyOptimizationBatch(
+        businessId,
+        [run.id],
+        selected.map((change) => change.id),
+      )
       invalidateCalendarAppointments(qc, businessId)
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['waiting'] })
       qc.invalidateQueries({ queryKey: ['schedule-health'] })
       qc.invalidateQueries({ queryKey: ['optimizations'] })
-      setAppliedChanges(applied.map((c) => ({ ...c, accepted: true })))
-      toast.success(t('opt.applied', { n: applied.length }))
+      setAppliedChanges(selected.map((change) => ({
+        ...change,
+        accepted: true,
+      })))
+      toast.success(t('opt.applied', { n: selected.length }))
       onApplied?.()
     } catch (e: any) {
       toast.error(e.message)

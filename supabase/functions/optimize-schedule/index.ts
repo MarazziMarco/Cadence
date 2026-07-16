@@ -1,6 +1,6 @@
 // Deno HTTP entrypoint for the optimize-schedule Edge Function.
 //
-// POST body: { business_id, date_from, date_to, settings_id?, mode?, profile_id? }
+// POST body: { business_id, date_from, date_to, settings_id?, mode?, scope_*? }
 // Orchestrates loadInput -> solveCore -> persistOutput and returns { run_id }.
 //
 // Secrets come ONLY from the environment (never hardcoded, never logged):
@@ -45,7 +45,12 @@ Deno.serve(async (req: Request) => {
   const date_to = body.date_to as string | undefined;
   const settings_id = body.settings_id as string | undefined;
   const mode = body.mode as Mode | undefined;
-  const profile_id = (body.profile_id as string | undefined) ?? null;
+  const batch_id = (body.batch_id as string | undefined) ?? crypto.randomUUID();
+  const scope_kind = (
+    body.scope_kind as "day" | "week" | "month" | "custom" | undefined
+  ) ?? (date_from === date_to ? "day" : "custom");
+  const week_key = (body.week_key as string | undefined) ?? null;
+  const allow_cross_week = body.allow_cross_week === true;
 
   if (!business_id) return json({ error: "business_id is required" }, 400);
   if (!date_from || !DATE_RE.test(date_from)) {
@@ -60,15 +65,42 @@ Deno.serve(async (req: Request) => {
   if (mode && !MODES.includes(mode)) {
     return json({ error: `mode must be one of ${MODES.join(", ")}` }, 400);
   }
+  if (!["day", "week", "month", "custom"].includes(scope_kind)) {
+    return json({ error: "invalid scope_kind" }, 400);
+  }
 
   const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !key) return json({ error: "server not configured" }, 500);
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !serviceKey || !anonKey) {
+    return json({ error: "server not configured" }, 500);
+  }
+  const authorization = req.headers.get("Authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return json({ error: "unauthorized" }, 401);
+  }
 
   try {
-    const supabase = createClient(url, key, {
+    const authClient = createClient(url, anonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authorization } },
+    });
+    const { data: { user }, error: userError } = await authClient.auth.getUser();
+    if (userError || !user) return json({ error: "unauthorized" }, 401);
+
+    const supabase = createClient(url, serviceKey, {
       auth: { persistSession: false },
     });
+    const { data: business, error: businessError } = await supabase
+      .from("business")
+      .select("id, profile_id")
+      .eq("id", business_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (businessError) throw businessError;
+    if (!business || business.profile_id !== user.id) {
+      return json({ error: "forbidden" }, 403);
+    }
 
     const input = await loadInput(supabase, {
       business_id,
@@ -78,7 +110,18 @@ Deno.serve(async (req: Request) => {
       mode,
     });
     const output = solveCore(input);
-    const run_id = await persistOutput(supabase, business_id, output, profile_id);
+    const run_id = await persistOutput(supabase, {
+      businessId: business_id,
+      output,
+      input,
+      profileId: user.id,
+      batchId: batch_id,
+      scopeKind: scope_kind,
+      scopeFrom: date_from,
+      scopeTo: date_to,
+      weekKey: week_key,
+      allowCrossWeek: allow_cross_week,
+    });
 
     return json({ run_id });
   } catch (err) {

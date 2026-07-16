@@ -130,7 +130,7 @@ export async function loadInput(
   const { data: apptRows, error: apptErr } = await supabase
     .from("appointments")
     .select(
-      "id, patient_id, service_id, appointment_date, start_time, end_time, duration_minutes, price, locked, manual_override, source",
+      "id, version, patient_id, service_id, appointment_date, start_time, end_time, duration_minutes, price, locked, manual_override, source",
     )
     .eq("business_id", business_id)
     .is("deleted_at", null)
@@ -140,6 +140,7 @@ export async function loadInput(
   if (apptErr) throw apptErr;
   const appointments = (apptRows ?? []).map((a) => ({
     id: a.id,
+    version: num(a.version, 1),
     patient_id: a.patient_id,
     service_id: a.service_id ?? null,
     appointment_date: a.appointment_date,

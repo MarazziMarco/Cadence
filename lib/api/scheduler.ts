@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/client'
-import { timeToMin } from '@/lib/api/appointments'
 
 // NOTE: optimization logic lives in the Supabase Edge Function 'optimize-schedule'.
 // The frontend only invokes it and renders/applies the resulting preview.
@@ -112,65 +111,48 @@ export async function fetchRun(runId: string) {
   return { run, changes: changes ?? [] }
 }
 
-// Accept a single change. Write order matters (see request): mutate the schedule
-// first, then flag accepted=true last, so a mid-failure leaves the row "to apply".
-export async function acceptChange(businessId: string, runId: string, change: any) {
-  const client = sb()
-  if (change.appointment_id) {
-    // Move
-    const { error } = await client.from('appointments').update({
-      appointment_date: change.new_date, start_time: change.new_start_time, end_time: change.new_end_time,
-    }).eq('id', change.appointment_id)
-    if (error) throw error
-    const { error: aErr } = await client.from('optimization_changes').update({ accepted: true }).eq('id', change.id)
-    if (aErr) throw aErr
-    // If this move fulfils an "advance" (move-me-up) request, close that entry.
-    const { data: wls } = await client.from('waiting_list')
-      .select('id, notes').eq('business_id', businessId).eq('patient_id', change.patient_id).eq('active', true).is('deleted_at', null)
-    for (const w of wls ?? []) {
-      let advFor: string | null = null
-      try { advFor = JSON.parse((w as any).notes || '')?.advance_for ?? null } catch {}
-      if (advFor === change.appointment_id) {
-        await client.from('waiting_list').update({ active: false, matched_appointment_id: change.appointment_id, matched_at: new Date().toISOString() }).eq('id', (w as any).id)
-      }
-    }
-  } else {
-    // Insert from waiting list
-    const dur = change.new_start_time && change.new_end_time ? timeToMin(change.new_end_time) - timeToMin(change.new_start_time) : 30
-    const { data: wl } = await client.from('waiting_list')
-      .select('id, preferred_service_id, services:preferred_service_id ( price )')
-      .eq('business_id', businessId).eq('patient_id', change.patient_id).eq('active', true).is('deleted_at', null)
-      .limit(1).maybeSingle()
-    const { data: appt, error } = await client.from('appointments').insert({
-      business_id: businessId, patient_id: change.patient_id, service_id: wl?.preferred_service_id ?? null,
-      appointment_date: change.new_date, start_time: change.new_start_time, end_time: change.new_end_time,
-      duration_minutes: dur, price: (wl as any)?.services?.price ?? null,
-      status: 'scheduled', source: 'ai', generated_by_ai: true, optimization_run_id: runId,
-    }).select('id').single()
-    if (error) throw error
-    if (wl?.id) {
-      await client.from('waiting_list').update({ matched_appointment_id: appt.id, matched_at: new Date().toISOString(), active: false }).eq('id', wl.id)
-    }
-    const { error: aErr } = await client.from('optimization_changes').update({ accepted: true }).eq('id', change.id)
-    if (aErr) throw aErr
-  }
+export interface OptimizationApplyRequest {
+  businessId: string
+  runIds: string[]
+  selectedChangeIds: string[]
+  idempotencyKey: string
 }
 
-// Batch apply: accept the selected changes and reject (dismiss) the rest, in one
-// go. Used by the single "Apply" button in the optimize preview (scheduler +
-// calendar). Sequential so acceptChange's waiting-list/advance side effects run
-// deterministically. Returns the changes actually applied.
-export async function applyChanges(businessId: string, runId: string, changes: any[], excludedIds: Set<string>): Promise<any[]> {
-  const applied: any[] = []
-  for (const c of changes) {
-    if (excludedIds.has(c.id)) { await rejectChange(c); continue }
-    await acceptChange(businessId, runId, c)
-    applied.push(c)
+async function optimizerMutation(body: Record<string, unknown>) {
+  const response = await fetch('/api/calendar/optimize/apply', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const result = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new Error(result?.error || 'Optimization update failed')
   }
-  return applied
+  return result
 }
 
-export async function rejectChange(change: any) {
-  const { error } = await sb().from('optimization_changes').update({ deleted_at: new Date().toISOString() }).eq('id', change.id)
-  if (error) throw error
+export async function applyOptimizationBatch(
+  businessId: string,
+  runIds: string[],
+  selectedChangeIds: string[],
+) {
+  const request: OptimizationApplyRequest = {
+    businessId,
+    runIds,
+    selectedChangeIds,
+    idempotencyKey: crypto.randomUUID(),
+  }
+  return optimizerMutation(request)
+}
+
+export async function undoOptimizationRun(
+  businessId: string,
+  runId: string,
+) {
+  return optimizerMutation({
+    action: 'undo',
+    businessId,
+    runId,
+    idempotencyKey: crypto.randomUUID(),
+  })
 }

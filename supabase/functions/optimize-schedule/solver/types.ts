@@ -111,6 +111,7 @@ export interface PatientException {
 
 export interface Appointment {
   id: string;
+  version: number;
   patient_id: string;
   service_id: string | null;
   appointment_date: string;

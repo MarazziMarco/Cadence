@@ -4,21 +4,46 @@
 // waiting list — those mutate later, on per-row accept (handled by the app).
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.74.0";
-import type { SolverOutput } from "./types.ts";
+import type { SolverInput, SolverOutput } from "./types.ts";
+
+export interface PersistArgs {
+  businessId: string;
+  output: SolverOutput;
+  input: SolverInput;
+  profileId: string;
+  batchId: string;
+  scopeKind: "day" | "week" | "month" | "custom";
+  scopeFrom: string;
+  scopeTo: string;
+  weekKey?: string | null;
+  allowCrossWeek?: boolean;
+}
 
 export async function persistOutput(
   supabase: SupabaseClient,
-  businessId: string,
-  output: SolverOutput,
-  profileId?: string | null,
+  args: PersistArgs,
 ): Promise<string> {
+  const { businessId, output, input } = args;
   const r = output.run;
+  const appointmentVersions = Object.fromEntries(
+    input.appointments.map((appointment) => [
+      appointment.id,
+      appointment.version,
+    ]),
+  );
 
   const { data: runRow, error: runErr } = await supabase
     .from("optimization_runs")
     .insert({
       business_id: businessId,
-      profile_id: profileId ?? null,
+      profile_id: args.profileId,
+      batch_id: args.batchId,
+      scope_kind: args.scopeKind,
+      scope_from: args.scopeFrom,
+      scope_to: args.scopeTo,
+      week_key: args.weekKey ?? null,
+      allow_cross_week: args.allowCrossWeek ?? false,
+      schedule_snapshot: { appointments: appointmentVersions },
       mode: r.mode,
       result: "preview",
       objective_score: r.objective_score,
