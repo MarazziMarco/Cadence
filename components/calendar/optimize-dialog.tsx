@@ -12,12 +12,25 @@ import { OptimizePreview } from './optimize-preview'
 // Calendar-side entry point for the intelligent optimizer. It reuses the exact
 // Scheduler flow (Edge Function invoke + preview + single batch apply) via
 // lib/api/scheduler and the shared OptimizePreview component.
-export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: string; dateFrom: string; dateTo: string }) {
+export function OptimizeDialog({
+  businessId,
+  dateFrom,
+  dateTo,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  businessId: string
+  dateFrom: string
+  dateTo: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
   const { t } = useT()
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [run, setRun] = useState<any>(null)
   const [changes, setChanges] = useState<any[]>([])
+  const open = controlledOpen ?? uncontrolledOpen
 
   async function optimize() {
     setLoading(true); setRun(null); setChanges([])
@@ -32,7 +45,8 @@ export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: s
   }
 
   function handleOpenChange(v: boolean) {
-    setOpen(v)
+    if (controlledOpen === undefined) setUncontrolledOpen(v)
+    onOpenChange?.(v)
     if (v) { setRun(null); setChanges([]); optimize() }
   }
 
