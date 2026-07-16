@@ -150,6 +150,74 @@ Deno.test("address hashing normalizes equivalent text and does not expose it in 
   assertNotEquals(location.key.includes("roma"), true);
 });
 
+Deno.test("raw-looking persisted address hashes are converted to opaque tokens", () => {
+  const rawLookingHash = "Via Segreta 99, Roma";
+  const location = resolveAppointmentLocation(input({
+    mode: "custom",
+    custom: {
+      addressHash: rawLookingHash,
+      address: null,
+      latitude: 41.9,
+      longitude: 12.5,
+    },
+  }));
+
+  assertNotEquals(location.addressHash, rawLookingHash);
+  assertNotEquals(location.addressHash?.includes("Segreta"), true);
+  assertNotEquals(location.key.includes("Segreta"), true);
+  assertEquals(location.addressHash, hashNormalizedAddress(rawLookingHash));
+});
+
+Deno.test("already opaque persisted hashes remain stable across resolution", () => {
+  const opaqueHash = hashNormalizedAddress("Via Stabile 5")!;
+  const location = resolveAppointmentLocation(input({
+    mode: "patient",
+    patient: {
+      addressHash: opaqueHash,
+      address: null,
+      latitude: 41.9,
+      longitude: 12.5,
+    },
+  }));
+
+  assertEquals(location.addressHash, opaqueHash);
+  assertEquals(location.key, `patient:${opaqueHash}`);
+});
+
+Deno.test("out-of-range coordinate pairs stay unresolved and are returned as null", () => {
+  const invalidPatient = resolveAppointmentLocation(input({
+    mode: "patient",
+    patient: {
+      address: null,
+      latitude: 91,
+      longitude: 12.5,
+    },
+  }));
+  const invalidCustom = resolveAppointmentLocation(input({
+    mode: "custom",
+    custom: {
+      address: null,
+      latitude: 41.9,
+      longitude: -181,
+    },
+  }));
+
+  assertEquals(invalidPatient, {
+    key: "unresolved:patient",
+    source: "patient",
+    latitude: null,
+    longitude: null,
+    addressHash: null,
+  });
+  assertEquals(invalidCustom, {
+    key: "unresolved:custom",
+    source: "custom",
+    latitude: null,
+    longitude: null,
+    addressHash: null,
+  });
+});
+
 Deno.test("walking is selected at nine minutes and driving above it", () => {
   assertEquals(chooseTravelMode(9 * 60, 9), "foot-walking");
   assertEquals(chooseTravelMode(9 * 60 + 1, 9), "driving-car");

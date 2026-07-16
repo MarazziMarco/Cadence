@@ -16,7 +16,7 @@ function normalizeAddress(value: string): string {
 }
 
 /**
- * A deterministic non-reversible cache token for normalized addresses.
+ * A deterministic opaque cache token for normalized address-like input.
  * Routing code must never log the normalized source string.
  */
 export function hashNormalizedAddress(value: string): string | null {
@@ -33,20 +33,47 @@ export function hashNormalizedAddress(value: string): string | null {
   return hash.toString(16).padStart(16, "0");
 }
 
-function finiteCoordinate(value: number | null): number | null {
-  return value !== null && Number.isFinite(value) ? value : null;
+function validLatitude(value: number | null): number | null {
+  return value !== null &&
+      Number.isFinite(value) &&
+      value >= -90 &&
+      value <= 90
+    ? value
+    : null;
+}
+
+function validLongitude(value: number | null): number | null {
+  return value !== null &&
+      Number.isFinite(value) &&
+      value >= -180 &&
+      value <= 180
+    ? value
+    : null;
+}
+
+function validCoordinates(
+  candidate: LocationCandidate,
+): { latitude: number; longitude: number } | null {
+  const latitude = validLatitude(candidate.latitude);
+  const longitude = validLongitude(candidate.longitude);
+  return latitude !== null && longitude !== null
+    ? { latitude, longitude }
+    : null;
 }
 
 function candidateHash(candidate: LocationCandidate): string | null {
   const supplied = candidate.addressHash?.trim();
-  if (supplied) return supplied;
+  if (supplied) {
+    return /^[0-9a-f]{16}$/i.test(supplied)
+      ? supplied.toLowerCase()
+      : hashNormalizedAddress(supplied);
+  }
   if (candidate.address) return hashNormalizedAddress(candidate.address);
 
-  const latitude = finiteCoordinate(candidate.latitude);
-  const longitude = finiteCoordinate(candidate.longitude);
-  if (latitude === null || longitude === null) return null;
+  const coordinates = validCoordinates(candidate);
+  if (!coordinates) return null;
   return hashNormalizedAddress(
-    `${latitude.toFixed(5)},${longitude.toFixed(5)}`,
+    `${coordinates.latitude.toFixed(5)},${coordinates.longitude.toFixed(5)}`,
   );
 }
 
@@ -98,11 +125,12 @@ function resolved(
     return unresolved(source);
   }
 
+  const coordinates = validCoordinates(candidate);
   return {
     key: `${source}:${addressHash}`,
     source,
-    latitude: finiteCoordinate(candidate.latitude),
-    longitude: finiteCoordinate(candidate.longitude),
+    latitude: coordinates?.latitude ?? null,
+    longitude: coordinates?.longitude ?? null,
     addressHash,
   };
 }
