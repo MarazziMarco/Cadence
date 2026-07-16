@@ -5,7 +5,9 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type MouseEvent,
+  type Ref,
 } from 'react'
 
 import {
@@ -21,6 +23,7 @@ import {
   minutesToY,
   yToMinutes,
 } from '@/lib/calendar/geometry'
+import { allocateOverlapLanes } from '@/lib/calendar/overlap-lanes'
 import type { CalendarRendererProps } from '@/components/calendar/desktop-week-calendar'
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
@@ -36,6 +39,7 @@ const ignoreViewChange = () => {}
 interface MobileDayCalendarProps extends CalendarRendererProps {
   isLoading?: boolean
   onOptimize?(): void
+  optimizeButtonRef?: Ref<HTMLButtonElement>
 }
 
 interface OpenWindow {
@@ -47,6 +51,7 @@ interface DaySchedule {
   isClosed: boolean
   rangeStart: number
   rangeEnd: number
+  openWindows: OpenWindow[]
   closedWindows: OpenWindow[]
 }
 
@@ -144,6 +149,7 @@ function daySchedule(
     isClosed,
     rangeStart,
     rangeEnd,
+    openWindows,
     closedWindows: isClosed
       ? [{ start: rangeStart, end: rangeEnd }]
       : complementWindows(rangeStart, rangeEnd, openWindows),
@@ -166,11 +172,13 @@ export function MobileDayCalendar({
   onSelectAppointment,
   onCreateAt,
   onOptimize,
+  optimizeButtonRef,
 }: MobileDayCalendarProps) {
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
-  const scrolledDatesRef = useRef(new Set<string>())
+  const lastScrolledDateRef = useRef<string | null>(null)
+  const [now, setNow] = useState<Date | null>(null)
   const selectedAppointments = useMemo(
     () => appointments
       .filter((appointment) => appointment.appointment_date === selectedDate)
@@ -181,15 +189,34 @@ export function MobileDayCalendar({
     () => daySchedule(config, selectedDate, selectedAppointments),
     [config, selectedAppointments, selectedDate],
   )
+  const appointmentLayouts = useMemo(
+    () => allocateOverlapLanes(selectedAppointments.map((appointment) => ({
+      appointment,
+      id: appointment.id,
+      top: minutesToY(
+        timeToMin(appointment.start_time),
+        schedule.rangeStart,
+        density,
+      ),
+      height: Math.max(
+        44,
+        minutesToY(appointment.duration_minutes, 0, density),
+      ),
+    }))),
+    [density, schedule.rangeStart, selectedAppointments],
+  )
   const totalHeight = minutesToY(
     schedule.rangeEnd,
     schedule.rangeStart,
     density,
   )
-  const today = businessToday(config.timezone)
-  const currentMinute = businessMinute(config.timezone)
+  const today = businessToday(config.timezone, now ?? undefined)
+  const currentMinute = now
+    ? businessMinute(config.timezone, now)
+    : null
   const showCurrentTime = (
-    selectedDate === today
+    currentMinute !== null
+    && selectedDate === today
     && currentMinute >= schedule.rangeStart
     && currentMinute <= schedule.rangeEnd
   )
@@ -209,16 +236,22 @@ export function MobileDayCalendar({
   }, [onSelectDate, today])
 
   useEffect(() => {
+    setNow(new Date())
+    const timer = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
     const scrollContainer = timelineScrollRef.current
     if (
       !scrollContainer
       || isLoading
-      || scrolledDatesRef.current.has(selectedDate)
+      || lastScrolledDateRef.current === selectedDate
       || typeof scrollContainer.scrollTo !== 'function'
     ) return
 
-    scrolledDatesRef.current.add(selectedDate)
-    const targetMinute = showCurrentTime
+    lastScrolledDateRef.current = selectedDate
+    const targetMinute = showCurrentTime && currentMinute !== null
       ? currentMinute
       : selectedAppointments[0]
         ? timeToMin(selectedAppointments[0].start_time)
@@ -246,6 +279,7 @@ export function MobileDayCalendar({
   ])
 
   function handleTimelineClick(event: MouseEvent<HTMLDivElement>) {
+    if (schedule.isClosed) return
     const rect = event.currentTarget.getBoundingClientRect()
     const minute = yToMinutes(
       event.clientY - rect.top,
@@ -253,14 +287,14 @@ export function MobileDayCalendar({
       density,
       config.slotIntervalMinutes,
     )
-    const latestStart = Math.max(
-      schedule.rangeStart,
-      schedule.rangeEnd - config.defaultDurationMinutes,
+    const containingWindow = schedule.openWindows.find(
+      (window) => (
+        minute >= window.start
+        && minute + config.defaultDurationMinutes <= window.end
+      ),
     )
-    onCreateAt(
-      selectedDate,
-      Math.max(schedule.rangeStart, Math.min(minute, latestStart)),
-    )
+    if (!containingWindow) return
+    onCreateAt(selectedDate, minute)
   }
 
   return (
@@ -271,123 +305,134 @@ export function MobileDayCalendar({
         month: 'long',
         day: 'numeric',
       })}
+      aria-busy={isLoading}
       className="w-full max-w-full overflow-hidden rounded-xl border border-border bg-card"
     >
-      <CalendarToolbar
-        selectedDate={selectedDate}
-        view="day"
-        onToday={handleToday}
-        onViewChange={ignoreViewChange}
-        onOptimize={onOptimize}
-      />
-      <MobileDateStrip
-        selectedDate={selectedDate}
-        timezone={config.timezone}
-        onSelectDate={onSelectDate}
-      />
+      <div className="sticky top-0 z-40 bg-card">
+        <CalendarToolbar
+          selectedDate={selectedDate}
+          view="day"
+          onToday={handleToday}
+          onViewChange={ignoreViewChange}
+          onOptimize={onOptimize}
+          optimizeButtonRef={optimizeButtonRef}
+        />
+        <MobileDateStrip
+          selectedDate={selectedDate}
+          timezone={config.timezone}
+          onSelectDate={onSelectDate}
+        />
+      </div>
 
-      {schedule.isClosed ? (
-        <p className="border-b border-border bg-muted/60 px-3 py-2 text-center text-xs font-semibold text-muted-foreground">
-          {t('cal.closed')}
-        </p>
-      ) : null}
-
-      <div
-        ref={timelineScrollRef}
-        className="max-h-[calc(100dvh-16rem)] overflow-x-hidden overflow-y-auto overscroll-y-contain"
-      >
+      {isLoading ? (
         <div
-          className="grid grid-cols-[3.25rem_minmax(0,1fr)]"
-          style={{ height: totalHeight }}
+          role="status"
+          className="space-y-3 px-4 py-5"
         >
-          <div className="relative border-r border-border bg-muted/20">
-            {hourMarks.map((minute) => (
-              <span
-                key={minute}
-                className="absolute right-2 -translate-y-1/2 text-[10px] font-medium tabular-nums text-muted-foreground"
-                style={{
-                  top: minutesToY(minute, schedule.rangeStart, density),
-                }}
-              >
-                {hourLabel(minute)}
-              </span>
-            ))}
-          </div>
+          <span className="sr-only">{t('common.loading')}</span>
+          <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+          <div className="h-16 animate-pulse rounded-lg bg-muted/80" />
+          <div className="h-16 animate-pulse rounded-lg bg-muted/60" />
+          <div className="h-16 animate-pulse rounded-lg bg-muted/40" />
+        </div>
+      ) : (
+        <>
+          {schedule.isClosed ? (
+            <p className="border-b border-border bg-muted/60 px-3 py-2 text-center text-xs font-semibold text-muted-foreground">
+              {t('cal.closed')}
+            </p>
+          ) : null}
 
           <div
-            data-testid="mobile-day-timeline"
-            className="relative touch-manipulation overflow-hidden"
-            style={{ height: totalHeight }}
-            onClick={handleTimelineClick}
+            ref={timelineScrollRef}
+            className="max-h-[calc(100dvh-16rem)] overflow-x-hidden overflow-y-auto overscroll-y-contain"
           >
-            {hourMarks.map((minute) => (
-              <div
-                key={minute}
-                aria-hidden="true"
-                className="absolute inset-x-0 border-t border-border/60"
-                style={{
-                  top: minutesToY(minute, schedule.rangeStart, density),
-                }}
-              />
-            ))}
-
-            {schedule.closedWindows.map((window) => (
-              <div
-                key={`${window.start}-${window.end}`}
-                data-testid={`closed-window-${window.start}-${window.end}`}
-                aria-hidden="true"
-                className="absolute inset-x-0 bg-muted/45 [background-image:repeating-linear-gradient(135deg,transparent,transparent_8px,hsl(var(--border)/.35)_8px,hsl(var(--border)/.35)_9px)]"
-                style={{
-                  top: minutesToY(
-                    window.start,
-                    schedule.rangeStart,
-                    density,
-                  ),
-                  height: minutesToY(window.end, window.start, density),
-                }}
-              />
-            ))}
-
-            {selectedAppointments.map((appointment) => (
-              <AppointmentCard
-                key={appointment.id}
-                appointment={appointment}
-                top={minutesToY(
-                  timeToMin(appointment.start_time),
-                  schedule.rangeStart,
-                  density,
-                )}
-                height={Math.max(
-                  44,
-                  minutesToY(
-                    appointment.duration_minutes,
-                    0,
-                    density,
-                  ),
-                )}
-                onSelect={onSelectAppointment}
-              />
-            ))}
-
-            {showCurrentTime ? (
-              <div
-                role="separator"
-                aria-label={t('cal.currentTime')}
-                className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-destructive"
-                style={{
-                  top: minutesToY(
-                    currentMinute,
-                    schedule.rangeStart,
-                    density,
-                  ),
-                }}
-              >
-                <span className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-destructive" />
+            <div
+              className="grid grid-cols-[3.25rem_minmax(0,1fr)]"
+              style={{ height: totalHeight }}
+            >
+              <div className="relative border-r border-border bg-muted/20">
+                {hourMarks.map((minute) => (
+                  <span
+                    key={minute}
+                    className="absolute right-2 -translate-y-1/2 text-[10px] font-medium tabular-nums text-muted-foreground"
+                    style={{
+                      top: minutesToY(minute, schedule.rangeStart, density),
+                    }}
+                  >
+                    {hourLabel(minute)}
+                  </span>
+                ))}
               </div>
-            ) : null}
+
+              <div
+                data-testid="mobile-day-timeline"
+                className="relative touch-manipulation overflow-hidden"
+                style={{ height: totalHeight }}
+                aria-disabled={schedule.isClosed || undefined}
+                onClick={schedule.isClosed ? undefined : handleTimelineClick}
+              >
+                {hourMarks.map((minute) => (
+                  <div
+                    key={minute}
+                    aria-hidden="true"
+                    className="absolute inset-x-0 border-t border-border/60"
+                    style={{
+                      top: minutesToY(minute, schedule.rangeStart, density),
+                    }}
+                  />
+                ))}
+
+                {schedule.closedWindows.map((window) => (
+                  <div
+                    key={`${window.start}-${window.end}`}
+                    data-testid={`closed-window-${window.start}-${window.end}`}
+                    aria-hidden="true"
+                    className="absolute inset-x-0 bg-muted/45 [background-image:repeating-linear-gradient(135deg,transparent,transparent_8px,hsl(var(--border)/.35)_8px,hsl(var(--border)/.35)_9px)]"
+                    style={{
+                      top: minutesToY(
+                        window.start,
+                        schedule.rangeStart,
+                        density,
+                      ),
+                      height: minutesToY(window.end, window.start, density),
+                    }}
+                  />
+                ))}
+
+                {appointmentLayouts.map((layout) => (
+                  <AppointmentCard
+                    key={layout.id}
+                    appointment={layout.appointment}
+                    top={layout.top}
+                    height={layout.height}
+                    leftPercent={layout.leftPercent}
+                    widthPercent={layout.widthPercent}
+                    onSelect={onSelectAppointment}
+                  />
+                ))}
+
+                {showCurrentTime && currentMinute !== null ? (
+                  <div
+                    role="separator"
+                    aria-label={t('cal.currentTime')}
+                    className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-destructive"
+                    style={{
+                      top: minutesToY(
+                        currentMinute,
+                        schedule.rangeStart,
+                        density,
+                      ),
+                    }}
+                  >
+                    <span className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-destructive" />
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </section>
   )
 }

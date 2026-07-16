@@ -13,6 +13,8 @@ interface AppointmentCardProps {
   appointment: CalendarAppointment
   top: number
   height: number
+  leftPercent?: number
+  widthPercent?: number
   onSelect(id: string): void
 }
 
@@ -34,6 +36,8 @@ function AppointmentCardComponent({
   appointment,
   top,
   height,
+  leftPercent = 0,
+  widthPercent = 100,
   onSelect,
 }: AppointmentCardProps) {
   const { t } = useT()
@@ -69,12 +73,14 @@ function AppointmentCardComponent({
       type="button"
       aria-label={accessibleName}
       className={cn(
-        'absolute inset-x-2 z-20 overflow-hidden rounded-lg border-l-[3px] px-2.5 py-1.5 text-left shadow-sm',
+        'absolute z-20 overflow-hidden rounded-lg border-l-[3px] px-2.5 py-1.5 text-left shadow-sm',
         'min-h-11 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
       )}
       style={{
         top,
         height,
+        left: `${leftPercent}%`,
+        width: `${widthPercent}%`,
         backgroundColor: `${color}1a`,
         borderColor: color,
       }}

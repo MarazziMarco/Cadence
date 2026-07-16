@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { forwardRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -14,6 +15,8 @@ import {
   WorkspaceProvider,
   type WorkspaceBusiness,
 } from '@/lib/workspace-context'
+
+const optimizerRuns = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api/appointments', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/appointments')>()
@@ -56,14 +59,19 @@ vi.mock('@/components/calendar/mobile-day-calendar', () => ({
     appointments: CalendarAppointment[]
     selectedDate: string
     density: number
+    isLoading?: boolean
+    onSelectDate(date: string): void
     onSelectAppointment(id: string): void
     onCreateAt(date: string, startMinute: number): void
+    onOptimize?(): void
+    optimizeButtonRef?: React.Ref<HTMLButtonElement>
   }) => (
     <div
       data-testid="calendar-renderer"
       data-date={props.selectedDate}
       data-density={props.density}
       data-view="day"
+      data-loading={props.isLoading}
     >
       <span>{props.appointments.length} appointments</span>
       <button onClick={() => props.onSelectAppointment('appointment-1')}>
@@ -71,6 +79,12 @@ vi.mock('@/components/calendar/mobile-day-calendar', () => ({
       </button>
       <button onClick={() => props.onCreateAt(props.selectedDate, 600)}>
         Create at 10
+      </button>
+      <button onClick={() => props.onSelectDate('2026-07-18')}>
+        Next mobile date
+      </button>
+      <button ref={props.optimizeButtonRef} onClick={props.onOptimize}>
+        Open mobile optimizer
       </button>
     </div>
   ),
@@ -89,26 +103,43 @@ vi.mock('@/components/calendar/appointment-dialog', () => ({
   ) : null,
 }))
 
-vi.mock('@/components/calendar/optimize-dialog', () => ({
-  OptimizeDialog: (props: {
-    open?: boolean
-    onOpenChange?(open: boolean): void
-  }) => (
-    <div>
-      <button onClick={() => props.onOpenChange?.(true)}>Open optimizer</button>
-      {props.open ? <span>Optimizer open</span> : null}
-    </div>
-  ),
-}))
+vi.mock('@/components/calendar/optimize-dialog', async () => {
+  const React = await import('react')
+  return {
+    OptimizeDialog: (props: {
+      open?: boolean
+      onOpenChange?(open: boolean): void
+    }) => {
+      const wasOpen = React.useRef(false)
+      React.useEffect(() => {
+        if (props.open && !wasOpen.current) optimizerRuns()
+        wasOpen.current = Boolean(props.open)
+      }, [props.open])
+      return (
+        <div data-testid="optimizer-dialog">
+          {props.open ? (
+            <>
+              <span>Optimizer open</span>
+              <button onClick={() => props.onOpenChange?.(false)}>
+                Close optimizer
+              </button>
+            </>
+          ) : null}
+        </div>
+      )
+    },
+  }
+})
 
 vi.mock('@/components/waiting-list/waiting-list-client', () => ({
   WaitingListClient: () => <div>Waiting list content</div>,
 }))
 
 vi.mock('@/components/ui/button', () => ({
-  Button: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button {...props} />
-  ),
+  Button: forwardRef<
+    HTMLButtonElement,
+    React.ButtonHTMLAttributes<HTMLButtonElement>
+  >((props, ref) => <button ref={ref} {...props} />),
 }))
 
 vi.mock('@/components/ui/popover', () => ({
@@ -172,6 +203,38 @@ function renderController(queryClient = new QueryClient({
         </WorkspaceProvider>
       </QueryClientProvider>,
     ),
+  }
+}
+
+function installMatchMedia(initialMatches: boolean) {
+  let matches = initialMatches
+  let listener: ((event: MediaQueryListEvent) => void) | null = null
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn((query: string) => ({
+      get matches() {
+        return matches
+      },
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: (
+        _type: 'change',
+        nextListener: (event: MediaQueryListEvent) => void,
+      ) => {
+        listener = nextListener
+      },
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+  return {
+    setMatches(nextMatches: boolean) {
+      matches = nextMatches
+      listener?.({ matches } as MediaQueryListEvent)
+    },
   }
 }
 
@@ -259,7 +322,7 @@ describe('CalendarController', () => {
     await user.click(screen.getByRole('button', { name: 'Select appointment' }))
     expect(screen.getByTestId('appointment-dialog')).toHaveTextContent('appointment-1')
 
-    await user.click(screen.getByRole('button', { name: 'Open optimizer' }))
+    await user.click(screen.getByRole('button', { name: 'Open mobile optimizer' }))
     expect(screen.getByText('Optimizer open')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Waiting list' }))
@@ -276,5 +339,49 @@ describe('CalendarController', () => {
 
     expect(screen.queryByTestId('appointment-dialog')).not.toBeInTheDocument()
     expect(screen.getByText('Waiting list content')).toBeInTheDocument()
+  })
+
+  it('treats kept previous query data as loading until the selected range resolves', async () => {
+    let resolveNext!: (appointments: CalendarAppointment[]) => void
+    const nextAppointments = new Promise<CalendarAppointment[]>((resolve) => {
+      resolveNext = resolve
+    })
+    vi.mocked(listAppointments).mockImplementation(async (_businessId, from) => {
+      if (from === '2026-07-18') return nextAppointments
+      return from === '2026-07-17' ? [appointment] : []
+    })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderController()
+
+    const renderer = await screen.findByTestId('calendar-renderer')
+    await waitFor(() => expect(renderer).toHaveAttribute('data-loading', 'false'))
+    await user.click(screen.getByRole('button', { name: 'Next mobile date' }))
+
+    await waitFor(() => expect(renderer).toHaveAttribute('data-loading', 'true'))
+    resolveNext([])
+    await waitFor(() => expect(renderer).toHaveAttribute('data-loading', 'false'))
+  })
+
+  it('keeps one optimizer run open across a mobile-to-desktop breakpoint change', async () => {
+    const media = installMatchMedia(false)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderController()
+
+    await screen.findByTestId('calendar-renderer')
+    const mobileTrigger = screen.getByRole('button', {
+      name: 'Open mobile optimizer',
+    })
+    mobileTrigger.focus()
+    await user.click(mobileTrigger)
+    await waitFor(() => expect(optimizerRuns).toHaveBeenCalledTimes(1))
+
+    act(() => media.setMatches(true))
+
+    expect(screen.getAllByTestId('optimizer-dialog')).toHaveLength(1)
+    expect(screen.getByText('Optimizer open')).toBeInTheDocument()
+    expect(optimizerRuns).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'Close optimizer' }))
+    expect(screen.getByRole('button', { name: 'Optimize' })).toHaveFocus()
   })
 })

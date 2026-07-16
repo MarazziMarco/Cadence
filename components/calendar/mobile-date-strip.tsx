@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useMemo } from 'react'
+import { memo, useEffect, useMemo, useRef } from 'react'
 
 import {
   addBusinessDays,
@@ -26,6 +26,8 @@ function MobileDateStripComponent({
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
   const today = businessToday(timezone)
+  const pendingFocusDateRef = useRef<string | null>(null)
+  const buttonRefs = useRef(new Map<string, HTMLButtonElement>())
   const days = useMemo(() => {
     const { from } = weekRange(selectedDate)
     return Array.from(
@@ -33,6 +35,13 @@ function MobileDateStripComponent({
       (_, index) => addBusinessDays(from, index),
     )
   }, [selectedDate])
+
+  useEffect(() => {
+    const pendingDate = pendingFocusDateRef.current
+    if (!pendingDate || pendingDate !== selectedDate) return
+    buttonRefs.current.get(pendingDate)?.focus()
+    pendingFocusDateRef.current = null
+  }, [days, selectedDate])
 
   return (
     <nav
@@ -58,6 +67,10 @@ function MobileDateStripComponent({
               aria-label={label}
               aria-current={isToday ? 'date' : undefined}
               aria-pressed={isSelected}
+              ref={(node) => {
+                if (node) buttonRefs.current.set(date, node)
+                else buttonRefs.current.delete(date)
+              }}
               className={cn(
                 'flex h-11 w-11 shrink-0 touch-manipulation flex-col items-center justify-center rounded-xl text-center',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
@@ -73,10 +86,13 @@ function MobileDateStripComponent({
                   return
                 }
                 event.preventDefault()
-                onSelectDate(addBusinessDays(
+                event.stopPropagation()
+                const nextDate = addBusinessDays(
                   date,
                   event.key === 'ArrowLeft' ? -1 : 1,
-                ))
+                )
+                pendingFocusDateRef.current = nextDate
+                onSelectDate(nextDate)
               }}
             >
               <span className="text-[10px] font-semibold uppercase leading-none opacity-75">

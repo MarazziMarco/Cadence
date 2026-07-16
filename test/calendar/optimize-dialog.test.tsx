@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 
 import { OptimizeDialog } from '@/components/calendar/optimize-dialog'
@@ -89,4 +89,33 @@ it('starts optimization when a controlled dialog is opened externally', async ()
       '2026-07-16',
     )
   })
+})
+
+it('keeps its trigger by default for uncontrolled backward compatibility', () => {
+  render(
+    <WorkspaceProvider business={business}>
+      <OptimizeDialog
+        businessId={business.id}
+        dateFrom="2026-07-16"
+        dateTo="2026-07-16"
+      />
+    </WorkspaceProvider>,
+  )
+
+  expect(screen.getByRole('button', { name: /Optimize/i })).toBeInTheDocument()
+})
+
+it('can hide its internal trigger when opened by an external toolbar button', () => {
+  render(
+    <WorkspaceProvider business={business}>
+      <OptimizeDialog
+        businessId={business.id}
+        dateFrom="2026-07-16"
+        dateTo="2026-07-16"
+        showTrigger={false}
+      />
+    </WorkspaceProvider>,
+  )
+
+  expect(screen.queryByRole('button', { name: /Optimize/i })).not.toBeInTheDocument()
 })

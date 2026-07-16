@@ -6,12 +6,13 @@ import {
   useQueries,
   useQueryClient,
 } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Info, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Info, Plus, Wand2 } from 'lucide-react'
 import {
   useCallback,
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from 'react'
 import { toast } from 'sonner'
@@ -170,6 +171,10 @@ export function CalendarController() {
   const [section, setSection] = useState<CalendarSection>('calendar')
   const [optimizeOpen, setOptimizeOpen] = useState(false)
   const [preferencesRestored, setPreferencesRestored] = useState(false)
+  const desktopOptimizeButtonRef = useRef<HTMLButtonElement>(null)
+  const mobileOptimizeButtonRef = useRef<HTMLButtonElement>(null)
+  const lastOptimizeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const wasOptimizeOpenRef = useRef(false)
   const isDesktop = useDesktopMediaQuery()
   const supportedView: SupportedCalendarView = isSupportedCalendarView(state.view)
     ? state.view
@@ -385,8 +390,28 @@ export function CalendarController() {
   }, [mutateCalendarChange])
 
   const handleOpenOptimizer = useCallback(() => {
+    const activeElement = document.activeElement
+    lastOptimizeButtonRef.current = activeElement instanceof HTMLButtonElement
+      ? activeElement
+      : null
     setOptimizeOpen(true)
   }, [])
+
+  const handleOptimizeOpenChange = useCallback((open: boolean) => {
+    setOptimizeOpen(open)
+  }, [])
+
+  useEffect(() => {
+    if (wasOptimizeOpenRef.current && !optimizeOpen) {
+      const lastButton = lastOptimizeButtonRef.current
+      const fallbackButton = isDesktop
+        ? desktopOptimizeButtonRef.current
+        : mobileOptimizeButtonRef.current
+      const focusTarget = lastButton?.isConnected ? lastButton : fallbackButton
+      focusTarget?.focus()
+    }
+    wasOptimizeOpenRef.current = optimizeOpen
+  }, [isDesktop, optimizeOpen])
 
   const rendererProps = useMemo<CalendarRendererProps>(() => ({
     appointments,
@@ -556,13 +581,14 @@ export function CalendarController() {
                   <Plus className="mr-2 h-4 w-4" /> {t('cal.new')}
                 </Button>
                 {businessId ? (
-                  <OptimizeDialog
-                    businessId={businessId}
-                    dateFrom={range.from}
-                    dateTo={range.to}
-                    open={optimizeOpen}
-                    onOpenChange={setOptimizeOpen}
-                  />
+                  <Button
+                    ref={desktopOptimizeButtonRef}
+                    className="gap-2"
+                    onClick={handleOpenOptimizer}
+                  >
+                    <Wand2 className="h-4 w-4" />
+                    {t('sched.optimize')}
+                  </Button>
                 ) : null}
               </div>
 
@@ -620,22 +646,28 @@ export function CalendarController() {
             <>
               <MobileDayCalendar
                 {...rendererProps}
-                isLoading={appointmentsQuery.isPending || configQuery.isPending}
+                isLoading={
+                  appointmentsQuery.isPending
+                  || appointmentsQuery.isPlaceholderData
+                  || configQuery.isPending
+                  || configQuery.isPlaceholderData
+                }
                 onOptimize={businessId ? handleOpenOptimizer : undefined}
+                optimizeButtonRef={mobileOptimizeButtonRef}
               />
-              {businessId ? (
-                <div className="hidden">
-                  <OptimizeDialog
-                    businessId={businessId}
-                    dateFrom={state.selectedDate}
-                    dateTo={state.selectedDate}
-                    open={optimizeOpen}
-                    onOpenChange={setOptimizeOpen}
-                  />
-                </div>
-              ) : null}
             </>
           )}
+
+          {businessId ? (
+            <OptimizeDialog
+              businessId={businessId}
+              dateFrom={range.from}
+              dateTo={range.to}
+              open={optimizeOpen}
+              onOpenChange={handleOptimizeOpenChange}
+              showTrigger={false}
+            />
+          ) : null}
 
           {businessId ? (
             <AppointmentDialog

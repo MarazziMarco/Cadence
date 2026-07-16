@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useMemo } from 'react'
+import { memo, useMemo, type Ref } from 'react'
 import { CalendarDays, ChevronDown, WandSparkles } from 'lucide-react'
 
 import { formatBusinessDate } from '@/lib/calendar/date'
@@ -15,6 +15,7 @@ interface CalendarToolbarProps {
   onToday(): void
   onViewChange(view: CalendarView): void
   onOptimize?(): void
+  optimizeButtonRef?: Ref<HTMLButtonElement>
 }
 
 const VIEWS: CalendarView[] = ['day', 'week', 'month', 'agenda']
@@ -27,6 +28,7 @@ function CalendarToolbarComponent({
   onToday,
   onViewChange,
   onOptimize,
+  optimizeButtonRef,
 }: CalendarToolbarProps) {
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
@@ -84,6 +86,7 @@ function CalendarToolbarComponent({
 
       {onOptimize ? (
         <button
+          ref={optimizeButtonRef}
           type="button"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label={t(`cal.optimize.${view}`)}

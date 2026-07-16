@@ -18,12 +18,14 @@ export function OptimizeDialog({
   dateTo,
   open: controlledOpen,
   onOpenChange,
+  showTrigger = true,
 }: {
   businessId: string
   dateFrom: string
   dateTo: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  showTrigger?: boolean
 }) {
   const { t } = useT()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
@@ -57,9 +59,11 @@ export function OptimizeDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button className="gap-2"><Wand2 className="h-4 w-4" /> {t('sched.optimize')}</Button>
-      </DialogTrigger>
+      {showTrigger ? (
+        <DialogTrigger asChild>
+          <Button className="gap-2"><Wand2 className="h-4 w-4" /> {t('sched.optimize')}</Button>
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="max-h-[85vh] gap-0 overflow-hidden p-0 sm:max-w-lg">
         <DialogHeader className="border-b border-border px-5 py-4">
           <DialogTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4 text-primary" /> {t('opt.title')}</DialogTitle>

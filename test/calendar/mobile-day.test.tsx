@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MobileDayCalendar } from '@/components/calendar/mobile-day-calendar'
+import { MobileDateStrip } from '@/components/calendar/mobile-date-strip'
 import type { CalendarAppointment } from '@/lib/api/appointments'
 import type { CalendarConfig } from '@/lib/api/calendar'
 import {
@@ -74,6 +76,27 @@ const appointment: CalendarAppointment = {
   },
 }
 
+function appointmentAt(
+  id: string,
+  startTime: string,
+  durationMinutes: number,
+): CalendarAppointment {
+  const [hour, minute] = startTime.split(':').map(Number)
+  const endTotal = hour * 60 + minute + durationMinutes
+  const endTime = `${String(Math.floor(endTotal / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}:00`
+  return {
+    ...appointment,
+    id,
+    start_time: `${startTime}:00`,
+    end_time: endTime,
+    duration_minutes: durationMinutes,
+    patients: {
+      ...appointment.patients!,
+      full_name: `Patient ${id}`,
+    },
+  }
+}
+
 function renderCalendar(overrides: Partial<React.ComponentProps<
   typeof MobileDayCalendar
 >> = {}) {
@@ -97,6 +120,26 @@ function renderCalendar(overrides: Partial<React.ComponentProps<
   )
 
   return { ...result, props }
+}
+
+function ControlledDateStrip({
+  initialDate,
+  onKeyDown,
+}: {
+  initialDate: string
+  onKeyDown?(event: React.KeyboardEvent): void
+}) {
+  const [selectedDate, setSelectedDate] = useState(initialDate)
+
+  return (
+    <div onKeyDown={onKeyDown}>
+      <MobileDateStrip
+        selectedDate={selectedDate}
+        timezone={business.timezone}
+        onSelectDate={setSelectedDate}
+      />
+    </div>
+  )
 }
 
 describe('MobileDayCalendar', () => {
@@ -132,6 +175,34 @@ describe('MobileDayCalendar', () => {
     expect(timeline).toHaveStyle({ height: '540px' })
     expect(lunchClosure).toHaveStyle({ top: '240px', height: '60px' })
     expect(card).toHaveStyle({ top: '15px', height: '45px' })
+  })
+
+  it('places simultaneous appointments in visible side-by-side lanes', () => {
+    renderCalendar({
+      appointments: [
+        appointmentAt('a1', '09:00', 30),
+        appointmentAt('a2', '09:00', 30),
+      ],
+    })
+
+    const first = screen.getByRole('button', { name: /Patient a1/i })
+    const second = screen.getByRole('button', { name: /Patient a2/i })
+    expect(first).toHaveStyle({ left: '0%', width: '50%' })
+    expect(second).toHaveStyle({ left: '50%', width: '50%' })
+  })
+
+  it('uses rendered 44px hit boxes when allocating adjacent short visits', () => {
+    renderCalendar({
+      appointments: [
+        appointmentAt('short-1', '09:00', 15),
+        appointmentAt('short-2', '09:15', 15),
+      ],
+    })
+
+    const first = screen.getByRole('button', { name: /Patient short-1/i })
+    const second = screen.getByRole('button', { name: /Patient short-2/i })
+    expect(first).toHaveStyle({ left: '0%', width: '50%', height: '44px' })
+    expect(second).toHaveStyle({ left: '50%', width: '50%', height: '44px' })
   })
 
   it('snaps blank timeline taps to the configured interval', () => {
@@ -178,6 +249,15 @@ describe('MobileDayCalendar', () => {
     expect(container.querySelector('[class*="min-w-[880px]"]')).toBeNull()
   })
 
+  it('keeps the mobile toolbar and date strip sticky above the timeline', () => {
+    renderCalendar()
+
+    expect(screen.getByRole('banner').parentElement).toHaveClass(
+      'sticky',
+      'top-0',
+    )
+  })
+
   it('renders seven accessible date targets and supports arrow navigation', () => {
     const { props } = renderCalendar()
     const selected = screen.getByRole('button', {
@@ -191,7 +271,37 @@ describe('MobileDayCalendar', () => {
     expect(props.onSelectDate).toHaveBeenCalledWith('2026-07-17')
   })
 
-  it('marks closed days while retaining a useful fallback timeline', () => {
+  it('moves and restores keyboard focus repeatedly, including across week boundaries', () => {
+    const bubbledKeyDown = vi.fn()
+    render(
+      <WorkspaceProvider business={business}>
+        <ControlledDateStrip
+          initialDate="2026-07-19"
+          onKeyDown={bubbledKeyDown}
+        />
+      </WorkspaceProvider>,
+    )
+
+    const sunday = screen.getByRole('button', {
+      name: /Sunday, July 19/i,
+    })
+    sunday.focus()
+    fireEvent.keyDown(sunday, { key: 'ArrowRight' })
+
+    const monday = screen.getByRole('button', {
+      name: /Monday, July 20/i,
+    })
+    expect(monday).toHaveFocus()
+    expect(bubbledKeyDown).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(monday, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', {
+      name: /Tuesday, July 21/i,
+    })).toHaveFocus()
+    expect(bubbledKeyDown).not.toHaveBeenCalled()
+  })
+
+  it('marks a fully closed timeline as non-actionable', () => {
     const closedConfig: CalendarConfig = {
       ...config,
       workingHours: [{
@@ -204,15 +314,71 @@ describe('MobileDayCalendar', () => {
       }],
     }
 
-    renderCalendar({ appointments: [], config: closedConfig })
+    const { props } = renderCalendar({ appointments: [], config: closedConfig })
 
     expect(screen.getByText('Closed')).toBeInTheDocument()
-    expect(screen.getByTestId('mobile-day-timeline')).toHaveStyle({
-      height: '600px',
-    })
+    const timeline = screen.getByTestId('mobile-day-timeline')
+    expect(timeline).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(timeline, { clientY: 60 })
+    expect(props.onCreateAt).not.toHaveBeenCalled()
   })
 
-  it('waits for calendar data before auto-scrolling, then scrolls once per date', () => {
+  it('does not create appointments on a closed holiday', () => {
+    const holidayConfig: CalendarConfig = {
+      ...config,
+      holidays: [{
+        id: 'holiday-1',
+        business_id: 'business-1',
+        name: 'Holiday',
+        start_date: '2026-07-16',
+        end_date: '2026-07-16',
+        is_closed: true,
+      }],
+    }
+    const { props } = renderCalendar({
+      appointments: [],
+      config: holidayConfig,
+    })
+
+    const timeline = screen.getByTestId('mobile-day-timeline')
+    expect(timeline).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(timeline, { clientY: 60 })
+    expect(props.onCreateAt).not.toHaveBeenCalled()
+  })
+
+  it('creates only when the snapped default duration fits an open window', () => {
+    const { props } = renderCalendar({ appointments: [] })
+    const timeline = screen.getByTestId('mobile-day-timeline')
+
+    fireEvent.click(timeline, { clientY: 0 })
+    fireEvent.click(timeline, { clientY: 225 })
+    fireEvent.click(timeline, { clientY: 255 })
+    fireEvent.click(timeline, { clientY: 525 })
+
+    expect(props.onCreateAt).toHaveBeenCalledTimes(1)
+    expect(props.onCreateAt).toHaveBeenCalledWith('2026-07-16', 540)
+  })
+
+  it('shows an accessible busy skeleton instead of a closed clickable fallback', () => {
+    renderCalendar({
+      appointments: [],
+      config: {
+        ...config,
+        workingHours: [],
+      },
+      isLoading: true,
+    })
+
+    expect(screen.getByTestId('mobile-day-calendar')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Loading')
+    expect(screen.queryByText('Closed')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('mobile-day-timeline')).not.toBeInTheDocument()
+  })
+
+  it('waits for real calendar data before auto-scrolling', () => {
     const scrollTo = vi.fn()
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
       configurable: true,
@@ -239,7 +405,32 @@ describe('MobileDayCalendar', () => {
       </WorkspaceProvider>,
     )
     expect(scrollTo).toHaveBeenCalledTimes(1)
+  })
 
+  it('auto-scrolls again when a previously visited date is selected anew', () => {
+    const scrollTo = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    })
+
+    const { rerender } = renderCalendar()
+    rerender(
+      <WorkspaceProvider business={business}>
+        <MobileDayCalendar
+          appointments={[]}
+          config={config}
+          selectedDate="2026-07-17"
+          density={60}
+          isLoading={false}
+          onSelectDate={vi.fn()}
+          onSelectAppointment={vi.fn()}
+          onCreateAt={vi.fn()}
+          onMove={vi.fn()}
+          onResize={vi.fn()}
+        />
+      </WorkspaceProvider>,
+    )
     rerender(
       <WorkspaceProvider business={business}>
         <MobileDayCalendar
@@ -256,6 +447,16 @@ describe('MobileDayCalendar', () => {
         />
       </WorkspaceProvider>,
     )
-    expect(scrollTo).toHaveBeenCalledTimes(1)
+
+    expect(scrollTo).toHaveBeenCalledTimes(3)
+  })
+
+  it('refreshes the business-local current-time line every minute after mount', () => {
+    renderCalendar()
+    expect(screen.getByLabelText('Current time')).toHaveStyle({ top: '90px' })
+
+    act(() => vi.advanceTimersByTime(60_000))
+
+    expect(screen.getByLabelText('Current time')).toHaveStyle({ top: '91px' })
   })
 })
