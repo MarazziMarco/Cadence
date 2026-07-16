@@ -131,10 +131,11 @@ function AppointmentCardComponent({
     >
       <button
         type="button"
+        data-appointment-id={appointment.id}
         aria-label={accessibleName}
         className={cn(
           'h-full w-full overflow-hidden rounded-lg border-l-[3px] px-2.5 py-1.5 text-left',
-          'min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          'min-h-11 motion-reduce:transform-none motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         )}
         style={{
           backgroundColor: `${color}1a`,

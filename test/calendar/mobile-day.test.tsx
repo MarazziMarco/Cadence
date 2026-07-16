@@ -11,6 +11,19 @@ import {
   type WorkspaceBusiness,
 } from '@/lib/workspace-context'
 
+vi.mock('@/components/ui/button', () => ({
+  Button: ({
+    asChild: _asChild,
+    size: _size,
+    variant: _variant,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    asChild?: boolean
+    size?: string
+    variant?: string
+  }) => <button {...props} />,
+}))
+
 const business: WorkspaceBusiness = {
   id: 'business-1',
   business_name: 'Cadence',
@@ -170,7 +183,9 @@ describe('MobileDayCalendar', () => {
 
     const timeline = screen.getByTestId('mobile-day-timeline')
     const lunchClosure = screen.getByTestId('closed-window-780-840')
-    const card = screen.getByRole('button', { name: /Marco Rossi/i })
+    const card = screen.getByRole('button', {
+      name: /^09:15, Marco Rossi,/i,
+    }).parentElement
 
     expect(timeline).toHaveStyle({ height: '540px' })
     expect(lunchClosure).toHaveStyle({ top: '240px', height: '60px' })
@@ -185,10 +200,10 @@ describe('MobileDayCalendar', () => {
       ],
     })
 
-    const first = screen.getByRole('button', { name: /Patient a1/i })
-    const second = screen.getByRole('button', { name: /Patient a2/i })
-    expect(first).toHaveStyle({ left: '0%', width: '50%' })
-    expect(second).toHaveStyle({ left: '50%', width: '50%' })
+    const first = screen.getByRole('button', { name: /^09:00, Patient a1,/i })
+    const second = screen.getByRole('button', { name: /^09:00, Patient a2,/i })
+    expect(first.parentElement).toHaveStyle({ left: '0%', width: '50%' })
+    expect(second.parentElement).toHaveStyle({ left: '50%', width: '50%' })
   })
 
   it('uses rendered 44px hit boxes when allocating adjacent short visits', () => {
@@ -199,10 +214,22 @@ describe('MobileDayCalendar', () => {
       ],
     })
 
-    const first = screen.getByRole('button', { name: /Patient short-1/i })
-    const second = screen.getByRole('button', { name: /Patient short-2/i })
-    expect(first).toHaveStyle({ left: '0%', width: '50%', height: '44px' })
-    expect(second).toHaveStyle({ left: '50%', width: '50%', height: '44px' })
+    const first = screen.getByRole('button', {
+      name: /^09:00, Patient short-1,/i,
+    })
+    const second = screen.getByRole('button', {
+      name: /^09:15, Patient short-2,/i,
+    })
+    expect(first.parentElement).toHaveStyle({
+      left: '0%',
+      width: '50%',
+      height: '44px',
+    })
+    expect(second.parentElement).toHaveStyle({
+      left: '50%',
+      width: '50%',
+      height: '44px',
+    })
   })
 
   it('snaps blank timeline taps to the configured interval', () => {

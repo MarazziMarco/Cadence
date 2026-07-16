@@ -262,6 +262,7 @@ export function CalendarController() {
   const mobileOptimizeButtonRef = useRef<HTMLButtonElement>(null)
   const lastOptimizeButtonRef = useRef<HTMLButtonElement | null>(null)
   const wasOptimizeOpenRef = useRef(false)
+  const lastAppointmentTriggerIdRef = useRef<string | null>(null)
   const responsiveLayout = useResponsiveCalendarLayout()
   const isDesktop = responsiveLayout === 'desktop'
   const supportedView: SupportedCalendarView = isSupportedCalendarView(state.view)
@@ -684,6 +685,7 @@ export function CalendarController() {
   }, [])
 
   const handleSelectAppointment = useCallback((id: string) => {
+    lastAppointmentTriggerIdRef.current = id
     setSelectedAppointmentSnapshot(appointmentById.get(id) ?? null)
     setEditorPresentation(isDesktop ? 'dialog' : null)
     setMoveSheetOpen(false)
@@ -695,6 +697,7 @@ export function CalendarController() {
   const handleSelectAgendaAppointment = useCallback((
     appointment: CalendarAppointment,
   ) => {
+    lastAppointmentTriggerIdRef.current = appointment.id
     setSelectedAppointmentSnapshot(appointment)
     setEditorPresentation(null)
     setMoveSheetOpen(false)
@@ -832,6 +835,13 @@ export function CalendarController() {
   const handleQuickSheetOpenChange = useCallback((open: boolean) => {
     if (open) return
     dispatch({ type: 'select-appointment', id: null })
+    const appointmentId = lastAppointmentTriggerIdRef.current
+    window.requestAnimationFrame(() => {
+      if (!appointmentId) return
+      document.querySelector<HTMLElement>(
+        `[data-appointment-id="${appointmentId}"]`,
+      )?.focus()
+    })
   }, [])
 
   const handleMoveSheetOpenChange = useCallback((open: boolean) => {
@@ -854,7 +864,7 @@ export function CalendarController() {
         || (
           target instanceof Element
           && target.matches(
-            'input, textarea, select, [contenteditable="true"]',
+            'input, textarea, select, button, a, [role="button"], [contenteditable="true"]',
           )
         )
       ) return
@@ -898,11 +908,18 @@ export function CalendarController() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-3">
+      <div
+        role="tablist"
+        aria-label={t('cal.tab')}
+        className="mb-4 flex items-center gap-3"
+      >
         <button
+          type="button"
+          role="tab"
+          aria-selected={section === 'calendar'}
           onClick={() => setSection('calendar')}
           className={cn(
-            'tracking-tight transition-colors',
+            'min-h-11 tracking-tight transition-colors',
             section === 'calendar'
               ? 'text-2xl font-bold'
               : 'text-sm font-medium text-muted-foreground hover:text-foreground',
@@ -911,9 +928,12 @@ export function CalendarController() {
           {t('cal.tab')}
         </button>
         <button
+          type="button"
+          role="tab"
+          aria-selected={section === 'waiting'}
           onClick={() => setSection('waiting')}
           className={cn(
-            'tracking-tight transition-colors',
+            'min-h-11 tracking-tight transition-colors',
             section === 'waiting'
               ? 'text-2xl font-bold'
               : 'text-sm font-medium text-muted-foreground hover:text-foreground',
@@ -926,7 +946,7 @@ export function CalendarController() {
             <PopoverTrigger asChild>
               <button
                 aria-label={t('cal.shortcutsAria')}
-                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <Info className="h-3.5 w-3.5" />
               </button>
@@ -987,7 +1007,8 @@ export function CalendarController() {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-9 w-9"
+                    className="h-11 w-11"
+                    aria-label={t('common.previous')}
                     onClick={() => navigate(-1)}
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -1005,7 +1026,8 @@ export function CalendarController() {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-9 w-9"
+                    className="h-11 w-11"
+                    aria-label={t('common.next')}
                     onClick={() => navigate(1)}
                   >
                     <ChevronRight className="h-4 w-4" />

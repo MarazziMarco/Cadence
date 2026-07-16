@@ -30,7 +30,7 @@ export function CalendarZoomControls({
         type="button"
         variant="ghost"
         size="icon"
-        className="h-9 w-9"
+        className="h-11 w-11"
         aria-label={t('cal.zoomOut')}
         onClick={() => onDensityChange(clampDensity(density - 12))}
       >
@@ -40,7 +40,7 @@ export function CalendarZoomControls({
         type="button"
         variant="ghost"
         size="icon"
-        className="h-9 w-9"
+        className="h-11 w-11"
         aria-label={t('cal.zoomReset')}
         onClick={() => onDensityChange(DEFAULT_DENSITY)}
       >
@@ -50,7 +50,7 @@ export function CalendarZoomControls({
         type="button"
         variant="ghost"
         size="icon"
-        className="h-9 w-9"
+        className="h-11 w-11"
         aria-label={t('cal.zoomIn')}
         onClick={() => onDensityChange(clampDensity(density + 12))}
       >

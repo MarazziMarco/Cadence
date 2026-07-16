@@ -214,6 +214,7 @@ export function MobileMonthCalendar({
               <button
                 key={appointment.id}
                 type="button"
+                data-appointment-id={appointment.id}
                 className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 aria-label={[
                   fmtTime(appointment.start_time),

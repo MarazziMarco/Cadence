@@ -19,8 +19,8 @@ vi.mock('@/components/calendar/move-appointment-sheet', () => ({
   MoveAppointmentSheet: () => null,
 }))
 
-vi.mock('@/components/calendar/optimize-dialog', () => ({
-  OptimizeDialog: () => null,
+vi.mock('@/components/calendar/contextual-optimize-dialog', () => ({
+  ContextualOptimizeDialog: () => null,
 }))
 
 vi.mock('@/components/waiting-list/waiting-list-client', () => ({

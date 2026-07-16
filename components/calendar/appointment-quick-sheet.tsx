@@ -199,6 +199,7 @@ export function AppointmentQuickSheet({
                 type="button"
                 variant="outline"
                 className="min-h-11 flex-col gap-1 py-2"
+                disabled={appointment.locked}
                 onClick={onMove}
               >
                 <MapPin aria-hidden className="h-4 w-4" />

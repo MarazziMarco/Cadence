@@ -98,6 +98,24 @@ vi.mock('@/components/calendar/mobile-day-calendar', () => ({
   ),
 }))
 
+vi.mock('@/components/calendar/mobile-week-overview', () => ({
+  MobileWeekOverview: () => (
+    <div data-testid="calendar-renderer" data-view="week" />
+  ),
+}))
+
+vi.mock('@/components/calendar/mobile-month-calendar', () => ({
+  MobileMonthCalendar: () => (
+    <div data-testid="calendar-renderer" data-view="month" />
+  ),
+}))
+
+vi.mock('@/components/calendar/calendar-agenda', () => ({
+  CalendarAgenda: () => (
+    <div data-testid="calendar-renderer" data-view="agenda" />
+  ),
+}))
+
 vi.mock('@/components/calendar/appointment-dialog', () => ({
   AppointmentDialog: (props: {
     open: boolean
@@ -162,10 +180,10 @@ vi.mock('@/components/calendar/move-appointment-sheet', () => ({
   ) : null,
 }))
 
-vi.mock('@/components/calendar/optimize-dialog', async () => {
+vi.mock('@/components/calendar/contextual-optimize-dialog', async () => {
   const React = await import('react')
   return {
-    OptimizeDialog: (props: {
+    ContextualOptimizeDialog: (props: {
       dateFrom: string
       dateTo: string
       open?: boolean
@@ -274,6 +292,7 @@ function renderController(queryClient = new QueryClient({
 function installMatchMedia(initialMatches: boolean) {
   let matches = initialMatches
   let listener: ((event: MediaQueryListEvent) => void) | null = null
+  window.innerWidth = initialMatches ? 1280 : 390
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
@@ -298,6 +317,8 @@ function installMatchMedia(initialMatches: boolean) {
   return {
     setMatches(nextMatches: boolean) {
       matches = nextMatches
+      window.innerWidth = nextMatches ? 1280 : 390
+      window.dispatchEvent(new Event('resize'))
       listener?.({ matches } as MediaQueryListEvent)
     },
   }
@@ -307,6 +328,8 @@ describe('CalendarController', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.setSystemTime(new Date('2026-07-16T22:30:00.000Z'))
+    window.innerWidth = 390
+    window.innerHeight = 844
     localStorage.clear()
     localStorage.setItem('cadence.calendar.view', 'day')
     localStorage.setItem('cadence.calendar.density', '999')
@@ -349,20 +372,15 @@ describe('CalendarController', () => {
   })
 
   it.each(['week', 'month', 'agenda'])(
-    'uses the available day renderer on mobile instead of stored %s view',
+    'restores the supported mobile %s view',
     async (storedView) => {
       localStorage.setItem('cadence.calendar.view', storedView)
       renderController()
 
       const renderer = await screen.findByTestId('calendar-renderer')
-      expect(renderer).toHaveAttribute('data-view', 'day')
-      expect(listAppointments).toHaveBeenCalledWith(
-        business.id,
-        '2026-07-17',
-        '2026-07-17',
-      )
+      expect(renderer).toHaveAttribute('data-view', storedView)
       await waitFor(() => {
-        expect(localStorage.getItem('cadence.calendar.view')).toBe('day')
+        expect(localStorage.getItem('cadence.calendar.view')).toBe(storedView)
       })
     },
   )
@@ -401,7 +419,7 @@ describe('CalendarController', () => {
     await user.click(screen.getByRole('button', { name: 'Open mobile optimizer' }))
     expect(screen.getByText('Optimizer open')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Waiting list' }))
+    await user.click(screen.getByRole('tab', { name: 'Waiting list' }))
     expect(screen.getByText('Waiting list content')).toBeInTheDocument()
   })
 
@@ -410,7 +428,7 @@ describe('CalendarController', () => {
     renderController()
 
     await screen.findByTestId('calendar-renderer')
-    await user.click(screen.getByRole('button', { name: 'Waiting list' }))
+    await user.click(screen.getByRole('tab', { name: 'Waiting list' }))
     fireEvent.keyDown(window, { key: 'n' })
 
     expect(screen.queryByTestId('appointment-dialog')).not.toBeInTheDocument()
@@ -539,7 +557,7 @@ describe('CalendarController', () => {
     )?.[0]).toMatchObject({ locked: true, version: 2 })
   })
 
-  it('switches an open desktop week optimizer to the mobile day scope once', async () => {
+  it('keeps an open week optimizer scoped to the week across breakpoints', async () => {
     localStorage.setItem('cadence.calendar.view', 'week')
     const media = installMatchMedia(true)
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
@@ -555,40 +573,35 @@ describe('CalendarController', () => {
     await waitFor(() => {
       expect(screen.getByTestId('calendar-renderer')).toHaveAttribute(
         'data-view',
-        'day',
+        'week',
       )
     })
     const optimizer = screen.getByTestId('optimizer-dialog')
-    expect(optimizer).toHaveAttribute('data-date-from', '2026-07-17')
-    expect(optimizer).toHaveAttribute('data-date-to', '2026-07-17')
+    expect(optimizer).toHaveAttribute('data-date-from', '2026-07-13')
+    expect(optimizer).toHaveAttribute('data-date-to', '2026-07-19')
     expect(listAppointments).toHaveBeenCalledWith(
       business.id,
-      '2026-07-17',
-      '2026-07-17',
+      '2026-07-13',
+      '2026-07-19',
     )
     expect(optimizerRuns).toHaveBeenCalledTimes(1)
     await waitFor(() => {
-      expect(localStorage.getItem('cadence.calendar.view')).toBe('day')
+      expect(localStorage.getItem('cadence.calendar.view')).toBe('week')
     })
   })
 
-  it('ignores the week shortcut on mobile and keeps day query and optimizer scope', async () => {
+  it('ignores the desktop-only week shortcut on mobile', async () => {
     installMatchMedia(false)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     renderController()
 
     await screen.findByTestId('calendar-renderer')
-    fireEvent.keyDown(window, { key: 'w' })
+    await user.keyboard('w')
 
     await waitFor(() => {
-      expect(listAppointments).toHaveBeenCalledWith(
-        business.id,
-        '2026-07-17',
-        '2026-07-17',
-      )
-      expect(listAppointments).not.toHaveBeenCalledWith(
-        business.id,
-        '2026-07-13',
-        '2026-07-19',
+      expect(screen.getByTestId('calendar-renderer')).toHaveAttribute(
+        'data-view',
+        'day',
       )
     })
     const optimizer = screen.getByTestId('optimizer-dialog')
