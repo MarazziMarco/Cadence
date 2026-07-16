@@ -15,7 +15,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { HistoryClient } from '@/components/history/history-client'
+import { OptimizePreview } from '@/components/calendar/optimize-preview'
 import { cn } from '@/lib/utils'
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '—')
@@ -56,7 +58,7 @@ export function SchedulerClient() {
   const [prioritizeAdvance, setPrioritizeAdvance] = useState(true)
 
   const [loading, setLoading] = useState(false)
-  const [busyId, setBusyId] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [run, setRun] = useState<any>(null)
   const [changes, setChanges] = useState<any[]>([])
 
@@ -94,24 +96,9 @@ export function SchedulerClient() {
       const runId = await runOptimization(businessId, dateFrom, dateTo)
       const res = await fetchRun(runId)
       setRun(res.run); setChanges(res.changes)
-      if (res.changes.length === 0) toast.info('Already optimal — no beneficial changes found.')
-    } catch (e: any) { toast.error(e.message || 'Optimization failed') }
+      setPreviewOpen(true) // always show the result in a modal (even if 0 changes)
+    } catch (e: any) { toast.error(e.message || t('opt.failed')) }
     finally { setLoading(false) }
-  }
-
-  async function onAccept(c: any) {
-    setBusyId(c.id)
-    try {
-      await acceptChange(businessId, run.id, c)
-      setChanges((prev) => prev.map((x) => (x.id === c.id ? { ...x, accepted: true } : x)))
-      qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); qc.invalidateQueries({ queryKey: ['waiting'] })
-      toast.success(t('sched.applied'))
-    } catch (e: any) { toast.error(e.message) } finally { setBusyId(null) }
-  }
-  async function onReject(c: any) {
-    setBusyId(c.id)
-    try { await rejectChange(c); setChanges((prev) => prev.filter((x) => x.id !== c.id)); toast(t('sched.dismissed')) }
-    catch (e: any) { toast.error(e.message) } finally { setBusyId(null) }
   }
 
   const idleSaved = run ? Math.max(0, (run.idle_minutes_before ?? 0) - (run.idle_minutes_after ?? 0)) : 0
@@ -174,7 +161,11 @@ export function SchedulerClient() {
                 <div className="space-y-2"><Label>{t('sched.to')}</Label><Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="sm:w-44" /></div>
               </>
             ) : (
-              <div className="space-y-2"><Label>{range === 'week' ? t('sched.weekOf') : t('sched.dayToOptimize')}</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:w-48" /></div>
+              <div className="space-y-2">
+                <Label>{range === 'week' ? t('sched.weekOf') : t('sched.dayToOptimize')}</Label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="sm:w-48" />
+                {range === 'week' && <p className="text-xs text-muted-foreground">{t('sched.from')} {dateFrom} — {t('sched.to')} {dateTo}</p>}
+              </div>
             )}
             <Button onClick={optimize} disabled={loading || !businessId || (range === 'custom' && (!customFrom || !customTo || customFrom > customTo))} className="sm:ml-auto">{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} {t('sched.optimize')}</Button>
           </div>
@@ -212,59 +203,17 @@ export function SchedulerClient() {
         </CardContent>
       </Card>
 
-      <AnimatePresence>
-        {run && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-            <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-accent/40 px-4 py-3 text-sm">
-              <Sparkles className="h-4 w-4 text-primary" /><span className="font-medium">{t('sched.previewReady')}</span>
-              <span className="text-muted-foreground">{run.ai_summary || t('sched.previewDefault')}</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {kpis.map((k) => (
-                <Card key={k.label} className="shadow-sm"><CardContent className="p-3.5"><div className="flex items-start justify-between gap-2"><p className="text-xs text-muted-foreground">{k.label}</p><k.icon className={`h-4 w-4 shrink-0 ${k.tone}`} /></div><p className={`mt-1.5 text-lg font-bold ${k.tone}`}>{k.value}</p></CardContent></Card>
-              ))}
-            </div>
-
-            <Card className="shadow-sm">
-              <CardHeader><CardTitle className="text-base">{t('sched.proposedChanges', { n: changes.length })}</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {changes.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">{t('sched.noChanges')}</p> : changes.map((c) => {
-                  const isMove = !!c.appointment_id
-                  const name = c.patients?.full_name || c.patients?.first_name || t('dash.client')
-                  return (
-                    <div key={c.id} className="rounded-lg border border-border p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={isMove ? 'secondary' : 'default'} className={isMove ? '' : 'bg-success/15 text-success hover:bg-success/15'}>
-                            {isMove ? <ArrowRightLeft className="mr-1 h-3 w-3" /> : <PlusCircle className="mr-1 h-3 w-3" />}
-                            {isMove ? t('sched.moved') : t('sched.addedFromWaiting')}
-                          </Badge>
-                          <span className="font-medium">{name}</span>
-                        </div>
-                        {isMove ? (
-                          <span className="flex items-center gap-2 text-sm"><span className="text-muted-foreground line-through">{hhmm(c.old_start_time)}</span><ArrowRight className="h-3.5 w-3.5 text-primary" /><span className="font-semibold text-primary">{hhmm(c.new_start_time)}</span></span>
-                        ) : (
-                          <Badge className="bg-success/10 text-success hover:bg-success/10">{c.new_date} · {hhmm(c.new_start_time)}</Badge>
-                        )}
-                      </div>
-                      {c.ai_reason && <p className="mt-1.5 text-xs text-muted-foreground">{c.ai_reason}</p>}
-                      <div className="mt-2 flex justify-end gap-2">
-                        {c.accepted ? <Badge className="bg-success/15 text-success hover:bg-success/15"><Check className="mr-1 h-3 w-3" /> {t('sched.applied')}</Badge> : (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => onReject(c)} disabled={busyId === c.id}><X className="mr-1 h-3.5 w-3.5" /> {t('sched.reject')}</Button>
-                            <Button size="sm" onClick={() => onAccept(c)} disabled={busyId === c.id}>{busyId === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />} {t('sched.accept')}</Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Result always shown in a modal (same UX as the calendar Optimize) */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-h-[85vh] gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="border-b border-border px-5 py-4">
+            <DialogTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4 text-primary" /> {t('opt.title')}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[calc(85vh-4rem)] overflow-y-auto p-5">
+            {run && <OptimizePreview businessId={businessId} run={run} changes={changes} />}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Optimization history + undo, right here on the Scheduler */}
       <div className="mt-10 border-t border-border pt-6">

@@ -156,6 +156,20 @@ export async function acceptChange(businessId: string, runId: string, change: an
   }
 }
 
+// Batch apply: accept the selected changes and reject (dismiss) the rest, in one
+// go. Used by the single "Apply" button in the optimize preview (scheduler +
+// calendar). Sequential so acceptChange's waiting-list/advance side effects run
+// deterministically. Returns the changes actually applied.
+export async function applyChanges(businessId: string, runId: string, changes: any[], excludedIds: Set<string>): Promise<any[]> {
+  const applied: any[] = []
+  for (const c of changes) {
+    if (excludedIds.has(c.id)) { await rejectChange(c); continue }
+    await acceptChange(businessId, runId, c)
+    applied.push(c)
+  }
+  return applied
+}
+
 export async function rejectChange(change: any) {
   const { error } = await sb().from('optimization_changes').update({ deleted_at: new Date().toISOString() }).eq('id', change.id)
   if (error) throw error

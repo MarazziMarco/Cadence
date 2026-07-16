@@ -337,6 +337,12 @@ const en: Dict = {
   'opt.kpi.moved': 'Moved',
   'opt.alreadyOptimal': 'Schedule already optimal for the selected period.',
   'opt.fromWaiting': 'From waiting list',
+  'opt.excludeHint': 'All changes are selected. Untick any you don’t want to apply.',
+  'opt.apply': 'Apply {n} change(s)',
+  'opt.applyNone': 'Nothing selected',
+  'opt.applied': '{n} change(s) applied',
+  'opt.close': 'Close',
+  'opt.optimizing': 'Optimizing…',
 
   // Moved-clients messages
   'mv.movedCount': '{n} clients moved.',
@@ -725,6 +731,12 @@ const it: Dict = {
   'opt.kpi.moved': 'Spostati',
   'opt.alreadyOptimal': 'Agenda già ottimale nel periodo selezionato.',
   'opt.fromWaiting': 'Da lista d’attesa',
+  'opt.excludeHint': 'Tutte le modifiche sono selezionate. Deseleziona quelle che non vuoi applicare.',
+  'opt.apply': 'Applica {n} modifiche',
+  'opt.applyNone': 'Nessuna selezionata',
+  'opt.applied': '{n} modifiche applicate',
+  'opt.close': 'Chiudi',
+  'opt.optimizing': 'Ottimizzazione…',
 
   'mv.movedCount': '{n} pazienti spostati.',
   'mv.prepareQuestion': 'Vuoi preparare i messaggi da inviare?',
@@ -1109,6 +1121,12 @@ const es: Dict = {
   'opt.kpi.moved': 'Movidas',
   'opt.alreadyOptimal': 'La agenda ya es óptima para el periodo seleccionado.',
   'opt.fromWaiting': 'De la lista de espera',
+  'opt.excludeHint': 'Todos los cambios están seleccionados. Desmarca los que no quieras aplicar.',
+  'opt.apply': 'Aplicar {n} cambios',
+  'opt.applyNone': 'Nada seleccionado',
+  'opt.applied': '{n} cambios aplicados',
+  'opt.close': 'Cerrar',
+  'opt.optimizing': 'Optimizando…',
 
   'mv.movedCount': '{n} clientes movidos.',
   'mv.prepareQuestion': '¿Preparar los mensajes para enviar?',
