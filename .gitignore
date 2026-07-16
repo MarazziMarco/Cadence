@@ -91,3 +91,5 @@ credentials.json
 
 # graphify output (local only)
 graphify-out/
+
+.superpowers/

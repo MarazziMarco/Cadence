@@ -7,7 +7,11 @@
         "dev:no-reload": "next dev --hostname 0.0.0.0 --port 3000",
         "dev:webpack": "next dev --hostname 0.0.0.0 --port 3000",
         "build": "next build && mkdir -p .next/standalone/public && cp -a public/. .next/standalone/public/ && mkdir -p .next/standalone/.next/static && cp -a .next/static/. .next/standalone/.next/static/",
-        "start": "next start"
+        "start": "next start",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:e2e": "playwright test",
+        "test:solver": "cd supabase/functions/optimize-schedule && deno test --allow-read"
     },
     "dependencies": {
         "@hookform/resolvers": "5.1.1",
@@ -71,14 +75,21 @@
         "zod": "3.25.67"
     },
     "devDependencies": {
+        "@playwright/test": "^1.54.1",
+        "@testing-library/jest-dom": "^6.6.3",
+        "@testing-library/react": "^16.3.0",
+        "@testing-library/user-event": "^14.6.1",
         "@types/lodash": "4.17.24",
         "@types/react": "18.3.12",
         "@types/react-dom": "18.3.1",
         "autoprefixer": "10.4.19",
         "globals": "16.2.0",
+        "jsdom": "^26.1.0",
         "postcss": "8",
         "tailwindcss": "3.4.1",
-        "typescript": "5.7.3"
+        "typescript": "5.7.3",
+        "vite-tsconfig-paths": "^5.1.4",
+        "vitest": "^3.2.4"
     },
     "resolutions": {
         "follow-redirects": "1.16.0",
