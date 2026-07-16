@@ -110,10 +110,12 @@ function pointer(
     pointerId,
     clientX,
     clientY,
+    isPrimary = true,
   }: {
     pointerId: number
     clientX: number
     clientY: number
+    isPrimary?: boolean
   },
 ) {
   const event = new Event(type, { bubbles: true, cancelable: true })
@@ -122,6 +124,8 @@ function pointer(
     pointerType: { value: 'touch' },
     clientX: { value: clientX },
     clientY: { value: clientY },
+    isPrimary: { value: isPrimary },
+    button: { value: 0 },
   })
   fireEvent(target, event)
 }
@@ -145,6 +149,7 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
     Reflect.deleteProperty(HTMLElement.prototype, 'setPointerCapture')
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo')
   })
@@ -178,32 +183,64 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
     })).toHaveTextContent('Physio')
   })
 
-  it('changes density from a body pinch without changing visible days', () => {
+  it('anchors a completed body pinch without changing visible days', () => {
     const onDensityChange = vi.fn()
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockImplementation(function offsetHeight(this: HTMLElement) {
+        return this.dataset.testid === 'week-pinch-header' ? 44 : 0
+      })
     renderWeek({ onDensityChange })
     const viewport = screen.getByTestId('mobile-week-viewport')
+    viewport.scrollTop = 100
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 390,
+      bottom: 600,
+      left: 0,
+      width: 390,
+      height: 600,
+      toJSON: () => ({}),
+    })
 
     pointer(viewport, 'pointerdown', {
       pointerId: 11,
       clientX: 120,
-      clientY: 180,
+      clientY: 100,
     })
     pointer(viewport, 'pointerdown', {
       pointerId: 12,
       clientX: 120,
-      clientY: 280,
+      clientY: 200,
     })
     pointer(viewport, 'pointermove', {
       pointerId: 12,
       clientX: 120,
-      clientY: 320,
+      clientY: 300,
     })
+    act(() => vi.runOnlyPendingTimers())
 
-    expect(onDensityChange).toHaveBeenCalled()
+    expect(onDensityChange).toHaveBeenCalledTimes(1)
+    expect(viewport.scrollTop).toBe(356)
     expect(screen.getByTestId('mobile-week-time-grid')).toHaveAttribute(
       'data-visible-days',
       '7',
     )
+
+    pointer(viewport, 'pointerup', {
+      pointerId: 12,
+      clientX: 120,
+      clientY: 300,
+      isPrimary: false,
+    })
+    pointer(viewport, 'pointermove', {
+      pointerId: 11,
+      clientX: 120,
+      clientY: 80,
+    })
+
+    expect(onDensityChange).toHaveBeenCalledTimes(1)
   })
 
   it('changes visible days from a header pinch without changing density', () => {
@@ -217,6 +254,48 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
       '3',
     )
     expect(onDensityChange).not.toHaveBeenCalled()
+  })
+
+  it('does not start body pinch while an appointment gesture is active', () => {
+    const onDensityChange = vi.fn()
+    renderWeek({ onDensityChange })
+    const card = screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })
+    const viewport = screen.getByTestId('mobile-week-viewport')
+
+    pointer(card, 'pointerdown', {
+      pointerId: 31,
+      clientX: 140,
+      clientY: 200,
+    })
+    act(() => vi.advanceTimersByTime(450))
+
+    pointer(viewport, 'pointerdown', {
+      pointerId: 41,
+      clientX: 120,
+      clientY: 180,
+    })
+    pointer(viewport, 'pointerdown', {
+      pointerId: 42,
+      clientX: 120,
+      clientY: 280,
+      isPrimary: false,
+    })
+    pointer(viewport, 'pointermove', {
+      pointerId: 42,
+      clientX: 120,
+      clientY: 320,
+      isPrimary: false,
+    })
+
+    expect(onDensityChange).not.toHaveBeenCalled()
+
+    pointer(card, 'pointerup', {
+      pointerId: 31,
+      clientX: 140,
+      clientY: 200,
+    })
   })
 
   it('initially scrolls the two-axis viewport near business-local current time', () => {
@@ -256,7 +335,7 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
     })
   })
 
-  it('falls back to the first working hour when a week has no appointments', () => {
+  it('falls back to the earliest valid configured working window', () => {
     const scrollTo = vi.fn()
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
       configurable: true,
@@ -266,10 +345,105 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
     renderWeek({
       selectedDate: '2026-07-23',
       appointments: [],
+      config: {
+        ...config,
+        workingHours: [
+          {
+            id: 'hours-monday',
+            business_id: business.id,
+            weekday: 'monday',
+            is_open: true,
+            morning_start: '06:00:00',
+            morning_end: '05:00:00',
+            afternoon_start: '13:00:00',
+            afternoon_end: '18:00:00',
+          },
+          {
+            id: 'hours-tuesday',
+            business_id: business.id,
+            weekday: 'tuesday',
+            is_open: true,
+            morning_start: '09:30:00',
+            morning_end: '12:00:00',
+            afternoon_start: null,
+            afternoon_end: null,
+          },
+        ],
+      },
+    })
+
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 54,
+      behavior: 'smooth',
+    })
+  })
+
+  it('uses 07:00 only when the week has no open configured window', () => {
+    const scrollTo = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    })
+
+    renderWeek({
+      selectedDate: '2026-07-23',
+      appointments: [],
+      config: {
+        ...config,
+        workingHours: [{
+          id: 'hours-monday',
+          business_id: business.id,
+          weekday: 'monday',
+          is_open: false,
+          morning_start: '09:00:00',
+          morning_end: '12:00:00',
+          afternoon_start: null,
+          afternoon_end: null,
+        }],
+      },
     })
 
     expect(scrollTo).toHaveBeenCalledWith({
       top: 0,
+      behavior: 'smooth',
+    })
+  })
+
+  it('waits for current week data before recording the initial scroll', () => {
+    const scrollTo = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    })
+    const { props, rerender } = renderWeek({
+      selectedDate: '2026-07-23',
+      appointments: [{
+        ...appointment,
+        appointment_date: '2026-07-16',
+        start_time: '08:00:00',
+      }],
+      isLoading: true,
+    })
+
+    expect(scrollTo).not.toHaveBeenCalled()
+
+    rerender(
+      <WorkspaceProvider business={business}>
+        <MobileWeekTimeGrid
+          {...props}
+          appointments={[{
+            ...appointment,
+            appointment_date: '2026-07-23',
+            start_time: '10:00:00',
+          }]}
+          isLoading={false}
+        />
+      </WorkspaceProvider>,
+    )
+
+    expect(scrollTo).toHaveBeenCalledTimes(1)
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 84,
       behavior: 'smooth',
     })
   })

@@ -19,6 +19,7 @@ import {
 } from '@/lib/calendar/week-layout'
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
+import { WEEKDAYS } from '@/lib/types/db'
 import { usePinchZoom } from '@/hooks/use-pinch-zoom'
 import { useWeekHeaderPinch } from '@/hooks/use-week-header-pinch'
 import { CalendarToolbar } from './calendar-toolbar'
@@ -30,6 +31,7 @@ interface MobileWeekTimeGridProps {
   config: CalendarConfig
   selectedDate: string
   density: number
+  isLoading?: boolean
   onSelectDate(date: string): void
   onSelectAppointment(id: string): void
   onCreateAt(date: string, startMinute: number): void
@@ -62,11 +64,35 @@ function businessMinute(timezone: string, now = new Date()) {
   return values.hour * 60 + values.minute
 }
 
+function weekdayForDate(date: string) {
+  const weekdayIndex = new Date(`${date}T12:00:00.000Z`).getUTCDay()
+  return WEEKDAYS[(weekdayIndex + 6) % 7]
+}
+
+function validWindowStart(start: string | null, end: string | null) {
+  if (!start || !end) return null
+  const startMinute = timeToMin(start)
+  return timeToMin(end) > startMinute ? startMinute : null
+}
+
+function firstWorkingMinute(config: CalendarConfig, days: string[]) {
+  const weekdays = new Set(days.map(weekdayForDate))
+  const starts = config.workingHours.flatMap((workingHour) => {
+    if (!workingHour.is_open || !weekdays.has(workingHour.weekday)) return []
+    return [
+      validWindowStart(workingHour.morning_start, workingHour.morning_end),
+      validWindowStart(workingHour.afternoon_start, workingHour.afternoon_end),
+    ].filter((minute): minute is number => minute !== null)
+  })
+  return starts.length ? Math.min(...starts) : START
+}
+
 export function MobileWeekTimeGrid({
   appointments,
   config,
   selectedDate,
   density,
+  isLoading = false,
   onSelectDate,
   onSelectAppointment,
   onCreateAt,
@@ -80,6 +106,7 @@ export function MobileWeekTimeGrid({
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
   const weekViewportRef = useRef<HTMLDivElement>(null)
+  const weekHeaderRef = useRef<HTMLDivElement>(null)
   const lastScrolledWeekRef = useRef<string | null>(null)
   const { from } = weekRange(selectedDate)
   const days = useMemo(
@@ -88,11 +115,13 @@ export function MobileWeekTimeGrid({
   )
   const [visibleDays, setVisibleDays] = useState(7)
   const [width, setWidth] = useState(390)
+  const [pinchContentOffsetTop, setPinchContentOffsetTop] = useState(0)
   const [calendarGestureActive, setCalendarGestureActive] = useState(false)
   const today = businessToday(config.timezone)
   const verticalPinch = usePinchZoom({
     density,
     disabled: calendarGestureActive,
+    contentOffsetTop: pinchContentOffsetTop,
     scrollRef: weekViewportRef,
     onDensityChange,
   })
@@ -101,11 +130,16 @@ export function MobileWeekTimeGrid({
   useEffect(() => {
     const node = weekViewportRef.current
     if (!node) return
-    const update = () => setWidth(node.clientWidth || 390)
+    const header = weekHeaderRef.current
+    const update = () => {
+      setWidth(node.clientWidth || 390)
+      setPinchContentOffsetTop(header?.offsetHeight ?? 0)
+    }
     update()
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(update)
     observer.observe(node)
+    if (header) observer.observe(header)
     return () => observer.disconnect()
   }, [])
 
@@ -135,18 +169,20 @@ export function MobileWeekTimeGrid({
     const node = weekViewportRef.current
     if (
       !node
+      || isLoading
       || lastScrolledWeekRef.current === from
       || typeof node.scrollTo !== 'function'
     ) return
 
     lastScrolledWeekRef.current = from
+    const weeklyAppointmentStarts = appointments
+      .filter((appointment) => days.includes(appointment.appointment_date))
+      .map((appointment) => timeToMin(appointment.start_time))
     const targetMinute = days.includes(today)
       ? businessMinute(config.timezone)
-      : appointments.length
-        ? Math.min(...appointments.map(
-            (appointment) => timeToMin(appointment.start_time),
-          ))
-        : START
+      : weeklyAppointmentStarts.length
+        ? Math.min(...weeklyAppointmentStarts)
+        : firstWorkingMinute(config, days)
     const targetTop = Math.max(
       0,
       minutesToY(targetMinute, START, density) - 96,
@@ -158,7 +194,7 @@ export function MobileWeekTimeGrid({
       top: targetTop,
       behavior: reduceMotion ? 'auto' : 'smooth',
     })
-  }, [appointments, config.timezone, days, density, from, today])
+  }, [appointments, config, days, density, from, isLoading, today])
 
   const hours = Array.from({ length: (END - START) / 60 + 1 }, (_, i) => (
     START + i * 60
@@ -189,6 +225,7 @@ export function MobileWeekTimeGrid({
         >
           <div style={{ width: contentWidth }}>
             <div
+              ref={weekHeaderRef}
               data-testid="week-pinch-header"
               data-pinch-zoom-ignore
               className="sticky top-0 z-30 grid border-y border-border bg-card touch-pan-x"

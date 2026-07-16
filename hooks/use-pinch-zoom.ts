@@ -16,6 +16,7 @@ interface PinchZoomStepInput {
   scale: number
   scrollTop: number
   focalY: number
+  contentOffsetTop?: number
 }
 
 export function pinchZoomStep(input: PinchZoomStepInput) {
@@ -23,13 +24,14 @@ export function pinchZoomStep(input: PinchZoomStepInput) {
     oldDensity: input.density,
     newDensity: input.density * input.scale,
     scrollTop: input.scrollTop,
-    focalY: input.focalY,
+    focalY: input.focalY - (input.contentOffsetTop ?? 0),
   })
 }
 
 interface UsePinchZoomOptions {
   density: number
   disabled?: boolean
+  contentOffsetTop?: number
   scrollRef: RefObject<HTMLElement | null>
   onDensityChange(density: number): void
 }
@@ -53,6 +55,7 @@ export function pinchZoomIgnoresTarget(target: EventTarget | null) {
 export function usePinchZoom({
   density,
   disabled = false,
+  contentOffsetTop = 0,
   scrollRef,
   onDensityChange,
 }: UsePinchZoomOptions) {
@@ -109,6 +112,7 @@ export function usePinchZoom({
       scale: nextDistance / previousDistance,
       scrollTop: scrollContainer.scrollTop,
       focalY,
+      contentOffsetTop,
     })
     densityRef.current = next.density
     onDensityChange(next.density)
@@ -119,7 +123,7 @@ export function usePinchZoom({
       scrollFrameRef.current = null
       scrollContainer.scrollTop = next.scrollTop
     })
-  }, [disabled, onDensityChange, scrollRef])
+  }, [contentOffsetTop, disabled, onDensityChange, scrollRef])
 
   const handlePointerDown = useCallback((
     event: ReactPointerEvent<HTMLElement>,

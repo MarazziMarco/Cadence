@@ -1125,6 +1125,12 @@ export function CalendarController() {
             ) : (
               <MobileWeekTimeGrid
                 {...rendererProps}
+                isLoading={
+                  appointmentsQuery.isPending
+                  || appointmentsQuery.isPlaceholderData
+                  || configQuery.isPending
+                  || configQuery.isPlaceholderData
+                }
                 onDensityChange={handleDensityChange}
                 onViewChange={handleViewChange}
                 onOptimize={businessId ? handleOpenOptimizer : undefined}
