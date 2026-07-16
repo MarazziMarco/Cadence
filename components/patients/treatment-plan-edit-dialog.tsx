@@ -5,12 +5,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { updateTreatmentPlan } from '@/lib/api/treatment-plans'
+import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
-export function TreatmentPlanEditDialog({ plan, patientId, open, onOpenChange }: {
+export function TreatmentPlanEditDialog({ businessId, plan, patientId, open, onOpenChange }: {
+  businessId: string
   plan: { id: string; treatmentType: string; therapist: string | null } | null
   patientId: string
   open: boolean
@@ -30,7 +32,7 @@ export function TreatmentPlanEditDialog({ plan, patientId, open, onOpenChange }:
     onSuccess: () => {
       toast.success('Plan updated')
       qc.invalidateQueries({ queryKey: ['patient-plans', patientId] })
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      invalidateCalendarAppointments(qc, businessId)
       onOpenChange(false)
     },
     onError: (e: any) => toast.error(e.message || 'Failed to save'),

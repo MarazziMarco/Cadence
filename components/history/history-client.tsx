@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { History, Clock, Undo2, Loader2, Sparkles, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getOptimizationHistory, undoLastOptimization } from '@/lib/api/optimization-history'
+import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { useWorkspace } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
 import { bcp47 } from '@/lib/i18n'
@@ -54,7 +55,7 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
       if (res.undone === 0) toast(t('hist.nothingUndo'))
       else toast.success(t('hist.reverted', { n: res.undone }))
       qc.invalidateQueries({ queryKey: ['optimizations'] })
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      invalidateCalendarAppointments(qc, businessId)
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['schedule-health'] })
     },

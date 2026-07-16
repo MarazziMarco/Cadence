@@ -9,6 +9,7 @@ import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX
 import { getPatient, setPatientFlag, softDeletePatient } from '@/lib/api/patients'
 import { listUpcomingByPatient, fmtTime } from '@/lib/api/appointments'
 import { getPatientPlans, deleteTreatmentPlan, type PatientPlan } from '@/lib/api/treatment-plans'
+import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { PatientFormDialog } from './patient-form-dialog'
 import { TreatmentPlanDialog } from './treatment-plan-dialog'
@@ -53,7 +54,7 @@ export function PatientProfile({ id }: { id: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['patient-plans', id] })
       qc.invalidateQueries({ queryKey: ['patient-upcoming', id] })
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      if (business?.id) invalidateCalendarAppointments(qc, business.id)
       toast.success('Plan deleted')
     },
     onError: (e: any) => toast.error(e.message),
@@ -219,7 +220,7 @@ export function PatientProfile({ id }: { id: string }) {
       {business?.id && <PatientFormDialog businessId={business.id} patient={p} open={editOpen} onOpenChange={setEditOpen} />}
       {business?.id && <TreatmentPlanDialog businessId={business.id} patientId={id} open={planOpen} onOpenChange={setPlanOpen} />}
       {business?.id && <AppointmentDialog businessId={business.id} defaultPatientId={id} open={apptOpen} onOpenChange={setApptOpen} />}
-      <TreatmentPlanEditDialog plan={editPlan} patientId={id} open={!!editPlan} onOpenChange={(v) => { if (!v) setEditPlan(null) }} />
+      {business?.id && <TreatmentPlanEditDialog businessId={business.id} plan={editPlan} patientId={id} open={!!editPlan} onOpenChange={(v) => { if (!v) setEditPlan(null) }} />}
     </div>
   )
 }

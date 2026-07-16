@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Loader2, CalendarPlus } from 'lucide-react'
 import { listServices } from '@/lib/api/services'
 import { createTreatmentPlan, generateSessionDates } from '@/lib/api/treatment-plans'
+import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -83,7 +84,7 @@ export function TreatmentPlanDialog({ businessId, patientId, open, onOpenChange 
       toast.success(`Plan created ·  sessions`)
       qc.invalidateQueries({ queryKey: ['patient-plans', patientId] })
       qc.invalidateQueries({ queryKey: ['patient-upcoming', patientId] })
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      invalidateCalendarAppointments(qc, businessId)
       onOpenChange(false)
     } catch (e: any) {
       toast.error(e.message || 'Could not create the plan')

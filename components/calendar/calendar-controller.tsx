@@ -140,17 +140,16 @@ function visibleSupportedRange(
   })
 }
 
-function useDesktopMediaQuery() {
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined'
-      && window.matchMedia('(min-width: 1024px)').matches,
-  )
+export function useDesktopMediaQuery() {
+  const [isDesktop, setIsDesktop] = useState(false)
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)')
-    const handleChange = () => setIsDesktop(media.matches)
-    handleChange()
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsDesktop(event.matches)
+    }
     media.addEventListener('change', handleChange)
+    setIsDesktop(media.matches)
     return () => media.removeEventListener('change', handleChange)
   }, [])
 

@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { FlaskConical, Loader2, CalendarPlus } from 'lucide-react'
 import { seedDemoAppointments } from '@/lib/api/dev-seed'
+import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { useWorkspace } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
 import { PageHeader } from '@/components/common/page-header'
@@ -24,7 +25,7 @@ export function LabClient() {
     try {
       const n = await seedDemoAppointments(businessId)
       toast.success(t('lab.seeded', { n }))
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      invalidateCalendarAppointments(qc, businessId)
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['schedule-health'] })
     } catch (e: any) {
