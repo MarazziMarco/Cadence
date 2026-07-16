@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Wand2, Loader2, Clock, DollarSign, ListChecks, ArrowRightLeft, Check, X, ArrowRight, Sparkles, PlusCircle } from 'lucide-react'
 import { runOptimization, fetchRun, acceptChange, rejectChange, ensureAlgorithmSettings } from '@/lib/api/scheduler'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -17,6 +18,7 @@ const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '—')
 // Scheduler flow (Edge Function invoke + preview + per-row apply) via lib/api/scheduler.
 export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: string; dateFrom: string; dateTo: string }) {
   const { business } = useWorkspace()
+  const { t } = useT()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -32,7 +34,7 @@ export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: s
       const res = await fetchRun(runId)
       setRun(res.run); setChanges(res.changes)
     } catch (e: any) {
-      toast.error(e.message || 'Ottimizzazione non riuscita')
+      toast.error(e.message || t('opt.failed'))
     } finally { setLoading(false) }
   }
 
@@ -47,39 +49,39 @@ export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: s
       await acceptChange(businessId, run.id, c)
       setChanges((prev) => prev.map((x) => (x.id === c.id ? { ...x, accepted: true } : x)))
       qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); qc.invalidateQueries({ queryKey: ['waiting'] })
-      toast.success('Applicato')
+      toast.success(t('sched.applied'))
     } catch (e: any) { toast.error(e.message) } finally { setBusyId(null) }
   }
   async function onReject(c: any) {
     setBusyId(c.id)
-    try { await rejectChange(c); setChanges((prev) => prev.filter((x) => x.id !== c.id)); toast('Modifica scartata') }
+    try { await rejectChange(c); setChanges((prev) => prev.filter((x) => x.id !== c.id)); toast(t('sched.dismissed')) }
     catch (e: any) { toast.error(e.message) } finally { setBusyId(null) }
   }
 
   const idleSaved = run ? Math.max(0, (run.idle_minutes_before ?? 0) - (run.idle_minutes_after ?? 0)) : 0
   const revImpact = run ? Number(run.estimated_revenue_after ?? 0) - Number(run.estimated_revenue_before ?? 0) : 0
   const kpis = run ? [
-    { label: 'Tempo morto', value: `${Math.floor(idleSaved / 60)}h ${idleSaved % 60}m`, icon: Clock },
-    { label: 'Ricavi', value: `+${formatMoney(revImpact, business?.currency)}`, icon: DollarSign },
-    { label: "Lista d'attesa", value: String(run.created_appointments ?? 0), icon: ListChecks },
-    { label: 'Spostati', value: String(run.moved_appointments ?? 0), icon: ArrowRightLeft },
+    { label: t('opt.kpi.idle'), value: `${Math.floor(idleSaved / 60)}h ${idleSaved % 60}m`, icon: Clock },
+    { label: t('opt.kpi.revenue'), value: `+${formatMoney(revImpact, business?.currency)}`, icon: DollarSign },
+    { label: t('opt.kpi.waiting'), value: String(run.created_appointments ?? 0), icon: ListChecks },
+    { label: t('opt.kpi.moved'), value: String(run.moved_appointments ?? 0), icon: ArrowRightLeft },
   ] : []
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button className="gap-2"><Wand2 className="h-4 w-4" /> Ottimizza</Button>
+        <Button className="gap-2"><Wand2 className="h-4 w-4" /> {t('sched.optimize')}</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] gap-0 overflow-hidden p-0 sm:max-w-lg">
         <DialogHeader className="border-b border-border px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4 text-primary" /> Ottimizzazione intelligente</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4 text-primary" /> {t('opt.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="max-h-[calc(85vh-4rem)] overflow-y-auto p-5">
           {loading && (
             <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
               <Loader2 className="h-7 w-7 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Sto costruendo la giornata migliore…</p>
+              <p className="text-sm text-muted-foreground">{t('opt.building')}</p>
             </div>
           )}
 
@@ -87,7 +89,7 @@ export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: s
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex items-start gap-2 rounded-xl border border-primary/30 bg-accent/40 px-3 py-2.5 text-sm">
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <span className="text-muted-foreground">{run.ai_summary || 'Ogni modifica è un\'anteprima. Nulla cambia finché non accetti.'}</span>
+                <span className="text-muted-foreground">{run.ai_summary || t('sched.previewDefault')}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -100,21 +102,21 @@ export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: s
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-semibold">Modifiche proposte ({changes.length})</p>
+                <p className="mb-2 text-sm font-semibold">{t('sched.proposedChanges', { n: changes.length })}</p>
                 {changes.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">Agenda già ottimale nel periodo selezionato.</div>
+                  <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">{t('opt.alreadyOptimal')}</div>
                 ) : (
                   <div className="space-y-2">
                     {changes.map((c) => {
                       const isMove = !!c.appointment_id
-                      const name = c.patients?.full_name || c.patients?.first_name || 'Cliente'
+                      const name = c.patients?.full_name || c.patients?.first_name || t('dash.client')
                       return (
                         <div key={c.id} className="rounded-lg border border-border p-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                               <Badge variant={isMove ? 'secondary' : 'default'} className={isMove ? '' : 'bg-success/15 text-success hover:bg-success/15'}>
                                 {isMove ? <ArrowRightLeft className="mr-1 h-3 w-3" /> : <PlusCircle className="mr-1 h-3 w-3" />}
-                                {isMove ? 'Spostato' : "Da lista d'attesa"}
+                                {isMove ? t('sched.moved') : t('opt.fromWaiting')}
                               </Badge>
                               <span className="text-sm font-medium">{name}</span>
                             </div>
@@ -126,10 +128,10 @@ export function OptimizeDialog({ businessId, dateFrom, dateTo }: { businessId: s
                           </div>
                           {c.ai_reason && <p className="mt-1.5 text-xs text-muted-foreground">{c.ai_reason}</p>}
                           <div className="mt-2 flex justify-end gap-2">
-                            {c.accepted ? <Badge className="bg-success/15 text-success hover:bg-success/15"><Check className="mr-1 h-3 w-3" /> Applicato</Badge> : (
+                            {c.accepted ? <Badge className="bg-success/15 text-success hover:bg-success/15"><Check className="mr-1 h-3 w-3" /> {t('sched.applied')}</Badge> : (
                               <>
-                                <Button size="sm" variant="outline" onClick={() => onReject(c)} disabled={busyId === c.id}><X className="mr-1 h-3.5 w-3.5" /> Rifiuta</Button>
-                                <Button size="sm" onClick={() => onAccept(c)} disabled={busyId === c.id}>{busyId === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />} Accetta</Button>
+                                <Button size="sm" variant="outline" onClick={() => onReject(c)} disabled={busyId === c.id}><X className="mr-1 h-3.5 w-3.5" /> {t('sched.reject')}</Button>
+                                <Button size="sm" onClick={() => onAccept(c)} disabled={busyId === c.id}>{busyId === c.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />} {t('sched.accept')}</Button>
                               </>
                             )}
                           </div>

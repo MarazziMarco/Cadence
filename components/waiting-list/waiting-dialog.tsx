@@ -8,6 +8,8 @@ import { createWaiting, updateWaiting } from '@/lib/api/waiting-list'
 import { listPatientsForSelect } from '@/lib/api/appointments'
 import { listServices } from '@/lib/api/services'
 import { WEEKDAYS, WEEKDAY_LABELS, AVAILABILITY_PRIORITY, type Weekday } from '@/lib/types/db'
+import { useT } from '@/lib/i18n/use-t'
+import { bcp47 } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +21,8 @@ import { cn } from '@/lib/utils'
 
 export function WaitingDialog({ businessId, entry, open, onOpenChange }: { businessId: string; entry?: any; open: boolean; onOpenChange: (v: boolean) => void }) {
   const qc = useQueryClient()
+  const { t, locale } = useT()
+  const dloc = bcp47(locale)
   const editing = !!entry
   const [patientId, setPatientId] = useState('')
   const [serviceId, setServiceId] = useState('none')
@@ -66,36 +70,36 @@ export function WaitingDialog({ businessId, entry, open, onOpenChange }: { busin
       }
       return editing ? updateWaiting(entry.id, values) : createWaiting(businessId, values)
     },
-    onSuccess: () => { toast.success(editing ? 'Updated' : 'Added to waiting list'); qc.invalidateQueries({ queryKey: ['waiting'] }); onOpenChange(false) },
+    onSuccess: () => { toast.success(editing ? t('waitd.updated') : t('waitd.added')); qc.invalidateQueries({ queryKey: ['waiting'] }); onOpenChange(false) },
     onError: (e: any) => toast.error(e.message),
   })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>{editing ? 'Edit waiting entry' : 'Add to waiting list'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{editing ? t('waitd.editTitle') : t('waitd.newTitle')}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Client *</Label><Select value={patientId} onValueChange={setPatientId}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{patients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name || p.first_name}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Priority</Label><Select value={priority} onValueChange={setPriority}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{AVAILABILITY_PRIORITY.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label>{t('waitd.client')}</Label><Select value={patientId} onValueChange={setPatientId}><SelectTrigger><SelectValue placeholder={t('waitd.select')} /></SelectTrigger><SelectContent>{patients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name || p.first_name}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label>{t('waitd.priority')}</Label><Select value={priority} onValueChange={setPriority}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{AVAILABILITY_PRIORITY.map((p) => <SelectItem key={p} value={p}>{t('wait.priority.' + p)}</SelectItem>)}</SelectContent></Select></div>
           </div>
-          <div className="space-y-2"><Label>Preferred service</Label><Select value={serviceId} onValueChange={setServiceId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Any service</SelectItem>{services.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select></div>
+          <div className="space-y-2"><Label>{t('waitd.prefService')}</Label><Select value={serviceId} onValueChange={setServiceId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{t('waitd.anyService')}</SelectItem>{services.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select></div>
           <div className="space-y-2">
-            <Label>Preferred days</Label>
-            <div className="flex flex-wrap gap-1.5">{WEEKDAYS.map((d) => <button key={d} type="button" onClick={() => toggleDay(d)} className={cn('rounded-md border px-2.5 py-1 text-xs font-medium transition-colors', weekdays.includes(d) ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-accent')}>{WEEKDAY_LABELS[d].slice(0, 3)}</button>)}</div>
+            <Label>{t('waitd.prefDays')}</Label>
+            <div className="flex flex-wrap gap-1.5">{WEEKDAYS.map((d, i) => <button key={d} type="button" onClick={() => toggleDay(d)} className={cn('rounded-md border px-2.5 py-1 text-xs font-medium capitalize transition-colors', weekdays.includes(d) ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-accent')}>{new Date(2024, 0, 1 + i).toLocaleDateString(dloc, { weekday: 'short' })}</button>)}</div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Earliest date</Label><Input type="date" value={earliestDate} onChange={(e) => setEarliestDate(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Latest date</Label><Input type="date" value={latestDate} onChange={(e) => setLatestDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('waitd.earliestDate')}</Label><Input type="date" value={earliestDate} onChange={(e) => setEarliestDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('waitd.latestDate')}</Label><Input type="date" value={latestDate} onChange={(e) => setLatestDate(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Earliest time</Label><Input type="time" value={earliestTime} onChange={(e) => setEarliestTime(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Latest time</Label><Input type="time" value={latestTime} onChange={(e) => setLatestTime(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('waitd.earliestTime')}</Label><Input type="time" value={earliestTime} onChange={(e) => setEarliestTime(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('waitd.latestTime')}</Label><Input type="time" value={latestTime} onChange={(e) => setLatestTime(e.target.value)} /></div>
           </div>
-          <div className="flex items-center justify-between"><Label>Flexible (AI may adjust)</Label><Switch checked={flexible} onCheckedChange={setFlexible} /></div>
-          <div className="space-y-2"><Label>Notes</Label><Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+          <div className="flex items-center justify-between"><Label>{t('waitd.flexible')}</Label><Switch checked={flexible} onCheckedChange={setFlexible} /></div>
+          <div className="space-y-2"><Label>{t('waitd.notes')}</Label><Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
         </div>
-        <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button><Button onClick={() => save.mutate()} disabled={!patientId || save.isPending}>{save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? 'Save' : 'Add'}</Button></DialogFooter>
+        <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button><Button onClick={() => save.mutate()} disabled={!patientId || save.isPending}>{save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? t('common.save') : t('waitd.add')}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   )

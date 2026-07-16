@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { createService, updateService } from '@/lib/api/services'
 import type { Service } from '@/lib/types/db'
+import { useT } from '@/lib/i18n/use-t'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +20,7 @@ const EMOJIS = ['💆', '💇', '✂️', '💅', '🧖', '🦷', '🩺', '💉'
 
 export function ServiceFormDialog({ businessId, service, open, onOpenChange }: { businessId: string; service?: Service | null; open: boolean; onOpenChange: (v: boolean) => void }) {
   const qc = useQueryClient()
+  const { t } = useT()
   const editing = !!service
   const [name, setName] = useState(service?.name ?? '')
   const [category, setCategory] = useState<string>(((service as any)?.metadata?.category as string) ?? '')
@@ -45,27 +47,27 @@ export function ServiceFormDialog({ businessId, service, open, onOpenChange }: {
         buffer_after_minutes: parseInt(bufferAfter) || 0,
         color,
         allow_ai_scheduling: aiSchedule,
-        metadata: { ...(service as any)?.metadata, category: category.trim() || 'General' },
+        metadata: { ...(service as any)?.metadata, category: category.trim() || t('svc.general') },
       }
       if (editing) return updateService(service!.id, values)
       return createService(businessId, values)
     },
     onSuccess: () => {
-      toast.success(editing ? 'Service updated' : 'Service added')
+      toast.success(editing ? t('svcf.updated') : t('svcf.added'))
       qc.invalidateQueries({ queryKey: ['services'] })
       onOpenChange(false)
     },
-    onError: (e: any) => toast.error(e.message || 'Failed to save'),
+    onError: (e: any) => toast.error(e.message || t('appt.saveFailed')),
   })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>{editing ? 'Edit service' : 'New service'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{editing ? t('svcf.editTitle') : t('svcf.newTitle')}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
-          <div className="space-y-2"><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Deep tissue massage" /></div>
+          <div className="space-y-2"><Label>{t('svcf.name')}</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('svcf.namePh')} /></div>
           <div className="space-y-2">
-            <Label>Icon <span className="text-muted-foreground">(optional)</span></Label>
+            <Label>{t('svcf.icon')} <span className="text-muted-foreground">{t('svcf.optional')}</span></Label>
             <div className="flex flex-wrap gap-1.5">
               <button type="button" onClick={() => setEmoji('')} className={cn('flex h-9 w-9 items-center justify-center rounded-md border text-sm', !emoji ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent')}>—</button>
               {EMOJIS.map((e) => (
@@ -73,32 +75,32 @@ export function ServiceFormDialog({ businessId, service, open, onOpenChange }: {
               ))}
             </div>
           </div>
-          <div className="space-y-2"><Label>Category</Label><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Massage" /></div>
-          <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} /></div>
+          <div className="space-y-2"><Label>{t('svcf.category')}</Label><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder={t('svcf.categoryPh')} /></div>
+          <div className="space-y-2"><Label>{t('svcf.description')}</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} /></div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-2"><Label>Duration (min)</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Price</Label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
-            <div className="space-y-2"><Label>VAT %</Label><Input type="number" value={vat} onChange={(e) => setVat(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('svcf.duration')}</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('svcf.price')}</Label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('svcf.vat')}</Label><Input type="number" value={vat} onChange={(e) => setVat(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Buffer before (min)</Label><Input type="number" value={bufferBefore} onChange={(e) => setBufferBefore(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Buffer after (min)</Label><Input type="number" value={bufferAfter} onChange={(e) => setBufferAfter(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('svcf.bufferBefore')}</Label><Input type="number" value={bufferBefore} onChange={(e) => setBufferBefore(e.target.value)} /></div>
+            <div className="space-y-2"><Label>{t('svcf.bufferAfter')}</Label><Input type="number" value={bufferAfter} onChange={(e) => setBufferAfter(e.target.value)} /></div>
           </div>
           <div className="space-y-2">
-            <Label>Color</Label>
+            <Label>{t('svcf.color')}</Label>
             <div className="flex flex-wrap gap-1.5">{COLORS.map((c) => <button key={c} type="button" onClick={() => setColor(c)} className={`h-6 w-6 rounded-full border-2 ${color === c ? 'border-foreground' : 'border-transparent'}`} style={{ backgroundColor: c }} />)}</div>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
             <div>
-              <p className="text-sm font-medium">Optimizer can reschedule this service</p>
-              <p className="text-xs text-muted-foreground">If off, appointments of this service are never moved by the optimizer.</p>
+              <p className="text-sm font-medium">{t('svcf.aiTitle')}</p>
+              <p className="text-xs text-muted-foreground">{t('svcf.aiHint')}</p>
             </div>
             <Switch checked={aiSchedule} onCheckedChange={setAiSchedule} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => mutation.mutate()} disabled={!name.trim() || mutation.isPending}>{mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? 'Save' : 'Add service'}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
+          <Button onClick={() => mutation.mutate()} disabled={!name.trim() || mutation.isPending}>{mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? t('common.save') : t('svcf.addService')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

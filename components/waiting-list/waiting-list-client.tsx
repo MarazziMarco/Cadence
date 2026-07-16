@@ -7,6 +7,7 @@ import { Plus, ListChecks, MoreHorizontal, Pencil, Trash2, Star, CalendarClock, 
 import { listWaiting, deleteWaiting, advanceApptId } from '@/lib/api/waiting-list'
 import { WEEKDAY_LABELS } from '@/lib/types/db'
 import { useWorkspace } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
 import { PageHeader } from '@/components/common/page-header'
 import { EmptyState } from '@/components/common/empty-state'
 import { WaitingDialog } from './waiting-dialog'
@@ -23,13 +24,14 @@ const PRIORITY_STYLE: Record<string, string> = {
 
 export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const { business } = useWorkspace()
+  const { t } = useT()
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any>(null)
 
   const { data: entries = [], isLoading } = useQuery({ queryKey: ['waiting', businessId], queryFn: () => listWaiting(businessId), enabled: !!businessId })
-  const del = useMutation({ mutationFn: (id: string) => deleteWaiting(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['waiting'] }); toast.success('Removed') } })
+  const del = useMutation({ mutationFn: (id: string) => deleteWaiting(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['waiting'] }); toast.success(t('wait.removed')) } })
 
   function openNew() { setEditing(null); setOpen(true) }
   function openEdit(e: any) { setEditing(e); setOpen(true) }
@@ -38,18 +40,18 @@ export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean
     <div>
       {hideHeader ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground">Clients ready to fill any gap that opens.</p>
-          <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Add to list</Button>
+          <p className="text-sm text-muted-foreground">{t('wait.subtitleShort')}</p>
+          <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> {t('wait.add')}</Button>
         </div>
       ) : (
-        <PageHeader title="Waiting List" description="Clients ready to fill any gap that opens — the scheduler uses these to auto-fill."
-          actions={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Add to list</Button>} />
+        <PageHeader title={t('wait.title')} description={t('wait.subtitle')}
+          actions={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> {t('wait.add')}</Button>} />
       )}
 
       {isLoading ? (
         <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}</div>
       ) : entries.length === 0 ? (
-        <EmptyState icon={ListChecks} title="Waiting list is empty" description="Add clients who want an earlier slot. The scheduler will place them automatically when gaps appear." action={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> Add to list</Button>} />
+        <EmptyState icon={ListChecks} title={t('wait.emptyTitle')} description={t('wait.emptyDesc')} action={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> {t('wait.add')}</Button>} />
       ) : (
         <div className="stagger-in space-y-3">
           {entries.map((e: any) => {
@@ -63,26 +65,26 @@ export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean
                     <div className="flex items-center gap-2">
                       <p className="font-semibold">{name}</p>
                       {adv ? (
-                        <Badge className="bg-primary/15 text-primary hover:bg-primary/15"><ChevronsUp className="mr-1 h-3 w-3" /> Advance</Badge>
+                        <Badge className="bg-primary/15 text-primary hover:bg-primary/15"><ChevronsUp className="mr-1 h-3 w-3" /> {t('wait.badge.advance')}</Badge>
                       ) : (
-                        <Badge variant="secondary" className="font-normal">New</Badge>
+                        <Badge variant="secondary" className="font-normal">{t('wait.badge.new')}</Badge>
                       )}
-                      {!adv && <Badge className={PRIORITY_STYLE[e.priority] + ' capitalize hover:' + PRIORITY_STYLE[e.priority]}>{e.priority === 'high' && <Star className="mr-1 h-3 w-3" />}{e.priority}</Badge>}
-                      {!adv && e.flexible && <Badge variant="secondary" className="font-normal">Flexible</Badge>}
+                      {!adv && <Badge className={PRIORITY_STYLE[e.priority] + ' capitalize hover:' + PRIORITY_STYLE[e.priority]}>{e.priority === 'high' && <Star className="mr-1 h-3 w-3" />}{t('wait.priority.' + e.priority)}</Badge>}
+                      {!adv && e.flexible && <Badge variant="secondary" className="font-normal">{t('wait.flexible')}</Badge>}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {e.services?.name && <span>{e.services.emoji ? e.services.emoji + ' ' : ''}{e.services.name}</span>}
                       {e.preferred_weekdays?.length > 0 && <span>{e.preferred_weekdays.map((d: any) => WEEKDAY_LABELS[d as keyof typeof WEEKDAY_LABELS]?.slice(0, 3)).join(', ')}</span>}
                       {(e.earliest_time || e.latest_time) && <span className="inline-flex items-center gap-1"><CalendarClock className="h-3 w-3" />{e.earliest_time?.slice(0, 5) || '—'}–{e.latest_time?.slice(0, 5) || '—'}</span>}
-                      {adv ? <span className="italic">Wants an earlier slot — will be moved up automatically</span> : (e.notes && <span className="italic">“{e.notes}”</span>)}
+                      {adv ? <span className="italic">{t('wait.advanceNote')}</span> : (e.notes && <span className="italic">“{e.notes}”</span>)}
                     </div>
                   </div>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEdit(e)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => del.mutate(e.id)}><Trash2 className="mr-2 h-4 w-4" /> Remove</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openEdit(e)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => del.mutate(e.id)}><Trash2 className="mr-2 h-4 w-4" /> {t('common.remove')}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </Card>

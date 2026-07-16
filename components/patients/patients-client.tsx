@@ -8,6 +8,7 @@ import { Plus, Search, Star, MoreHorizontal, Archive, Trash2, Pencil, Users, Arc
 import { listPatients, softDeletePatient, setPatientFlag, type PatientFilter } from '@/lib/api/patients'
 import type { Patient } from '@/lib/types/db'
 import { useWorkspace } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
 import { ClientsServicesTabs } from '@/components/common/clients-services-tabs'
 import { EmptyState } from '@/components/common/empty-state'
 import { PatientFormDialog } from './patient-form-dialog'
@@ -23,13 +24,14 @@ import {
 
 // Colors available when creating a client (mirror patient-form-dialog).
 const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6']
-const STATUS: { key: PatientFilter; label: string }[] = [
-  { key: 'all', label: 'All' }, { key: 'vip', label: 'VIP' }, { key: 'archived', label: 'Archived' },
+const STATUS: { key: PatientFilter; labelKey: string }[] = [
+  { key: 'all', labelKey: 'pat.all' }, { key: 'vip', labelKey: 'pat.vip' }, { key: 'archived', labelKey: 'pat.archived' },
 ]
 type Sort = 'default' | 'asc' | 'desc'
 
 export function PatientsClient() {
   const { business } = useWorkspace()
+  const { t } = useT()
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
@@ -61,12 +63,12 @@ export function PatientsClient() {
 
   const flagMut = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: any }) => setPatientFlag(id, patch),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patients'] }); toast.success('Updated') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patients'] }); toast.success(t('pat.updated')) },
     onError: (e: any) => toast.error(e.message),
   })
   const delMut = useMutation({
     mutationFn: (id: string) => softDeletePatient(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patients'] }); toast.success('Client deleted') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patients'] }); toast.success(t('pat.deleted')) },
     onError: (e: any) => toast.error(e.message),
   })
 
@@ -77,39 +79,39 @@ export function PatientsClient() {
 
   return (
     <div>
-      <ClientsServicesTabs current="clients" action={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New client</Button>} />
+      <ClientsServicesTabs current="clients" action={<Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> {t('pat.new')}</Button>} />
 
       <div className="mb-4 flex items-center justify-between gap-2">
         {/* Search: a lens icon that expands into a full search bar */}
         {searchOpen ? (
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input autoFocus className="pl-9 pr-9" placeholder="Search clients..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            <button aria-label="Close search" onClick={() => { setSearch(''); setSearchOpen(false) }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            <Input autoFocus className="pl-9 pr-9" placeholder={t('pat.searchPh')} value={search} onChange={(e) => setSearch(e.target.value)} />
+            <button aria-label={t('pat.closeSearch')} onClick={() => { setSearch(''); setSearchOpen(false) }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
           </div>
         ) : (
-          <Button variant="outline" size="icon" aria-label="Search" onClick={() => setSearchOpen(true)}><Search className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" aria-label={t('pat.search')} onClick={() => setSearchOpen(true)}><Search className="h-4 w-4" /></Button>
         )}
 
         {/* Filters: status + color, in one expandable menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2">
-              <SlidersHorizontal className="h-4 w-4" /> Filters
+              <SlidersHorizontal className="h-4 w-4" /> {t('pat.filters')}
               {filtersActive && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('pat.status')}</DropdownMenuLabel>
             {STATUS.map((s) => (
               <DropdownMenuItem key={s.key} onClick={() => setFilter(s.key)}>
-                <span className="flex-1">{s.label}</span>{filter === s.key && <Check className="h-4 w-4 text-primary" />}
+                <span className="flex-1">{t(s.labelKey)}</span>{filter === s.key && <Check className="h-4 w-4 text-primary" />}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Color</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('pat.color')}</DropdownMenuLabel>
             <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5">
-              <button onClick={() => setColorFilter(null)} className={cn('flex h-6 items-center rounded-md border px-2 text-xs', !colorFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>Any</button>
+              <button onClick={() => setColorFilter(null)} className={cn('flex h-6 items-center rounded-md border px-2 text-xs', !colorFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>{t('pat.any')}</button>
               {COLORS.map((c) => (
                 <button key={c} onClick={() => setColorFilter(c)} aria-label={c} className={cn('h-6 w-6 rounded-full border-2', colorFilter === c ? 'border-foreground' : 'border-transparent')} style={{ backgroundColor: c }} />
               ))}
@@ -122,18 +124,18 @@ export function PatientsClient() {
         {isLoading ? (
           <div className="space-y-2 p-4">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : displayed.length === 0 ? (
-          <EmptyState icon={Users} title={search || colorFilter ? 'No matches' : 'No clients yet'} description={search || colorFilter ? 'Try a different search or filter.' : 'Add your first client to start scheduling.'} action={!search && !colorFilter ? <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New client</Button> : undefined} className="border-0" />
+          <EmptyState icon={Users} title={search || colorFilter ? t('pat.noMatches') : t('pat.noClientsTitle')} description={search || colorFilter ? t('pat.noMatchesDesc') : t('pat.noClientsDesc')} action={!search && !colorFilter ? <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> {t('pat.new')}</Button> : undefined} className="border-0" />
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>
                   <button onClick={cycleSort} className="flex items-center gap-1 font-medium transition-colors hover:text-foreground">
-                    Name {sort === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : sort === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />}
+                    {t('pat.name')} {sort === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : sort === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />}
                   </button>
                 </TableHead>
-                <TableHead className="hidden md:table-cell">Contact</TableHead>
-                <TableHead className="text-center">Appts</TableHead>
+                <TableHead className="hidden md:table-cell">{t('pat.contact')}</TableHead>
+                <TableHead className="text-center">{t('pat.appts')}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -158,10 +160,10 @@ export function PatientsClient() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(p)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => flagMut.mutate({ id: p.id, patch: { is_vip: !p.is_vip } })}><Star className="mr-2 h-4 w-4" /> {p.is_vip ? 'Remove VIP' : 'Mark VIP'}</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => flagMut.mutate({ id: p.id, patch: { archived: !p.archived } })}>{p.archived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />} {p.archived ? 'Unarchive' : 'Archive'}</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => delMut.mutate(p.id)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEdit(p)}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => flagMut.mutate({ id: p.id, patch: { is_vip: !p.is_vip } })}><Star className="mr-2 h-4 w-4" /> {p.is_vip ? t('pat.removeVip') : t('pat.markVip')}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => flagMut.mutate({ id: p.id, patch: { archived: !p.archived } })}>{p.archived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />} {p.archived ? t('pat.unarchive') : t('pat.archive')}</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => delMut.mutate(p.id)}><Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

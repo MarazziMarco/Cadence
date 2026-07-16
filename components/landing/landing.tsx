@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/app-shell/theme-toggle'
 import { Disclaimer } from '@/components/legal/disclaimer'
+import { DemoLogin } from '@/components/landing/demo-login'
 import { cn } from '@/lib/utils'
 
 // Headline value prop.
@@ -64,9 +65,10 @@ export function Landing() {
             If your week runs on appointments, you know the pain — nights and weekends spent arranging them by hand. Cadence rebuilds your whole week, the best way possible, in one click.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.18 }}
-            className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
+            className="mt-9 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
             <Link href="/signup"><Button size="lg" className="h-12 px-7 text-base">Try free <ArrowRight className="ml-1 h-4 w-4" /></Button></Link>
             <Link href="/demo"><Button size="lg" variant="outline" className="h-12 gap-2 px-7 text-base"><PlayCircle className="h-4 w-4" /> Try without an account</Button></Link>
+            <DemoLogin />
           </motion.div>
         </div>
       </section>

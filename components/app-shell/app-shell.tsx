@@ -11,25 +11,32 @@ import { BottomNav, type QuickKind } from './bottom-nav'
 import { UserMenu } from './user-menu'
 import { ThemeToggle } from './theme-toggle'
 import { NAV_SECTIONS } from '@/lib/brand'
+import { navKey, normalizeLocale, translate } from '@/lib/i18n'
 import { WorkspaceProvider, type WorkspaceBusiness } from '@/lib/workspace-context'
 import { AppointmentDialog } from '@/components/calendar/appointment-dialog'
 import { PatientFormDialog } from '@/components/patients/patient-form-dialog'
 import { VoiceAppointment } from '@/components/ai/voice-appointment'
 
-function useTitle() {
+// Returns the matched nav href for the current path (null = no match).
+function useTitleHref(): string | null {
   const pathname = usePathname()
   for (const s of NAV_SECTIONS) {
     for (const i of s.items) {
-      if (pathname === i.href || pathname.startsWith(i.href + '/')) return i.label
+      if (pathname === i.href || pathname.startsWith(i.href + '/')) return i.href
     }
   }
-  return 'Cadence'
+  return null
 }
 
 export function AppShell({ user, business, children }: { user: { email: string; name?: string }; business: WorkspaceBusiness | null; children: ReactNode }) {
-  const title = useTitle()
   const pathname = usePathname()
   const businessId = business?.id ?? ''
+  // Title is translated directly from the business prop (useTitle runs outside
+  // the WorkspaceProvider below, so it can't use the useT hook).
+  const locale = normalizeLocale(business?.language)
+  const titleHref = useTitleHref()
+  const nk = titleHref ? navKey(titleHref) : null
+  const title = nk ? translate(locale, nk) : 'Cadence'
 
   // Quick-create modals triggered from the bottom-nav "+". A key bump remounts
   // the dialog so it always opens with fresh state.
@@ -87,7 +94,7 @@ export function AppShell({ user, business, children }: { user: { email: string; 
           <PatientFormDialog key={`client-${quickKey}`} businessId={businessId} open={quick === 'client'} onOpenChange={(v) => { if (!v) setQuick(null) }} />
           <Dialog open={quick === 'voice'} onOpenChange={(v) => { if (!v) setQuick(null) }}>
             <DialogContent className="sm:max-w-lg">
-              <DialogHeader><DialogTitle>Add by voice</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{translate(locale, 'create.byVoice')}</DialogTitle></DialogHeader>
               <VoiceAppointment />
             </DialogContent>
           </Dialog>
