@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { CalendarAppointment } from '@/lib/api/appointments'
 import {
   Dialog,
@@ -53,11 +53,31 @@ export function AppointmentDialog({
   defaultDurationMinutes,
   open,
   onOpenChange,
-  presentation = 'dialog',
+  presentation,
 }: AppointmentDialogProps) {
   const { t } = useT()
   const [dirty, setDirty] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
+  const [sessionPresentation, setSessionPresentation] =
+    useState<AppointmentEditorPresentation | null>(presentation ?? null)
+
+  useEffect(() => {
+    if (!open) {
+      setSessionPresentation(presentation ?? null)
+      return
+    }
+
+    if (presentation) {
+      setSessionPresentation(presentation)
+      return
+    }
+
+    setSessionPresentation((current) => current ?? (
+      window.matchMedia('(min-width: 1024px)').matches ? 'dialog' : 'drawer'
+    ))
+  }, [open, presentation])
+
+  const resolvedPresentation = presentation ?? sessionPresentation
 
   const closeImmediately = useCallback(() => {
     setDirty(false)
@@ -73,6 +93,8 @@ export function AppointmentDialog({
     closeImmediately()
   }, [closeImmediately, dirty])
 
+  if (!resolvedPresentation) return null
+
   const form = (
     <AppointmentForm
       businessId={businessId}
@@ -85,13 +107,13 @@ export function AppointmentDialog({
       onDirtyChange={setDirty}
       onSaved={closeImmediately}
       onCancel={requestClose}
-      className={presentation === 'drawer'
+      className={resolvedPresentation === 'drawer'
         ? 'flex min-h-0 flex-1 flex-col'
         : undefined}
-      bodyClassName={presentation === 'drawer'
+      bodyClassName={resolvedPresentation === 'drawer'
         ? 'min-h-0 flex-1 overflow-y-auto px-4'
         : undefined}
-      actionsClassName={presentation === 'drawer'
+      actionsClassName={resolvedPresentation === 'drawer'
         ? 'sticky bottom-0 z-10 border-t border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3'
         : undefined}
     />
@@ -119,7 +141,7 @@ export function AppointmentDialog({
     </AlertDialog>
   )
 
-  if (presentation === 'drawer') {
+  if (resolvedPresentation === 'drawer') {
     return (
       <>
         <Drawer

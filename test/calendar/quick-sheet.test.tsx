@@ -300,6 +300,25 @@ describe('MoveAppointmentSheet', () => {
     expect(onMoved).toHaveBeenCalledWith(expect.objectContaining({ version: 2 }))
   })
 
+  it('blocks a move that would end after midnight before the API', async () => {
+    render(
+      <MoveAppointmentSheet
+        businessId={business.id}
+        open
+        appointment={appointment}
+        onOpenChange={() => {}}
+        onMoved={() => {}}
+      />,
+    )
+
+    await userEvent.clear(screen.getByLabelText(/^start$/i))
+    await userEvent.type(screen.getByLabelText(/^start$/i), '23:30')
+    await userEvent.click(screen.getByRole('button', { name: /move appointment/i }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/before midnight/i)
+    expect(mutateCalendarOrThrow).not.toHaveBeenCalled()
+  })
+
   it('shows warnings and retries with exact codes and a new idempotency key', async () => {
     const warningRequest = {
       businessId: business.id,

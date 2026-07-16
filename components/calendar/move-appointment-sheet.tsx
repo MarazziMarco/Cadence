@@ -46,6 +46,7 @@ export function MoveAppointmentSheet({
   const { t } = useT()
   const [date, setDate] = useState('')
   const [start, setStart] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
   const [warning, setWarning] = useState<CalendarMutationError | null>(null)
   const [pending, setPending] = useState(false)
 
@@ -53,6 +54,7 @@ export function MoveAppointmentSheet({
     if (!open || !appointment) return
     setDate(appointment.appointment_date)
     setStart(appointment.start_time.slice(0, 5))
+    setFormError(null)
     setWarning(null)
     setPending(false)
   }, [appointment, open])
@@ -79,6 +81,14 @@ export function MoveAppointmentSheet({
   }
 
   async function submit(confirmWarnings?: string[]) {
+    const startMinute = timeToMin(`${start}:00`)
+    if (startMinute + appointment!.duration_minutes > 1440) {
+      setFormError(t('appt.endNextDay'))
+      setWarning(null)
+      return
+    }
+
+    setFormError(null)
     setPending(true)
     try {
       const result = await mutateCalendarOrThrow(request(confirmWarnings))
@@ -142,6 +152,7 @@ export function MoveAppointmentSheet({
                   required
                   onChange={(event) => {
                     setDate(event.target.value)
+                    setFormError(null)
                     setWarning(null)
                   }}
                 />
@@ -155,6 +166,7 @@ export function MoveAppointmentSheet({
                   required
                   onChange={(event) => {
                     setStart(event.target.value)
+                    setFormError(null)
                     setWarning(null)
                   }}
                 />
@@ -173,6 +185,15 @@ export function MoveAppointmentSheet({
                   {t('appt.moveDurationHint')}
                 </p>
               </div>
+
+              {formError ? (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+                >
+                  {formError}
+                </div>
+              ) : null}
 
               {warning ? (
                 <div

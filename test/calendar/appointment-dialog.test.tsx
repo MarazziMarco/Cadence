@@ -33,7 +33,7 @@ vi.mock('@/components/ui/dialog', () => ({
     onOpenChange(open: boolean): void
     children: React.ReactNode
   }) => props.open ? (
-    <div>
+    <div data-testid="appointment-dialog">
       {props.children}
       <button onClick={() => props.onOpenChange(false)}>Dismiss dialog</button>
     </div>
@@ -49,7 +49,7 @@ vi.mock('@/components/ui/drawer', () => ({
     onOpenChange(open: boolean): void
     children: React.ReactNode
   }) => props.open ? (
-    <div>
+    <div data-testid="appointment-drawer">
       {props.children}
       <button onClick={() => props.onOpenChange(false)}>Dismiss drawer</button>
     </div>
@@ -75,6 +75,63 @@ vi.mock('@/components/ui/alert-dialog', () => ({
 }))
 
 describe('AppointmentDialog', () => {
+  it('chooses its omitted presentation when opened and freezes it for that session', async () => {
+    let desktop = false
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => ({
+        matches: desktop,
+        media: '(min-width: 1024px)',
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    })
+
+    function Harness() {
+      const [open, setOpen] = useState(false)
+      const [, rerenderForViewport] = useState(0)
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>Open appointment</button>
+          <button
+            onClick={() => {
+              desktop = true
+              rerenderForViewport((value) => value + 1)
+            }}
+          >
+            Switch to desktop
+          </button>
+          <AppointmentDialog
+            businessId="business-1"
+            open={open}
+            onOpenChange={setOpen}
+          />
+        </>
+      )
+    }
+
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    await user.click(screen.getByRole('button', { name: 'Open appointment' }))
+    expect(await screen.findByTestId('appointment-drawer')).toBeInTheDocument()
+    expect(screen.queryByTestId('appointment-dialog')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Switch to desktop' }))
+    expect(screen.getByTestId('appointment-drawer')).toBeInTheDocument()
+    expect(screen.queryByTestId('appointment-dialog')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss drawer' }))
+    await user.click(screen.getByRole('button', { name: 'Open appointment' }))
+    expect(await screen.findByTestId('appointment-dialog')).toBeInTheDocument()
+    expect(screen.queryByTestId('appointment-drawer')).not.toBeInTheDocument()
+  })
+
   it('guards Cancel and drawer dismissal when the form is dirty', async () => {
     const onOpenChange = vi.fn()
     const user = userEvent.setup()
