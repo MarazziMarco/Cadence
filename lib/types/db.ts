@@ -30,6 +30,15 @@ export type BookingSource = (typeof BOOKING_SOURCE)[number]
 export const APPOINTMENT_LOCATION_MODES = ['inherit', 'studio', 'patient', 'custom'] as const
 export type AppointmentLocationMode = (typeof APPOINTMENT_LOCATION_MODES)[number]
 
+export const OPTIMIZATION_STRATEGIES = ['balanced', 'smart_route'] as const
+export type OptimizationStrategy = (typeof OPTIMIZATION_STRATEGIES)[number]
+
+export const OPTIMIZATION_GOALS = ['optimize', 'free_period'] as const
+export type OptimizationGoal = (typeof OPTIMIZATION_GOALS)[number]
+
+export const ROUTING_PROFILES = ['foot-walking', 'driving-car'] as const
+export type RoutingProfile = (typeof ROUTING_PROFILES)[number]
+
 export const AVAILABILITY_PRIORITY = ['low', 'normal', 'high'] as const
 export type AvailabilityPriority = (typeof AVAILABILITY_PRIORITY)[number]
 
@@ -189,6 +198,25 @@ export interface Appointment {
   location_geocoded_at: string | null
   manual_override: boolean
   version: number
+}
+
+export interface RouteCache {
+  id: string
+  business_id: string
+  origin_hash: string
+  destination_hash: string
+  origin_latitude: number
+  origin_longitude: number
+  destination_latitude: number
+  destination_longitude: number
+  profile: RoutingProfile
+  duration_seconds: number
+  distance_meters: number
+  provider: string
+  fetched_at: string
+  expires_at: string
+  created_at: string
+  updated_at: string
 }
 
 export interface PatientAvailability {
