@@ -1,3 +1,10 @@
+alter table public.business
+  add column if not exists location_latitude double precision,
+  add column if not exists location_longitude double precision,
+  add column if not exists location_accuracy_meters double precision,
+  add column if not exists location_source text,
+  add column if not exists location_captured_at timestamptz;
+
 alter table public.appointments
   add column if not exists location_mode text not null default 'inherit',
   add column if not exists location_address text,
@@ -11,6 +18,82 @@ alter table public.appointments
 
 do $$
 begin
+  if not exists (
+    select 1
+      from pg_catalog.pg_constraint
+     where conname = 'business_location_latitude_check'
+       and conrelid = 'public.business'::regclass
+  ) then
+    alter table public.business
+      add constraint business_location_latitude_check
+      check (
+        location_latitude is null
+        or (
+          location_latitude between -90 and 90
+          and location_latitude = round(location_latitude::numeric, 5)::double precision
+        )
+      );
+  end if;
+
+  if not exists (
+    select 1
+      from pg_catalog.pg_constraint
+     where conname = 'business_location_longitude_check'
+       and conrelid = 'public.business'::regclass
+  ) then
+    alter table public.business
+      add constraint business_location_longitude_check
+      check (
+        location_longitude is null
+        or (
+          location_longitude between -180 and 180
+          and location_longitude = round(location_longitude::numeric, 5)::double precision
+        )
+      );
+  end if;
+
+  if not exists (
+    select 1
+      from pg_catalog.pg_constraint
+     where conname = 'business_location_source_check'
+       and conrelid = 'public.business'::regclass
+  ) then
+    alter table public.business
+      add constraint business_location_source_check
+      check (
+        location_source is null
+        or location_source in ('device_geolocation')
+      );
+  end if;
+
+  if not exists (
+    select 1
+      from pg_catalog.pg_constraint
+     where conname = 'business_location_capture_check'
+       and conrelid = 'public.business'::regclass
+  ) then
+    alter table public.business
+      add constraint business_location_capture_check
+      check (
+        (
+          location_latitude is null
+          and location_longitude is null
+          and location_accuracy_meters is null
+          and location_source is null
+          and location_captured_at is null
+        )
+        or (
+          location_latitude is not null
+          and location_longitude is not null
+          and location_accuracy_meters is not null
+          and location_accuracy_meters between 0 and 1000000
+          and location_accuracy_meters = round(location_accuracy_meters::numeric, 0)::double precision
+          and location_source = 'device_geolocation'
+          and location_captured_at is not null
+        )
+      );
+  end if;
+
   if not exists (
     select 1
       from pg_catalog.pg_constraint

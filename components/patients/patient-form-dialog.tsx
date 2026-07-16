@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -24,6 +24,9 @@ export function PatientFormDialog({ businessId, patient, open, onOpenChange }: {
   const [lastName, setLastName] = useState(patient?.last_name ?? '')
   const [email, setEmail] = useState(patient?.email ?? '')
   const [phone, setPhone] = useState(patient?.phone ?? '')
+  const [address, setAddress] = useState(patient?.address ?? '')
+  const [city, setCity] = useState(patient?.city ?? '')
+  const [postalCode, setPostalCode] = useState(patient?.postal_code ?? '')
   const [notes, setNotes] = useState(patient?.notes ?? '')
   const [color, setColor] = useState(patient?.color ?? COLORS[0])
   const [isVip, setIsVip] = useState(patient?.is_vip ?? false)
@@ -35,6 +38,9 @@ export function PatientFormDialog({ businessId, patient, open, onOpenChange }: {
         last_name: lastName.trim() || null,
         email: email.trim() || null,
         phone: phone.trim() || null,
+        address: address.trim() || null,
+        city: city.trim() || null,
+        postal_code: postalCode.trim() || null,
         notes: notes.trim() || null,
         color,
         is_vip: isVip,
@@ -57,14 +63,22 @@ export function PatientFormDialog({ businessId, patient, open, onOpenChange }: {
         <DialogHeader><DialogTitle>{editing ? t('patf.editTitle') : t('patf.newTitle')}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>{t('patf.first')}</Label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
-            <div className="space-y-2"><Label>{t('patf.last')}</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="patient-first-name">{t('patf.first')}</Label><Input id="patient-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="patient-last-name">{t('patf.last')}</Label><Input id="patient-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>{t('patf.email')}</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-            <div className="space-y-2"><Label>{t('patf.phone')}</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="patient-email">{t('patf.email')}</Label><Input id="patient-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="patient-phone">{t('patf.phone')}</Label><Input id="patient-phone" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
           </div>
-          <div className="space-y-2"><Label>{t('patf.notes')}</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></div>
+          <div className="space-y-2">
+            <Label htmlFor="patient-address">{t('patf.address')}</Label>
+            <Input id="patient-address" value={address} onChange={(e: ChangeEvent<HTMLInputElement>) => setAddress(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2"><Label htmlFor="patient-city">{t('patf.city')}</Label><Input id="patient-city" value={city} onChange={(e: ChangeEvent<HTMLInputElement>) => setCity(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="patient-postal-code">{t('patf.postalCode')}</Label><Input id="patient-postal-code" value={postalCode} onChange={(e: ChangeEvent<HTMLInputElement>) => setPostalCode(e.target.value)} /></div>
+          </div>
+          <div className="space-y-2"><Label htmlFor="patient-notes">{t('patf.notes')}</Label><Textarea id="patient-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} /></div>
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <Label>{t('patf.color')}</Label>

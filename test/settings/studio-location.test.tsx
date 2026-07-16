@@ -1,0 +1,261 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { PreferencesClient } from '@/components/settings/preferences-client'
+import {
+  getBusinessSettings,
+  updateBusinessSettings,
+} from '@/lib/api/working-hours'
+
+const refresh = vi.fn()
+const getCurrentPosition = vi.fn()
+const watchPosition = vi.fn()
+const locationMigration = readFileSync(
+  join(
+    process.cwd(),
+    'supabase/migrations/202607160004_client_locations_and_availability.sql',
+  ),
+  'utf8',
+)
+
+vi.mock('next/link', () => ({
+  default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a {...props}>{children}</a>
+  ),
+}))
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh }),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}))
+
+vi.mock('@/lib/i18n/use-t', () => ({
+  useT: () => ({ t: (key: string) => key }),
+}))
+
+vi.mock('@/lib/workspace-context', () => ({
+  useWorkspace: () => ({
+    business: {
+      id: 'business-1',
+      currency: 'EUR',
+      language: 'en',
+    },
+  }),
+  formatMoney: () => '€1,234.50',
+}))
+
+vi.mock('@/lib/api/working-hours', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api/working-hours')>()
+  return {
+    ...actual,
+    getBusinessSettings: vi.fn(),
+    updateBusinessSettings: vi.fn(),
+  }
+})
+
+vi.mock('@/components/common/page-header', () => ({
+  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
+}))
+
+vi.mock('@/components/ui/button', () => ({
+  Button: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} />,
+}))
+
+vi.mock('@/components/ui/input', () => ({
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+}))
+
+vi.mock('@/components/ui/label', () => ({
+  Label: (props: React.LabelHTMLAttributes<HTMLLabelElement>) => <label {...props} />,
+}))
+
+vi.mock('@/components/ui/card', () => ({
+  Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>,
+  CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CardHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CardTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+}))
+
+vi.mock('@/components/ui/select', () => ({
+  Select: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectValue: () => null,
+}))
+
+describe('studio location preferences', () => {
+  beforeEach(() => {
+    vi.useRealTimers()
+    refresh.mockReset()
+    getCurrentPosition.mockReset()
+    watchPosition.mockReset()
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition, watchPosition },
+    })
+    vi.mocked(updateBusinessSettings).mockReset()
+    vi.mocked(getBusinessSettings).mockResolvedValue({
+      id: 'business-1',
+      default_appointment_duration: 30,
+      slot_interval_minutes: 15,
+      default_buffer_minutes: 0,
+      max_daily_appointments: null,
+      lunch_break_enabled: false,
+      lunch_start: null,
+      lunch_end: null,
+      currency: 'EUR',
+      language: 'en',
+      address: 'Via Vecchia 1',
+      city: 'Roma',
+      postal_code: '00100',
+      location_latitude: null,
+      location_longitude: null,
+      location_accuracy_meters: null,
+      location_source: null,
+      location_captured_at: null,
+    })
+  })
+
+  it('loads localized address fields and saves blanks as null', async () => {
+    const user = userEvent.setup()
+    vi.mocked(updateBusinessSettings).mockResolvedValue()
+
+    render(<PreferencesClient />)
+
+    const address = await screen.findByLabelText('prefs.address')
+    const city = screen.getByLabelText('prefs.city')
+    const postalCode = screen.getByLabelText('prefs.postalCode')
+
+    expect(address).toHaveValue('Via Vecchia 1')
+    expect(city).toHaveValue('Roma')
+    expect(postalCode).toHaveValue('00100')
+
+    await user.clear(address)
+    await user.type(address, '  Via Nuova 20  ')
+    await user.clear(city)
+    await user.type(city, '   ')
+    await user.clear(postalCode)
+    await user.click(screen.getByRole('button', { name: 'common.save' }))
+
+    await waitFor(() => {
+      expect(updateBusinessSettings).toHaveBeenCalledWith('business-1', {
+        currency: 'EUR',
+        language: 'en',
+        address: 'Via Nuova 20',
+        city: null,
+        postal_code: null,
+        location_latitude: null,
+        location_longitude: null,
+        location_accuracy_meters: null,
+        location_source: null,
+        location_captured_at: null,
+      })
+    })
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it('captures one approximate position, rounds it, and persists capture metadata', async () => {
+    const user = userEvent.setup()
+    vi.mocked(updateBusinessSettings).mockResolvedValue()
+    getCurrentPosition.mockImplementation((success: PositionCallback) => {
+      success({
+        coords: {
+          latitude: 41.9027833,
+          longitude: 12.4963655,
+          accuracy: 18.6,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null,
+          toJSON: () => ({}),
+        },
+        timestamp: Date.now(),
+        toJSON: () => ({}),
+      })
+    })
+
+    render(<PreferencesClient />)
+    await screen.findByLabelText('prefs.address')
+
+    await user.click(screen.getByRole('button', {
+      name: 'prefs.useApproximatePosition',
+    }))
+
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1)
+    expect(getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      expect.objectContaining({ enableHighAccuracy: false }),
+    )
+    expect(watchPosition).not.toHaveBeenCalled()
+    expect(screen.getByText('prefs.positionReady')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'common.save' }))
+
+    await waitFor(() => {
+      expect(updateBusinessSettings).toHaveBeenCalledWith(
+        'business-1',
+        expect.objectContaining({
+          location_latitude: 41.90278,
+          location_longitude: 12.49637,
+          location_accuracy_meters: 19,
+          location_source: 'device_geolocation',
+          location_captured_at: expect.stringMatching(
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+          ),
+        }),
+      )
+    })
+  })
+
+  it('shows a localized permission error without starting a watcher', async () => {
+    const user = userEvent.setup()
+    getCurrentPosition.mockImplementation((
+      _success: PositionCallback,
+      error: PositionErrorCallback,
+    ) => {
+      error({
+        code: 1,
+        message: 'Permission denied',
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      })
+    })
+
+    render(<PreferencesClient />)
+    await screen.findByLabelText('prefs.address')
+    await user.click(screen.getByRole('button', {
+      name: 'prefs.useApproximatePosition',
+    }))
+
+    expect(screen.getByText('prefs.positionDenied')).toBeInTheDocument()
+    expect(watchPosition).not.toHaveBeenCalled()
+  })
+
+  it('adds constrained business coordinate capture columns', () => {
+    expect(locationMigration).toMatch(
+      /alter table public\.business[\s\S]+location_latitude double precision[\s\S]+location_longitude double precision[\s\S]+location_accuracy_meters double precision[\s\S]+location_source text[\s\S]+location_captured_at timestamptz/i,
+    )
+    expect(locationMigration).toMatch(
+      /business_location_latitude_check[\s\S]+between -90 and 90[\s\S]+round\(location_latitude::numeric, 5\)/i,
+    )
+    expect(locationMigration).toMatch(
+      /business_location_longitude_check[\s\S]+between -180 and 180[\s\S]+round\(location_longitude::numeric, 5\)/i,
+    )
+    expect(locationMigration).toMatch(
+      /business_location_source_check[\s\S]+device_geolocation/i,
+    )
+    expect(locationMigration).toMatch(
+      /business_location_capture_check[\s\S]+location_accuracy_meters[\s\S]+location_captured_at/i,
+    )
+  })
+})

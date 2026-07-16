@@ -5,6 +5,9 @@ import { createContext, useContext, type ReactNode } from 'react'
 export interface WorkspaceBusiness {
   id: string
   business_name: string
+  address?: string | null
+  city?: string | null
+  postal_code?: string | null
   default_appointment_duration: number
   slot_interval_minutes: number
   currency: string

@@ -5,12 +5,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX, Wallet, ClipboardList, Plus, CalendarPlus, CalendarClock } from 'lucide-react'
+import { ArrowLeft, Star, Pencil, Archive, Trash2, CalendarCheck, XCircle, UserX, Wallet, ClipboardList, Plus, CalendarPlus, CalendarClock, MapPin } from 'lucide-react'
 import { getPatient, setPatientFlag, softDeletePatient } from '@/lib/api/patients'
 import { listUpcomingByPatient, fmtTime } from '@/lib/api/appointments'
 import { getPatientPlans, deleteTreatmentPlan, type PatientPlan } from '@/lib/api/treatment-plans'
 import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
 import { PatientFormDialog } from './patient-form-dialog'
 import { TreatmentPlanDialog } from './treatment-plan-dialog'
 import { TreatmentPlanEditDialog } from './treatment-plan-edit-dialog'
@@ -29,7 +30,7 @@ import {
 
 export function PatientProfile({ id }: { id: string }) {
   const { business } = useWorkspace()
-  const it = business?.language === 'it'
+  const { t } = useT()
   const qc = useQueryClient()
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
@@ -69,6 +70,10 @@ export function PatientProfile({ id }: { id: string }) {
     { label: 'Cancelled', value: (p as any).cancelled_appointments ?? 0, icon: XCircle },
     { label: 'Spent', value: formatMoney(p.total_spent, business?.currency), icon: Wallet },
   ]
+  const addressLine = [
+    p.address,
+    [p.postal_code, p.city].filter(Boolean).join(' '),
+  ].filter(Boolean).join(', ')
 
   return (
     <div>
@@ -88,6 +93,13 @@ export function PatientProfile({ id }: { id: string }) {
               {p.archived && <Badge variant="secondary">Archived</Badge>}
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">{[p.email, p.phone].filter(Boolean).join('  ·  ') || 'No contact info'}</p>
+            <div className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-foreground">{t('patient.location')}</p>
+                <p>{addressLine || t('patient.locationMissing')}</p>
+              </div>
+            </div>
           </div>
         </div>
         {/* Primary actions, stacked */}

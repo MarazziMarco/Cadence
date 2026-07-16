@@ -29,6 +29,11 @@ export async function getPatient(id: string): Promise<Patient | null> {
 
 function clean<T extends Record<string, any>>(v: T) {
   const { full_name, ...rest } = v as any
+  for (const key of ['address', 'city', 'postal_code'] as const) {
+    if (key in rest && typeof rest[key] === 'string') {
+      rest[key] = rest[key].trim() || null
+    }
+  }
   return rest
 }
 

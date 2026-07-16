@@ -30,6 +30,9 @@ export type BookingSource = (typeof BOOKING_SOURCE)[number]
 export const APPOINTMENT_LOCATION_MODES = ['inherit', 'studio', 'patient', 'custom'] as const
 export type AppointmentLocationMode = (typeof APPOINTMENT_LOCATION_MODES)[number]
 
+export const BUSINESS_LOCATION_SOURCES = ['device_geolocation'] as const
+export type BusinessLocationSource = (typeof BUSINESS_LOCATION_SOURCES)[number]
+
 export const OPTIMIZATION_STRATEGIES = ['balanced', 'smart_route'] as const
 export type OptimizationStrategy = (typeof OPTIMIZATION_STRATEGIES)[number]
 
@@ -100,6 +103,11 @@ export interface Business {
   address: string | null
   city: string | null
   postal_code: string | null
+  location_latitude: number | null
+  location_longitude: number | null
+  location_accuracy_meters: number | null
+  location_source: BusinessLocationSource | null
+  location_captured_at: string | null
   timezone: string
   language: string
   currency: string
