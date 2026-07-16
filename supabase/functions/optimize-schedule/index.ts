@@ -1,12 +1,16 @@
+/// <reference lib="deno.ns" />
+
 // Deno HTTP entrypoint for the optimize-schedule Edge Function.
 //
 // POST body: { business_id, date_from, date_to, settings_id?, mode?, scope_*? }
-// Orchestrates loadInput -> solveCore -> persistOutput and returns { run_id }.
+// Orchestrates loadInput -> prepareRoutingInput -> solveCore -> persistOutput
+// and returns { run_id }.
 //
 // Secrets come ONLY from the environment (never hardcoded, never logged):
-//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENROUTESERVICE_API_KEY
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.74.0";
+import { prepareRoutingInput } from "./routing/matrix.ts";
 import { solveCore } from "./solver/core.ts";
 import { loadInput } from "./solver/load.ts";
 import { persistOutput } from "./solver/persist.ts";
@@ -93,7 +97,8 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false },
       global: { headers: { Authorization: authorization } },
     });
-    const { data: { user }, error: userError } = await authClient.auth.getUser();
+    const { data: { user }, error: userError } = await authClient.auth
+      .getUser();
     if (userError || !user) return json({ error: "unauthorized" }, 401);
 
     const supabase = createClient(url, serviceKey, {
@@ -121,11 +126,42 @@ Deno.serve(async (req: Request) => {
       allow_cross_week,
       max_cross_week_days,
     });
-    const output = solveCore(input);
+    const metadata = input.context.settings.metadata ?? {};
+    const routedInput = await prepareRoutingInput(supabase, input, {
+      walkingThresholdMinutes: numberSetting(
+        metadata,
+        "WALK_MAX_MINUTES",
+        9,
+        1,
+        60,
+      ),
+      unknownStudioLegMinutes: numberSetting(
+        metadata,
+        "UNKNOWN_STUDIO_LEG_MINUTES",
+        20,
+        0,
+        180,
+      ),
+      plausibleWalkingMeters: numberSetting(
+        metadata,
+        "PLAUSIBLE_WALKING_METERS",
+        2_000,
+        100,
+        10_000,
+      ),
+      cacheTtlDays: numberSetting(
+        metadata,
+        "ROUTE_CACHE_TTL_DAYS",
+        30,
+        1,
+        365,
+      ),
+    });
+    const output = solveCore(routedInput);
     const run_id = await persistOutput(supabase, {
       businessId: business_id,
       output,
-      input,
+      input: routedInput,
       profileId: user.id,
       batchId: batch_id,
       scopeKind: scope_kind,
@@ -142,3 +178,18 @@ Deno.serve(async (req: Request) => {
     return json({ error: message }, 500);
   }
 });
+
+function numberSetting(
+  metadata: object,
+  key: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const value = Number(
+    (metadata as Record<string, unknown>)[key] ?? fallback,
+  );
+  return Number.isFinite(value)
+    ? Math.min(maximum, Math.max(minimum, value))
+    : fallback;
+}

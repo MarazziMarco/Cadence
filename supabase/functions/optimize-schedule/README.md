@@ -12,7 +12,11 @@ Spec / source of truth: `cadence_solver_data_contract.md`.
 
 ```
 index.ts                HTTP entrypoint (Deno). CORS + validation.
-                        loadInput -> solveCore -> persistOutput -> { run_id }
+                        loadInput -> prepareRoutingInput -> solveCore ->
+                        persistOutput -> { run_id }
+routing/provider.ts     Server-only OpenRouteService geocoding + batched matrices
+routing/cache.ts        Tenant-scoped directed route-cache adapter
+routing/matrix.ts       Geocoding dedupe, walk/drive selection, fallback matrix
 solver/core.ts          solveCore(input): SolverOutput — PURE, deterministic, zero I/O
 solver/types.ts         SolverInput / SolverOutput contracts (§2 / §7)
 solver/time.ts          minutes-from-midnight, capacity windows, effective availability
@@ -33,9 +37,30 @@ which Supabase injects automatically for deployed functions:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENROUTESERVICE_API_KEY`
 
-Copy the folder into your Supabase project (`supabase/functions/optimize-schedule/`)
-and import/deploy it from the dashboard. Nothing here hardcodes or logs secrets.
+`OPENROUTESERVICE_API_KEY` is read only inside the Edge Function. It is never
+sent to the browser, written to application logs, or included in errors. Cadence
+uses no paid routing fallback. When OpenRouteService is unavailable it uses a
+fresh tenant-scoped cache entry, the configured unknown-studio fallback, or an
+unverifiable external leg that the route-aware solver blocks.
+
+Route preparation batches OpenRouteService matrix requests so every request
+contains at most 3,500 directed origin×destination routes. Larger matrices use
+the ORS `sources` and `destinations` fields and merge the results before
+solving; small matrices remain a single request. Plausibly close locations are
+checked with `foot-walking`; walking is selected only when the actual route is
+at most `WALK_MAX_MINUTES` (default 9). Other legs use `driving-car`. Unknown
+studio-to-external legs use `UNKNOWN_STUDIO_LEG_MINUTES` (default 20). Cache
+entries expire after `ROUTE_CACHE_TTL_DAYS` (default 30).
+
+Routing and geocoding are provided by
+[OpenRouteService](https://openrouteservice.org/) using
+[OpenStreetMap contributors](https://www.openstreetmap.org/copyright) data.
+
+Copy the folder into your Supabase project
+(`supabase/functions/optimize-schedule/`) and import/deploy it from the
+dashboard. Nothing here hardcodes or logs secrets.
 
 ## HTTP API
 
@@ -43,14 +68,14 @@ and import/deploy it from the dashboard. Nothing here hardcodes or logs secrets.
 
 Request body:
 
-| field         | type                                             | required | notes                                  |
-|---------------|--------------------------------------------------|----------|----------------------------------------|
-| `business_id` | uuid                                             | yes      |                                        |
-| `date_from`   | `YYYY-MM-DD`                                      | yes      | inclusive                              |
-| `date_to`     | `YYYY-MM-DD`                                      | yes      | inclusive, `>= date_from`              |
-| `settings_id` | uuid                                             | no       | defaults to the active `algorithm_settings` row |
-| `mode`        | `conservative` \| `balanced` \| `aggressive`     | no       | defaults to the settings row's mode    |
-| `profile_id`  | uuid                                             | no       | stored on the run for attribution      |
+| field         | type                                         | required | notes                                           |
+| ------------- | -------------------------------------------- | -------- | ----------------------------------------------- |
+| `business_id` | uuid                                         | yes      |                                                 |
+| `date_from`   | `YYYY-MM-DD`                                 | yes      | inclusive                                       |
+| `date_to`     | `YYYY-MM-DD`                                 | yes      | inclusive, `>= date_from`                       |
+| `settings_id` | uuid                                         | no       | defaults to the active `algorithm_settings` row |
+| `mode`        | `conservative` \| `balanced` \| `aggressive` | no       | defaults to the settings row's mode             |
+| `profile_id`  | uuid                                         | no       | stored on the run for attribution               |
 
 Response `200`:
 
@@ -101,8 +126,9 @@ set and non-null `old_*`.
 
 ## What `solveCore` returns
 
-Same shape `persistOutput` writes. Real output for `fixtures/a_interstitial_gap.json`
-(one 125-minute gap between two appointments; the second is pulled earlier):
+Same shape `persistOutput` writes. Real output for
+`fixtures/a_interstitial_gap.json` (one 125-minute gap between two appointments;
+the second is pulled earlier):
 
 ```json
 {
@@ -153,12 +179,12 @@ deno fmt
 
 ### Fixtures
 
-| file                          | exercises                                                        |
-|-------------------------------|-----------------------------------------------------------------|
-| `a_interstitial_gap.json`     | one large interstitial gap -> compaction pulls an appt earlier  |
-| `b_patient_blackout.json`     | exception override (11:00–13:00) + full-day blackout blocks a WL fill |
-| `c_waiting_list_fill.json`    | waiting-list entry matches a residual gap -> a `create` change   |
-| `d_holiday_and_split.json`    | midweek holiday closes a day + `allow_split_days=false` blocks an afternoon WL fill, compaction still runs |
+| file                       | exercises                                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `a_interstitial_gap.json`  | one large interstitial gap -> compaction pulls an appt earlier                                             |
+| `b_patient_blackout.json`  | exception override (11:00–13:00) + full-day blackout blocks a WL fill                                      |
+| `c_waiting_list_fill.json` | waiting-list entry matches a residual gap -> a `create` change                                             |
+| `d_holiday_and_split.json` | midweek holiday closes a day + `allow_split_days=false` blocks an afternoon WL fill, compaction still runs |
 
 ## Guarantees
 
