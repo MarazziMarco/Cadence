@@ -43,6 +43,13 @@ function distance([first, second]: PointerPosition[]) {
   return Math.hypot(second.x - first.x, second.y - first.y)
 }
 
+export function pinchZoomIgnoresTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element
+    && target.closest('[data-pinch-zoom-ignore]') !== null
+  )
+}
+
 export function usePinchZoom({
   density,
   disabled = false,
@@ -117,7 +124,11 @@ export function usePinchZoom({
   const handlePointerDown = useCallback((
     event: ReactPointerEvent<HTMLElement>,
   ) => {
-    if (disabled || event.pointerType === 'mouse') return
+    if (
+      disabled
+      || event.pointerType === 'mouse'
+      || pinchZoomIgnoresTarget(event.target)
+    ) return
     const pointers = pointersRef.current
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
     if (pointers.size === 2) {

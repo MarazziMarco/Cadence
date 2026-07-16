@@ -6,8 +6,19 @@ import {
   gestureTouchAction,
   initialCalendarGestureState,
 } from '@/hooks/use-calendar-gesture'
+import { pinchZoomIgnoresTarget } from '@/hooks/use-pinch-zoom'
 
 describe('calendarGestureReducer', () => {
+  it('keeps header pinch targets out of vertical body zoom', () => {
+    const header = document.createElement('div')
+    header.setAttribute('data-pinch-zoom-ignore', '')
+    const child = document.createElement('span')
+    header.appendChild(child)
+
+    expect(pinchZoomIgnoresTarget(child)).toBe(true)
+    expect(pinchZoomIgnoresTarget(document.createElement('div'))).toBe(false)
+  })
+
   it('cancels a pending long press after movement exceeds 8px', () => {
     const pressing = calendarGestureReducer(initialCalendarGestureState, {
       type: 'pointer-down',
