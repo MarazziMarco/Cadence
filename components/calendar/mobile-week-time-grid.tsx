@@ -345,6 +345,9 @@ export function MobileWeekTimeGrid({
                           rangeEnd={END}
                           density={density}
                           snapIntervalMinutes={config.slotIntervalMinutes}
+                          dates={days}
+                          railWidth={RAIL}
+                          columnWidth={columnWidth}
                           scrollRef={weekViewportRef}
                           gestureDisabled={verticalPinch.isPinching}
                           onGestureActiveChange={setCalendarGestureActive}

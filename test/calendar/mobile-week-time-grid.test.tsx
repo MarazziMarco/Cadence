@@ -298,6 +298,212 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
     })
   })
 
+  it('moves a long-pressed appointment within Monday with versioned intent', () => {
+    const onMove = vi.fn()
+    renderWeek({
+      appointments: [{
+        ...appointment,
+        appointment_date: '2026-07-13',
+      }],
+      selectedDate: '2026-07-13',
+      onMove,
+    })
+    const card = screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })
+
+    pointer(card, 'pointerdown', {
+      pointerId: 51,
+      clientX: 70,
+      clientY: 200,
+    })
+    act(() => vi.advanceTimersByTime(450))
+    pointer(card, 'pointermove', {
+      pointerId: 51,
+      clientX: 80,
+      clientY: 230,
+    })
+    pointer(card, 'pointerup', {
+      pointerId: 51,
+      clientX: 80,
+      clientY: 230,
+    })
+
+    expect(onMove).toHaveBeenCalledWith({
+      appointmentId: 'appointment-1',
+      expectedVersion: 1,
+      date: '2026-07-13',
+      startMinute: 9 * 60 + 30,
+    })
+  })
+
+  it('moves a long-pressed Monday appointment across the Tuesday boundary', () => {
+    const onMove = vi.fn()
+    renderWeek({
+      appointments: [{
+        ...appointment,
+        appointment_date: '2026-07-13',
+      }],
+      selectedDate: '2026-07-13',
+      onMove,
+    })
+    const card = screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })
+
+    pointer(card, 'pointerdown', {
+      pointerId: 52,
+      clientX: 70,
+      clientY: 200,
+    })
+    act(() => vi.advanceTimersByTime(450))
+    pointer(card, 'pointermove', {
+      pointerId: 52,
+      clientX: 110,
+      clientY: 215,
+    })
+    pointer(card, 'pointerup', {
+      pointerId: 52,
+      clientX: 110,
+      clientY: 215,
+    })
+
+    expect(onMove).toHaveBeenCalledWith({
+      appointmentId: 'appointment-1',
+      expectedVersion: 1,
+      date: '2026-07-14',
+      startMinute: 9 * 60 + 15,
+    })
+  })
+
+  it('previews a cross-day drag in the target Tuesday column', () => {
+    renderWeek({
+      appointments: [{
+        ...appointment,
+        appointment_date: '2026-07-13',
+      }],
+      selectedDate: '2026-07-13',
+    })
+    const card = screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })
+    const viewport = screen.getByTestId('mobile-week-viewport')
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 390,
+      bottom: 600,
+      left: 0,
+      width: 390,
+      height: 600,
+      toJSON: () => ({}),
+    })
+
+    pointer(card, 'pointerdown', {
+      pointerId: 55,
+      clientX: 70,
+      clientY: 200,
+    })
+    act(() => vi.advanceTimersByTime(450))
+    pointer(card, 'pointermove', {
+      pointerId: 55,
+      clientX: 110,
+      clientY: 215,
+    })
+    act(() => vi.advanceTimersByTime(40))
+
+    expect(card.parentElement?.style.transform).toMatch(/^translateX\(/)
+
+    pointer(card, 'pointerup', {
+      pointerId: 55,
+      clientX: 110,
+      clientY: 215,
+    })
+  })
+
+  it('suppresses the synthetic click after a completed weekly drag', () => {
+    const onSelectAppointment = vi.fn()
+    renderWeek({
+      appointments: [{
+        ...appointment,
+        appointment_date: '2026-07-13',
+      }],
+      selectedDate: '2026-07-13',
+      onSelectAppointment,
+    })
+    const card = screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })
+
+    pointer(card, 'pointerdown', {
+      pointerId: 53,
+      clientX: 70,
+      clientY: 200,
+    })
+    act(() => vi.advanceTimersByTime(450))
+    pointer(card, 'pointermove', {
+      pointerId: 53,
+      clientX: 110,
+      clientY: 215,
+    })
+    pointer(card, 'pointerup', {
+      pointerId: 53,
+      clientX: 110,
+      clientY: 215,
+    })
+    fireEvent.click(card)
+
+    expect(onSelectAppointment).not.toHaveBeenCalled()
+  })
+
+  it('auto-scrolls both viewport axes near the bottom-right edge', () => {
+    renderWeek({
+      appointments: [{
+        ...appointment,
+        appointment_date: '2026-07-13',
+      }],
+      selectedDate: '2026-07-13',
+    })
+    const card = screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })
+    const viewport = screen.getByTestId('mobile-week-viewport')
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 390,
+      bottom: 600,
+      left: 0,
+      width: 390,
+      height: 600,
+      toJSON: () => ({}),
+    })
+
+    pointer(card, 'pointerdown', {
+      pointerId: 54,
+      clientX: 70,
+      clientY: 200,
+    })
+    act(() => vi.advanceTimersByTime(450))
+    pointer(card, 'pointermove', {
+      pointerId: 54,
+      clientX: 380,
+      clientY: 590,
+    })
+    act(() => vi.advanceTimersByTime(40))
+
+    expect(viewport.scrollLeft).toBeGreaterThan(0)
+    expect(viewport.scrollTop).toBeGreaterThan(0)
+
+    pointer(card, 'pointerup', {
+      pointerId: 54,
+      clientX: 380,
+      clientY: 590,
+    })
+  })
+
   it('initially scrolls the two-axis viewport near business-local current time', () => {
     const scrollTo = vi.fn()
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', {

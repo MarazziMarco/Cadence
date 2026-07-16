@@ -11,13 +11,13 @@ import { minutesToY } from '@/lib/calendar/geometry'
 import type { MoveIntent, ResizeIntent } from '@/lib/calendar/types'
 import { useT } from '@/lib/i18n/use-t'
 import { cn } from '@/lib/utils'
-import { useCalendarGesture } from '@/hooks/use-calendar-gesture'
+import { useWeekAppointmentGesture } from '@/hooks/use-week-appointment-gesture'
 
 export interface WeekAppointmentGestureBindings {
-  state: ReturnType<typeof useCalendarGesture>['state']
-  touchAction: ReturnType<typeof useCalendarGesture>['touchAction']
-  liveValue: ReturnType<typeof useCalendarGesture>['liveValue']
-  cardHandlers: ReturnType<typeof useCalendarGesture>['cardHandlers']
+  state: ReturnType<typeof useWeekAppointmentGesture>['state']
+  touchAction: ReturnType<typeof useWeekAppointmentGesture>['touchAction']
+  liveValue: ReturnType<typeof useWeekAppointmentGesture>['liveValue']
+  cardHandlers: ReturnType<typeof useWeekAppointmentGesture>['cardHandlers']
   consumeClickSuppression(): boolean
 }
 
@@ -28,6 +28,7 @@ export interface MobileWeekAppointmentCardProps {
   leftPercent: number
   widthPercent: number
   showService: boolean
+  horizontalOffset?: number
   onSelect(id: string): void
   gesture: WeekAppointmentGestureBindings
 }
@@ -40,6 +41,9 @@ interface MobileWeekAppointmentWithGestureProps extends Omit<
   rangeEnd: number
   density: number
   snapIntervalMinutes: number
+  dates: string[]
+  railWidth: number
+  columnWidth: number
   scrollRef: RefObject<HTMLElement | null>
   gestureDisabled?: boolean
   onGestureActiveChange?(active: boolean): void
@@ -68,6 +72,7 @@ function MobileWeekAppointmentCardComponent({
   leftPercent,
   widthPercent,
   showService,
+  horizontalOffset = 0,
   onSelect,
   gesture,
 }: MobileWeekAppointmentCardProps) {
@@ -110,6 +115,9 @@ function MobileWeekAppointmentCardComponent({
         height,
         left: `${leftPercent}%`,
         width: `${widthPercent}%`,
+        transform: horizontalOffset === 0
+          ? undefined
+          : `translateX(${horizontalOffset}px) scale(1.02)`,
         touchAction: gesture.touchAction,
       }}
     >
@@ -166,6 +174,9 @@ export function MobileWeekAppointmentWithGesture({
   rangeEnd,
   density,
   snapIntervalMinutes,
+  dates,
+  railWidth,
+  columnWidth,
   scrollRef,
   gestureDisabled,
   onGestureActiveChange,
@@ -173,7 +184,7 @@ export function MobileWeekAppointmentWithGesture({
   onMove,
   onResize,
 }: MobileWeekAppointmentWithGestureProps) {
-  const gesture = useCalendarGesture({
+  const gesture = useWeekAppointmentGesture({
     appointmentId: appointment.id,
     expectedVersion: appointment.version,
     date: appointment.appointment_date,
@@ -183,30 +194,36 @@ export function MobileWeekAppointmentWithGesture({
     rangeEnd,
     density,
     snapIntervalMinutes,
+    dates,
+    railWidth,
+    columnWidth,
     scrollRef,
     disabled: gestureDisabled,
     onActiveChange: onGestureActiveChange,
     onMove,
-    onResize,
   })
   const previewTop = gesture.preview
     ? minutesToY(gesture.preview.startMinute, rangeStart, density)
     : top
-  const previewHeight = gesture.preview
-    ? Math.max(
-        44,
-        minutesToY(gesture.preview.durationMinutes, 0, density),
-      )
-    : height
+  const sourceDateIndex = dates.indexOf(appointment.appointment_date)
+  const previewDateIndex = gesture.preview
+    ? dates.indexOf(gesture.preview.date)
+    : sourceDateIndex
+  const horizontalOffset = (
+    sourceDateIndex >= 0 && previewDateIndex >= 0
+      ? (previewDateIndex - sourceDateIndex) * columnWidth
+      : 0
+  )
 
   return (
     <MobileWeekAppointmentCard
       appointment={appointment}
       top={previewTop}
-      height={previewHeight}
+      height={height}
       leftPercent={leftPercent}
       widthPercent={widthPercent}
       showService={showService}
+      horizontalOffset={horizontalOffset}
       onSelect={onSelect}
       gesture={gesture}
     />
