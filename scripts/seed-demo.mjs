@@ -13,13 +13,14 @@
 // The exported resetDemo() is reused by the /api/demo/reset route.
 
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
 // --- env -------------------------------------------------------------------
 function loadEnv() {
   const env = {}
   try {
-    const txt = readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
+    const txt = readFileSync(resolve(process.cwd(), '.env.local'), 'utf8')
     for (const line of txt.split('\n')) {
       const m = line.match(/^([A-Z0-9_]+)=(.*)$/)
       if (m) env[m[1]] = m[2].trim()
