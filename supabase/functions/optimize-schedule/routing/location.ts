@@ -62,6 +62,13 @@ function validCoordinates(
 }
 
 function candidateHash(candidate: LocationCandidate): string | null {
+  const coordinates = validCoordinates(candidate);
+  if (coordinates) {
+    return hashNormalizedAddress(
+      `${coordinates.latitude.toFixed(5)},${coordinates.longitude.toFixed(5)}`,
+    );
+  }
+
   const supplied = candidate.addressHash?.trim();
   if (supplied) {
     return /^[0-9a-f]{16}$/i.test(supplied)
@@ -69,12 +76,7 @@ function candidateHash(candidate: LocationCandidate): string | null {
       : hashNormalizedAddress(supplied);
   }
   if (candidate.address) return hashNormalizedAddress(candidate.address);
-
-  const coordinates = validCoordinates(candidate);
-  if (!coordinates) return null;
-  return hashNormalizedAddress(
-    `${coordinates.latitude.toFixed(5)},${coordinates.longitude.toFixed(5)}`,
-  );
+  return null;
 }
 
 function hasLocationIdentity(candidate: LocationCandidate | null): boolean {

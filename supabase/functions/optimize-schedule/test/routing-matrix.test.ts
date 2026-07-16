@@ -17,6 +17,7 @@ import {
   prepareTravelMatrix,
   type RoutingLocation,
 } from "../routing/matrix.ts";
+import { hashNormalizedAddress } from "../routing/location.ts";
 import {
   createOpenRouteServiceProvider,
   type ProviderLocation,
@@ -617,7 +618,7 @@ Deno.test("routing input resolves tenant business, appointment, and patient loca
   assertEquals(routed.studio_location_key, "studio:unknown");
   assertEquals(
     routed.appointments[0].location_key,
-    "custom:dddddddddddddddd",
+    `custom:${hashNormalizedAddress("41.90300,12.49700")}`,
   );
   assertEquals(queries.map((query) => query.table), [
     "business",
@@ -709,6 +710,95 @@ Deno.test("routing input uses approximate studio coordinates without a postal ad
       routed.appointments[0].location_key
     ].verifiable,
     true,
+  );
+});
+
+Deno.test("changed explicit studio coordinates bypass stale address-keyed cache", async () => {
+  const staleStudioHash = hashNormalizedAddress(
+    "Via Studio 1, Roma, 00100",
+  )!;
+  const appointmentHash = "bbbbbbbbbbbbbbbb";
+  const cacheReads: string[] = [];
+  const providerLocations: ProviderLocation[][] = [];
+  const staleRows = [
+    cached(staleStudioHash, appointmentHash, "foot-walking", 60),
+    cached(appointmentHash, staleStudioHash, "foot-walking", 60),
+  ];
+  const cache = memoryCache(staleRows, () => {
+    cacheReads.push("miss");
+    return null;
+  });
+  const supabase = locationSupabase({
+    business: {
+      id: "business-1",
+      address: "Via Studio 1",
+      city: "Roma",
+      postal_code: "00100",
+      location_latitude: 41.91278,
+      location_longitude: 12.50637,
+    },
+    appointments: [{
+      id: "appointment-1",
+      patient_id: "patient-1",
+      location_mode: "custom",
+      location_address: "Via Cliente 2",
+      location_city: "Roma",
+      location_postal_code: "00100",
+      location_latitude: 41.91,
+      location_longitude: 12.5,
+      location_address_hash: "bbbbbbbbbbbbbbbb",
+    }],
+    patients: [{
+      id: "patient-1",
+      address: null,
+      city: null,
+      postal_code: null,
+    }],
+  }, []);
+
+  const routed = await prepareRoutingInput(
+    supabase,
+    {
+      context: { business_id: "business-1" },
+      appointments: [{ id: "appointment-1" }],
+    },
+    defaults(),
+    {
+      cache,
+      provider: {
+        geocode() {
+          throw new Error("explicit coordinates must not be geocoded");
+        },
+        matrix(_profile, locations) {
+          providerLocations.push(locations);
+          return Promise.resolve(Object.fromEntries(locations.map((origin) => [
+            origin.key,
+            Object.fromEntries(locations.map((destination) => [
+              destination.key,
+              {
+                seconds: origin.key === destination.key ? 0 : 420,
+                meters: origin.key === destination.key ? 0 : 1_400,
+              },
+            ])),
+          ])));
+        },
+      },
+    },
+  );
+
+  assertNotEquals(routed.studio_location_key, `studio:${staleStudioHash}`);
+  assert(cacheReads.length > 0, "expected stale address cache to miss");
+  assert(providerLocations.length > 0, "expected provider routing after miss");
+  const routedStudio = providerLocations.flat().find((location) =>
+    location.key === routed.studio_location_key
+  );
+  assertEquals(routedStudio?.latitude, 41.91278);
+  assertEquals(routedStudio?.longitude, 12.50637);
+  assertEquals(
+    routed.travel_matrix[routed.studio_location_key][
+      routed.appointments[0].location_key
+    ].seconds,
+    420,
   );
 });
 

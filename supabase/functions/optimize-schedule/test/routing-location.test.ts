@@ -150,6 +150,39 @@ Deno.test("address hashing normalizes equivalent text and does not expose it in 
   assertNotEquals(location.key.includes("roma"), true);
 });
 
+Deno.test("explicit coordinates take cache identity precedence over address text and hash", () => {
+  const staleAddressHash = hashNormalizedAddress("Via Studio 1, Roma")!;
+  const first = resolveAppointmentLocation(input({
+    mode: "studio",
+    studio: {
+      addressHash: staleAddressHash,
+      address: "Via Studio 1, Roma",
+      latitude: 41.90278,
+      longitude: 12.49637,
+    },
+  }));
+  const changed = resolveAppointmentLocation(input({
+    mode: "studio",
+    studio: {
+      addressHash: staleAddressHash,
+      address: "Via Studio 1, Roma",
+      latitude: 41.91278,
+      longitude: 12.50637,
+    },
+  }));
+
+  assertNotEquals(first.addressHash, staleAddressHash);
+  assertNotEquals(first.key, changed.key);
+  assertEquals(
+    first.addressHash,
+    hashNormalizedAddress("41.90278,12.49637"),
+  );
+  assertEquals(
+    changed.addressHash,
+    hashNormalizedAddress("41.91278,12.50637"),
+  );
+});
+
 Deno.test("raw-looking persisted address hashes are converted to opaque tokens", () => {
   const rawLookingHash = "Via Segreta 99, Roma";
   const location = resolveAppointmentLocation(input({
@@ -157,8 +190,8 @@ Deno.test("raw-looking persisted address hashes are converted to opaque tokens",
     custom: {
       addressHash: rawLookingHash,
       address: null,
-      latitude: 41.9,
-      longitude: 12.5,
+      latitude: null,
+      longitude: null,
     },
   }));
 
@@ -175,8 +208,8 @@ Deno.test("already opaque persisted hashes remain stable across resolution", () 
     patient: {
       addressHash: opaqueHash,
       address: null,
-      latitude: 41.9,
-      longitude: 12.5,
+      latitude: null,
+      longitude: null,
     },
   }));
 
