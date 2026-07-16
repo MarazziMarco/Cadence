@@ -408,7 +408,14 @@ export function MobileDayCalendar({
                     height={layout.height}
                     leftPercent={layout.leftPercent}
                     widthPercent={layout.widthPercent}
+                    rangeStart={schedule.rangeStart}
+                    rangeEnd={schedule.rangeEnd}
+                    density={density}
+                    snapIntervalMinutes={config.slotIntervalMinutes}
+                    scrollRef={timelineScrollRef}
                     onSelect={onSelectAppointment}
+                    onMove={onMove}
+                    onResize={onResize}
                   />
                 ))}
 

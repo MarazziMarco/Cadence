@@ -1,6 +1,10 @@
 import type { CalendarAppointment } from '@/lib/api/appointments'
 import { isCalendarConstraint } from '@/lib/calendar/constraints'
-import type { CalendarConstraint } from '@/lib/calendar/types'
+import type {
+  CalendarConstraint,
+  MoveIntent,
+  ResizeIntent,
+} from '@/lib/calendar/types'
 import { createClient } from '@/lib/supabase/client'
 import { WEEKDAYS, type WorkingHour } from '@/lib/types/db'
 
@@ -96,6 +100,23 @@ export interface CalendarMutationRequest {
   values: Record<string, unknown>
 }
 
+export type CalendarAppointmentChange =
+  | { kind: 'move'; request: MoveIntent }
+  | { kind: 'resize'; request: ResizeIntent }
+
+function appointmentTimeToMinute(time: string) {
+  const [hour, minute] = time.split(':').map(Number)
+  return hour * 60 + minute
+}
+
+function appointmentMinuteToTime(minute: number) {
+  const hour = Math.floor(minute / 60)
+  const value = minute % 60
+  return `${String(hour).padStart(2, '0')}:${
+    String(value).padStart(2, '0')
+  }:00`
+}
+
 export type CalendarMutationResponse =
   | { ok: true; appointment: CalendarAppointment | null; warnings: CalendarConstraint[] }
   | {
@@ -169,6 +190,95 @@ export async function mutateCalendar(
     ? (body as { error: string }).error
     : 'Calendar mutation failed'
   throw new Error(message)
+}
+
+export function optimisticCalendarAppointment(
+  appointment: CalendarAppointment,
+  change: CalendarAppointmentChange,
+): CalendarAppointment {
+  if (change.kind === 'move') {
+    return {
+      ...appointment,
+      appointment_date: change.request.date,
+      start_time: appointmentMinuteToTime(change.request.startMinute),
+      end_time: appointmentMinuteToTime(
+        change.request.startMinute + appointment.duration_minutes,
+      ),
+    }
+  }
+
+  const startMinute = appointmentTimeToMinute(appointment.start_time)
+  return {
+    ...appointment,
+    duration_minutes: change.request.durationMinutes,
+    end_time: appointmentMinuteToTime(
+      startMinute + change.request.durationMinutes,
+    ),
+  }
+}
+
+export function calendarChangeRequest(
+  businessId: string,
+  appointment: CalendarAppointment,
+  change: CalendarAppointmentChange,
+): CalendarMutationRequest {
+  const optimistic = optimisticCalendarAppointment(appointment, change)
+  return change.kind === 'move'
+    ? {
+        businessId,
+        operation: 'move',
+        appointmentId: appointment.id,
+        expectedVersion: change.request.expectedVersion,
+        idempotencyKey: crypto.randomUUID(),
+        values: {
+          appointment_date: optimistic.appointment_date,
+          start_time: optimistic.start_time,
+          end_time: optimistic.end_time,
+        },
+      }
+    : {
+        businessId,
+        operation: 'resize',
+        appointmentId: appointment.id,
+        expectedVersion: change.request.expectedVersion,
+        idempotencyKey: crypto.randomUUID(),
+        values: {
+          duration_minutes: optimistic.duration_minutes,
+          end_time: optimistic.end_time,
+        },
+      }
+}
+
+export function undoCalendarChangeRequest(
+  businessId: string,
+  before: CalendarAppointment,
+  current: CalendarAppointment,
+  kind: CalendarAppointmentChange['kind'],
+): CalendarMutationRequest {
+  return kind === 'move'
+    ? {
+        businessId,
+        operation: 'move',
+        appointmentId: current.id,
+        expectedVersion: current.version,
+        idempotencyKey: crypto.randomUUID(),
+        values: {
+          appointment_date: before.appointment_date,
+          start_time: before.start_time,
+          end_time: before.end_time,
+        },
+      }
+    : {
+        businessId,
+        operation: 'resize',
+        appointmentId: current.id,
+        expectedVersion: current.version,
+        idempotencyKey: crypto.randomUUID(),
+        values: {
+          duration_minutes: before.duration_minutes,
+          end_time: before.end_time,
+        },
+      }
 }
 
 export async function mutateCalendarOrThrow(

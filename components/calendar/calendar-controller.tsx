@@ -5,6 +5,7 @@ import {
   useMutation,
   useQueries,
   useQueryClient,
+  type QueryKey,
 } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Info, Plus, Wand2 } from 'lucide-react'
 import {
@@ -21,15 +22,17 @@ import {
   deleteAppointment,
   listAppointments,
   minToTime,
-  timeToMin,
-  updateAppointment,
   type CalendarAppointment,
 } from '@/lib/api/appointments'
 import {
+  calendarChangeRequest,
   confirmCalendarMutationInteractively,
   getCalendarConfig,
   isCalendarWarningConfirmation,
   mutateCalendarOrThrow,
+  optimisticCalendarAppointment,
+  undoCalendarChangeRequest,
+  type CalendarAppointmentChange,
   type CalendarConfig,
 } from '@/lib/api/calendar'
 import {
@@ -78,11 +81,13 @@ import { MoveAppointmentSheet } from './move-appointment-sheet'
 import { OptimizeDialog } from './optimize-dialog'
 
 type CalendarSection = 'calendar' | 'waiting'
-type CalendarChange =
-  | { kind: 'move'; request: MoveIntent }
-  | { kind: 'resize'; request: ResizeIntent }
 type QuickAction = 'delete' | 'toggle-lock'
 const EMPTY_APPOINTMENTS: CalendarAppointment[] = []
+
+type CalendarRangeSnapshot = [
+  queryKey: QueryKey,
+  data: CalendarAppointment[] | undefined,
+]
 
 type SupportedCalendarView = Extract<CalendarView, 'day' | 'week'>
 
@@ -143,6 +148,39 @@ function visibleSupportedRange(
     selectedAppointmentId: null,
     createAt: null,
   })
+}
+
+function isCalendarRangeKey(queryKey: QueryKey, businessId: string) {
+  return (
+    queryKey[0] === 'calendar'
+    && queryKey[1] === businessId
+    && queryKey[2] === 'range'
+    && typeof queryKey[3] === 'string'
+    && typeof queryKey[4] === 'string'
+  )
+}
+
+function appointmentForRange(
+  appointments: CalendarAppointment[] | undefined,
+  queryKey: QueryKey,
+  appointment: CalendarAppointment,
+) {
+  if (!appointments) return appointments
+  const withoutAppointment = appointments.filter(
+    (candidate) => candidate.id !== appointment.id,
+  )
+  const from = String(queryKey[3])
+  const to = String(queryKey[4])
+  if (
+    appointment.appointment_date >= from
+    && appointment.appointment_date <= to
+  ) {
+    withoutAppointment.push(appointment)
+  }
+  return withoutAppointment.sort((left, right) => (
+    left.appointment_date.localeCompare(right.appointment_date)
+    || left.start_time.localeCompare(right.start_time)
+  ))
 }
 
 export function useDesktopMediaQuery() {
@@ -321,48 +359,128 @@ export function CalendarController() {
     queryClient,
   ])
 
-  const finishCalendarChange = useCallback(() => {
-    invalidateCalendarAppointments(queryClient, businessId)
-  }, [businessId, queryClient])
+  const calendarRangeFilter = useMemo(() => ({
+    queryKey: ['calendar', businessId, 'range'] as const,
+  }), [businessId])
+
+  const writeCalendarAppointment = useCallback((
+    appointment: CalendarAppointment,
+  ) => {
+    const ranges = queryClient.getQueriesData<CalendarAppointment[]>({
+      queryKey: calendarRangeFilter.queryKey,
+    })
+    for (const [queryKey, data] of ranges) {
+      if (!isCalendarRangeKey(queryKey, businessId)) continue
+      queryClient.setQueryData<CalendarAppointment[]>(
+        queryKey,
+        appointmentForRange(data, queryKey, appointment),
+      )
+    }
+  }, [businessId, calendarRangeFilter.queryKey, queryClient])
+
+  const invalidateCalendarRanges = useCallback(() => {
+    void queryClient.invalidateQueries(calendarRangeFilter)
+    void queryClient.invalidateQueries({ queryKey: ['appointments'] })
+  }, [calendarRangeFilter, queryClient])
+
+  const undoCalendarChange = useCallback(async (
+    before: CalendarAppointment,
+    current: CalendarAppointment,
+    kind: CalendarAppointmentChange['kind'],
+  ) => {
+    try {
+      const request = undoCalendarChangeRequest(
+        businessId,
+        before,
+        current,
+        kind,
+      )
+      let result
+      try {
+        result = await mutateCalendarOrThrow(request)
+      } catch (error) {
+        if (!isCalendarWarningConfirmation(error)) throw error
+        result = await confirmCalendarMutationInteractively(error)
+      }
+      if (result?.appointment) {
+        writeCalendarAppointment(result.appointment)
+        toast.success('Calendar change undone')
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Could not undo change',
+      )
+    } finally {
+      invalidateCalendarRanges()
+    }
+  }, [
+    businessId,
+    invalidateCalendarRanges,
+    writeCalendarAppointment,
+  ])
+
+  const showCalendarChangeSuccess = useCallback((
+    before: CalendarAppointment,
+    current: CalendarAppointment,
+    change: CalendarAppointmentChange,
+  ) => {
+    toast.success(
+      change.kind === 'move' ? 'Appointment moved' : 'Appointment resized',
+      {
+        duration: 8_000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void undoCalendarChange(before, current, change.kind)
+          },
+        },
+      },
+    )
+  }, [undoCalendarChange])
 
   const calendarChange = useMutation({
-    mutationFn: async (change: CalendarChange) => {
+    mutationFn: async (change: CalendarAppointmentChange) => {
       const appointment = appointmentById.get(change.request.appointmentId)
       if (!appointment) {
         throw new Error('Appointment is no longer available')
       }
-
-      if (change.kind === 'move') {
-        const { request } = change
-        return updateAppointment(
-          businessId,
-          appointment.id,
-          request.expectedVersion,
-          {
-            appointment_date: request.date,
-            start_time: minToTime(request.startMinute),
-            end_time: minToTime(
-              request.startMinute + appointment.duration_minutes,
-            ),
-            duration_minutes: appointment.duration_minutes,
-          },
-        )
-      }
-
-      const { request } = change
-      const startMinute = timeToMin(appointment.start_time)
-      return updateAppointment(
-        businessId,
-        appointment.id,
-        request.expectedVersion,
-        {
-          end_time: minToTime(startMinute + request.durationMinutes),
-          duration_minutes: request.durationMinutes,
-        },
+      return mutateCalendarOrThrow(
+        calendarChangeRequest(businessId, appointment, change),
       )
     },
-    onSuccess: finishCalendarChange,
-    onError: async (error: unknown) => {
+    onMutate: async (change) => {
+      const before = appointmentById.get(change.request.appointmentId)
+      if (!before) {
+        throw new Error('Appointment is no longer available')
+      }
+      await queryClient.cancelQueries(calendarRangeFilter)
+      const snapshots = (
+        queryClient
+          .getQueriesData<CalendarAppointment[]>(calendarRangeFilter)
+          .filter(([queryKey]) => isCalendarRangeKey(queryKey, businessId))
+      ) as CalendarRangeSnapshot[]
+      const optimistic = optimisticCalendarAppointment(before, change)
+      for (const [queryKey, data] of snapshots) {
+        queryClient.setQueryData<CalendarAppointment[]>(
+          queryKey,
+          appointmentForRange(data, queryKey, optimistic),
+        )
+      }
+      return { before, change, snapshots }
+    },
+    onSuccess: (result, change, context) => {
+      if (!result.appointment || !context) return
+      writeCalendarAppointment(result.appointment)
+      showCalendarChangeSuccess(
+        context.before,
+        result.appointment,
+        change,
+      )
+    },
+    onError: async (error: unknown, change, context) => {
+      for (const [queryKey, data] of context?.snapshots ?? []) {
+        queryClient.setQueryData(queryKey, data)
+      }
       if (!isCalendarWarningConfirmation(error)) {
         toast.error(
           error instanceof Error ? error.message : 'Calendar update failed',
@@ -372,7 +490,13 @@ export function CalendarController() {
 
       try {
         const confirmed = await confirmCalendarMutationInteractively(error)
-        if (confirmed) finishCalendarChange()
+        if (!confirmed?.appointment || !context) return
+        writeCalendarAppointment(confirmed.appointment)
+        showCalendarChangeSuccess(
+          context.before,
+          confirmed.appointment,
+          change,
+        )
       } catch (retryError) {
         toast.error(
           retryError instanceof Error
@@ -381,6 +505,7 @@ export function CalendarController() {
         )
       }
     },
+    onSettled: invalidateCalendarRanges,
   })
   const mutateCalendarChange = calendarChange.mutate
 
