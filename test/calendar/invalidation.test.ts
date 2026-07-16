@@ -24,7 +24,7 @@ describe('invalidateCalendarAppointments', () => {
   })
 
   it.each([
-    'components/calendar/appointment-dialog.tsx',
+    'components/calendar/appointment-form.tsx',
     'components/calendar/optimize-preview.tsx',
     'components/ai/voice-appointment.tsx',
     'components/history/history-client.tsx',
@@ -40,7 +40,7 @@ describe('invalidateCalendarAppointments', () => {
 
   it('keeps raw legacy appointment invalidation inside the shared helper', () => {
     const componentSources = [
-      'components/calendar/appointment-dialog.tsx',
+      'components/calendar/appointment-form.tsx',
       'components/calendar/calendar-controller.tsx',
       'components/calendar/optimize-preview.tsx',
       'components/ai/voice-appointment.tsx',

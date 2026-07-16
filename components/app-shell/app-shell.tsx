@@ -102,18 +102,30 @@ export function AppShell({ user, business, children }: { user: { email: string; 
       </div>
 
       {/* Quick-create modals — opened from the bottom-nav "+" */}
-      {businessId && (
-        <>
-          <AppointmentDialog key={`appt-${quickKey}`} businessId={businessId} open={quick === 'appointment'} onOpenChange={(v) => { if (!v) setQuick(null) }} />
-          <PatientFormDialog key={`client-${quickKey}`} businessId={businessId} open={quick === 'client'} onOpenChange={(v) => { if (!v) setQuick(null) }} />
-          <Dialog open={quick === 'voice'} onOpenChange={(v) => { if (!v) setQuick(null) }}>
+      {businessId && quick === 'appointment' ? (
+        <AppointmentDialog
+          key={`appt-${quickKey}`}
+          businessId={businessId}
+          open
+          onOpenChange={(open) => { if (!open) setQuick(null) }}
+        />
+      ) : null}
+      {businessId && quick === 'client' ? (
+        <PatientFormDialog
+          key={`client-${quickKey}`}
+          businessId={businessId}
+          open
+          onOpenChange={(open) => { if (!open) setQuick(null) }}
+        />
+      ) : null}
+      {businessId && quick === 'voice' ? (
+        <Dialog open onOpenChange={(open) => { if (!open) setQuick(null) }}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader><DialogTitle>{translate(locale, 'create.byVoice')}</DialogTitle></DialogHeader>
               <VoiceAppointment />
             </DialogContent>
-          </Dialog>
-        </>
-      )}
+        </Dialog>
+      ) : null}
     </WorkspaceProvider>
   )
 }

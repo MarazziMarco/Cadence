@@ -41,6 +41,8 @@ export interface AppointmentFormProps {
   defaultDate?: string
   defaultStart?: string
   defaultPatientId?: string
+  defaultServiceId?: string
+  defaultDurationMinutes?: number
   onSaved(appointmentId: string): void
   onCancel(): void
 }
@@ -68,6 +70,8 @@ export function AppointmentForm({
   defaultDate,
   defaultStart,
   defaultPatientId,
+  defaultServiceId,
+  defaultDurationMinutes,
   onSaved,
   onCancel,
 }: AppointmentFormProps) {
@@ -111,7 +115,7 @@ export function AppointmentForm({
   useEffect(() => {
     setPatientId(appointment?.patient_id ?? defaultPatientId ?? '')
     setNewClient('')
-    setServiceId(appointment?.service_id ?? 'none')
+    setServiceId(appointment?.service_id ?? defaultServiceId ?? 'none')
     setDate(appointment?.appointment_date ?? defaultDate ?? localDate())
     setStart(
       appointment?.start_time.slice(0, 5)
@@ -120,6 +124,7 @@ export function AppointmentForm({
     )
     setDuration(String(
       appointment?.duration_minutes
+      ?? defaultDurationMinutes
       ?? business?.default_appointment_duration
       ?? 30,
     ))
@@ -133,7 +138,9 @@ export function AppointmentForm({
     appointment,
     business?.default_appointment_duration,
     defaultDate,
+    defaultDurationMinutes,
     defaultPatientId,
+    defaultServiceId,
     defaultStart,
   ])
 

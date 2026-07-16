@@ -97,12 +97,16 @@ vi.mock('@/components/calendar/appointment-dialog', () => ({
     defaultDate?: string
     defaultStart?: string
     defaultPatientId?: string
+    defaultServiceId?: string
+    defaultDurationMinutes?: number
   }) => props.open ? (
     <div data-testid="appointment-dialog">
       {props.appt?.id ?? [
         props.defaultDate,
         props.defaultStart,
         props.defaultPatientId,
+        props.defaultServiceId,
+        props.defaultDurationMinutes,
       ].filter(Boolean).join('-')}
     </div>
   ) : null,
@@ -399,7 +403,7 @@ describe('CalendarController', () => {
     )
 
     expect(screen.getByTestId('appointment-dialog')).toHaveTextContent(
-      '2026-07-17-09:00-patient-1',
+      '2026-07-17-09:00-patient-1-service-1-30',
     )
     expect(screen.queryByTestId('appointment-quick-sheet')).not.toBeInTheDocument()
   })

@@ -16,6 +16,8 @@ export interface AppointmentDialogProps {
   defaultDate?: string
   defaultStart?: string
   defaultPatientId?: string
+  defaultServiceId?: string
+  defaultDurationMinutes?: number
   open: boolean
   onOpenChange(open: boolean): void
 }
@@ -26,6 +28,8 @@ export function AppointmentDialog({
   defaultDate,
   defaultStart,
   defaultPatientId,
+  defaultServiceId,
+  defaultDurationMinutes,
   open,
   onOpenChange,
 }: AppointmentDialogProps) {
@@ -45,6 +49,8 @@ export function AppointmentDialog({
           defaultDate={defaultDate}
           defaultStart={defaultStart}
           defaultPatientId={defaultPatientId}
+          defaultServiceId={defaultServiceId}
+          defaultDurationMinutes={defaultDurationMinutes}
           onSaved={() => onOpenChange(false)}
           onCancel={() => onOpenChange(false)}
         />

@@ -832,6 +832,12 @@ export function CalendarController() {
               defaultPatientId={
                 duplicating ? selectedAppointment?.patient_id : undefined
               }
+              defaultServiceId={
+                duplicating ? selectedAppointment?.service_id ?? undefined : undefined
+              }
+              defaultDurationMinutes={
+                duplicating ? selectedAppointment?.duration_minutes : undefined
+              }
               open={appointmentDialogOpen}
               onOpenChange={closeAppointmentDialog}
             />

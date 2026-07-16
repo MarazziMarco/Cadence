@@ -11,6 +11,14 @@ vi.mock('@/components/calendar/appointment-dialog', () => ({
   AppointmentDialog: () => null,
 }))
 
+vi.mock('@/components/calendar/appointment-quick-sheet', () => ({
+  AppointmentQuickSheet: () => null,
+}))
+
+vi.mock('@/components/calendar/move-appointment-sheet', () => ({
+  MoveAppointmentSheet: () => null,
+}))
+
 vi.mock('@/components/calendar/optimize-dialog', () => ({
   OptimizeDialog: () => null,
 }))
