@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { listAppointments } from '@/lib/api/appointments'
 import { getCalendarConfig } from '@/lib/api/calendar'
@@ -67,9 +67,8 @@ describe('calendar appointment range reads', () => {
 
 describe('calendar configuration reads', () => {
   beforeEach(() => vi.clearAllMocks())
-  afterEach(() => vi.useRealTimers())
 
-  it('maps business settings, sorts weekdays, and bounds overlapping holidays', async () => {
+  it('maps business settings and loads all scheduler holidays in stable order', async () => {
     const businessSingle = vi.fn().mockResolvedValue({
       data: {
         timezone: 'Europe/Rome',
@@ -92,14 +91,17 @@ describe('calendar configuration reads', () => {
     const workingEq = vi.fn(() => ({ order: workingOrder }))
     const workingSelect = vi.fn(() => ({ eq: workingEq }))
 
-    const holidayGte = vi.fn().mockResolvedValue({
+    const holidayEndOrder = vi.fn().mockResolvedValue({
       data: [
+        { start_date: '2026-12-25', end_date: '2026-12-26', is_closed: true },
         { start_date: '2026-08-15', end_date: '2026-08-15', is_closed: true },
+        { start_date: '2026-08-15', end_date: '2026-08-16', is_closed: false },
       ],
       error: null,
     })
-    const holidayLte = vi.fn(() => ({ gte: holidayGte }))
-    const holidayIs = vi.fn(() => ({ lte: holidayLte }))
+    const holidayStartOrder = vi.fn(() => ({ order: holidayEndOrder }))
+    const holidayAffectsScheduler = vi.fn(() => ({ order: holidayStartOrder }))
+    const holidayIs = vi.fn(() => ({ eq: holidayAffectsScheduler }))
     const holidayEq = vi.fn(() => ({ is: holidayIs }))
     const holidaySelect = vi.fn(() => ({ eq: holidayEq }))
 
@@ -112,13 +114,12 @@ describe('calendar configuration reads', () => {
     const { createClient } = await import('@/lib/supabase/client')
     vi.mocked(createClient).mockReturnValue({ from } as never)
 
-    const config = await getCalendarConfig(BUSINESS_ID, {
-      from: '2026-07-01',
-      to: '2026-09-30',
-    })
+    const config = await getCalendarConfig(BUSINESS_ID)
 
-    expect(holidayLte).toHaveBeenCalledWith('start_date', '2026-09-30')
-    expect(holidayGte).toHaveBeenCalledWith('end_date', '2026-07-01')
+    expect(holidayIs).toHaveBeenCalledWith('deleted_at', null)
+    expect(holidayAffectsScheduler).toHaveBeenCalledWith('affects_scheduler', true)
+    expect(holidayStartOrder).toHaveBeenCalledWith('start_date', { ascending: true })
+    expect(holidayEndOrder).toHaveBeenCalledWith('end_date', { ascending: true })
     expect(config).toEqual({
       timezone: 'Europe/Rome',
       slotIntervalMinutes: 15,
@@ -130,47 +131,9 @@ describe('calendar configuration reads', () => {
       ],
       holidays: [
         { start_date: '2026-08-15', end_date: '2026-08-15', is_closed: true },
+        { start_date: '2026-08-15', end_date: '2026-08-16', is_closed: false },
+        { start_date: '2026-12-25', end_date: '2026-12-26', is_closed: true },
       ],
     })
-  })
-
-  it('keeps the no-range API bounded around the current calendar year', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-07-16T12:00:00Z'))
-
-    const businessSingle = vi.fn().mockResolvedValue({
-      data: {
-        timezone: 'Europe/Rome',
-        slot_interval_minutes: 30,
-        default_appointment_duration: 60,
-        max_daily_appointments: null,
-      },
-      error: null,
-    })
-    const workingOrder = vi.fn().mockResolvedValue({ data: [], error: null })
-    const holidayGte = vi.fn().mockResolvedValue({ data: [], error: null })
-    const holidayLte = vi.fn(() => ({ gte: holidayGte }))
-    const from = vi.fn((table: string) => {
-      if (table === 'business') {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ single: businessSingle })) })) }
-      }
-      if (table === 'working_hours') {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ order: workingOrder })) })) }
-      }
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            is: vi.fn(() => ({ lte: holidayLte })),
-          })),
-        })),
-      }
-    })
-    const { createClient } = await import('@/lib/supabase/client')
-    vi.mocked(createClient).mockReturnValue({ from } as never)
-
-    await getCalendarConfig(BUSINESS_ID)
-
-    expect(holidayLte).toHaveBeenCalledWith('start_date', '2027-12-31')
-    expect(holidayGte).toHaveBeenCalledWith('end_date', '2025-01-01')
   })
 })

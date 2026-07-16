@@ -1,6 +1,6 @@
 import type { CalendarAppointment } from '@/lib/api/appointments'
 import { isCalendarConstraint } from '@/lib/calendar/constraints'
-import type { CalendarConstraint, DateRange } from '@/lib/calendar/types'
+import type { CalendarConstraint } from '@/lib/calendar/types'
 import { createClient } from '@/lib/supabase/client'
 import { WEEKDAYS, type WorkingHour } from '@/lib/types/db'
 
@@ -13,24 +13,12 @@ export interface CalendarConfig {
   holidays: Array<{ start_date: string; end_date: string; is_closed: boolean }>
 }
 
-function defaultHolidayRange(now = new Date()): DateRange {
-  const year = now.getUTCFullYear()
-  return {
-    from: `${year - 1}-01-01`,
-    to: `${year + 1}-12-31`,
-  }
-}
-
 /**
- * Loads the client calendar configuration. Callers displaying a known calendar
- * range should pass it so holiday reads stay exact. The optional fallback is
- * bounded to the surrounding three UTC calendar years, which safely covers
- * timezone year boundaries without loading unbounded holiday history.
+ * Loads the complete client calendar configuration. Holidays are intentionally
+ * range-independent so the stable config query key remains correct while users
+ * navigate to any month.
  */
-export async function getCalendarConfig(
-  businessId: string,
-  holidayRange: DateRange = defaultHolidayRange(),
-): Promise<CalendarConfig> {
+export async function getCalendarConfig(businessId: string): Promise<CalendarConfig> {
   const supabase = createClient()
 
   const [businessResult, workingHoursResult, holidaysResult] = await Promise.all([
@@ -49,8 +37,9 @@ export async function getCalendarConfig(
       .select('start_date, end_date, is_closed')
       .eq('business_id', businessId)
       .is('deleted_at', null)
-      .lte('start_date', holidayRange.to)
-      .gte('end_date', holidayRange.from),
+      .eq('affects_scheduler', true)
+      .order('start_date', { ascending: true })
+      .order('end_date', { ascending: true }),
   ])
 
   if (businessResult.error) throw businessResult.error
@@ -64,11 +53,15 @@ export async function getCalendarConfig(
       (weekdayOrder.get(left.weekday as WorkingHour['weekday']) ?? WEEKDAYS.length)
       - (weekdayOrder.get(right.weekday as WorkingHour['weekday']) ?? WEEKDAYS.length)
     )) as WorkingHour[]
-  const holidays = (holidaysResult.data ?? []) as Array<{
-    start_date: string
-    end_date: string
-    is_closed: boolean
-  }>
+  const holidays = [...(holidaysResult.data ?? [])]
+    .sort((left, right) => (
+      left.start_date.localeCompare(right.start_date)
+      || left.end_date.localeCompare(right.end_date)
+    )) as Array<{
+      start_date: string
+      end_date: string
+      is_closed: boolean
+    }>
 
   return {
     timezone: businessResult.data.timezone,
