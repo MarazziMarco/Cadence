@@ -75,6 +75,30 @@ describe('calendarReducer', () => {
     )
   })
 
+  it.each([0, 1439])(
+    'accepts create-at startMinute boundary %s',
+    (startMinute) => {
+      expect(
+        calendarReducer(state, {
+          type: 'create-at',
+          value: { date: '2026-07-18', startMinute },
+        }).createAt,
+      ).toEqual({ date: '2026-07-18', startMinute })
+    },
+  )
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5, 1440])(
+    'rejects invalid create-at startMinute %s',
+    (startMinute) => {
+      expect(() =>
+        calendarReducer(state, {
+          type: 'create-at',
+          value: { date: '2026-07-18', startMinute },
+        }),
+      ).toThrow(RangeError)
+    },
+  )
+
   it.each([
     { type: 'select-date', date: '2026-02-30' },
     {

@@ -41,6 +41,14 @@ function requireDateOnly(value: string): string {
   return addBusinessDays(value, 0)
 }
 
+function requireMinuteOfDay(value: number): number {
+  if (!Number.isInteger(value) || value < 0 || value >= 24 * 60) {
+    throw new RangeError(`Invalid minute of day: ${String(value)}`)
+  }
+
+  return value
+}
+
 function sameCreateAt(
   first: CalendarState['createAt'],
   second: CalendarState['createAt'],
@@ -90,7 +98,7 @@ export function calendarReducer(
           ? null
           : {
               date: requireDateOnly(action.value.date),
-              startMinute: action.value.startMinute,
+              startMinute: requireMinuteOfDay(action.value.startMinute),
             }
 
       return sameCreateAt(value, state.createAt)
