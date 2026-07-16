@@ -94,6 +94,7 @@ declare
   v_location_address text;
   v_location_city text;
   v_location_postal_code text;
+  v_location_changed boolean := false;
 begin
   if p_operation is null
      or p_operation not in ('create', 'update', 'move', 'resize', 'delete', 'lock', 'unlock') then
@@ -104,6 +105,18 @@ begin
   end if;
   if p_values is null or jsonb_typeof(p_values) <> 'object' then
     raise exception 'calendar mutation values must be an object' using errcode = '22023';
+  end if;
+
+  -- This check must precede every access to the outer idempotency record.
+  -- Otherwise a caller who guesses another tenant's canonical request could
+  -- replay the stored response through this SECURITY DEFINER wrapper.
+  perform 1
+    from public.business
+   where id = p_business_id
+     and profile_id = auth.uid()
+     and deleted_at is null;
+  if not found then
+    raise exception 'forbidden' using errcode = '42501';
   end if;
 
   if p_operation not in ('create', 'update')
@@ -126,6 +139,13 @@ begin
     v_values := jsonb_set(v_values, '{location_mode}', to_jsonb(v_location_mode), true);
   end if;
   if p_values ? 'location_address' then
+    if jsonb_typeof(p_values -> 'location_address') not in ('string', 'null')
+       or (
+         jsonb_typeof(p_values -> 'location_address') = 'string'
+         and char_length(btrim(p_values ->> 'location_address')) > 500
+       ) then
+      raise exception 'invalid appointment location address' using errcode = '22023';
+    end if;
     v_location_address := nullif(btrim(p_values ->> 'location_address'), '');
     v_values := jsonb_set(
       v_values,
@@ -135,6 +155,13 @@ begin
     );
   end if;
   if p_values ? 'location_city' then
+    if jsonb_typeof(p_values -> 'location_city') not in ('string', 'null')
+       or (
+         jsonb_typeof(p_values -> 'location_city') = 'string'
+         and char_length(btrim(p_values ->> 'location_city')) > 500
+       ) then
+      raise exception 'invalid appointment location city' using errcode = '22023';
+    end if;
     v_location_city := nullif(btrim(p_values ->> 'location_city'), '');
     v_values := jsonb_set(
       v_values,
@@ -144,6 +171,13 @@ begin
     );
   end if;
   if p_values ? 'location_postal_code' then
+    if jsonb_typeof(p_values -> 'location_postal_code') not in ('string', 'null')
+       or (
+         jsonb_typeof(p_values -> 'location_postal_code') = 'string'
+         and char_length(btrim(p_values ->> 'location_postal_code')) > 500
+       ) then
+      raise exception 'invalid appointment location postal code' using errcode = '22023';
+    end if;
     v_location_postal_code := nullif(btrim(p_values ->> 'location_postal_code'), '');
     v_values := jsonb_set(
       v_values,
@@ -260,6 +294,11 @@ begin
         then nullif(btrim(v_values ->> 'location_postal_code'), '')
       else v_appointment.location_postal_code
     end;
+    v_location_changed :=
+      v_location_mode is distinct from v_appointment.location_mode
+      or v_location_address is distinct from v_appointment.location_address
+      or v_location_city is distinct from v_appointment.location_city
+      or v_location_postal_code is distinct from v_appointment.location_postal_code;
 
     if v_location_mode = 'custom' and v_location_address is null then
       raise exception 'CUSTOM_LOCATION_REQUIRED'
@@ -284,7 +323,22 @@ begin
        set location_mode = v_location_mode,
            location_address = v_location_address,
            location_city = v_location_city,
-           location_postal_code = v_location_postal_code
+           location_postal_code = v_location_postal_code,
+           location_latitude = case
+             when v_location_changed then null else location_latitude
+           end,
+           location_longitude = case
+             when v_location_changed then null else location_longitude
+           end,
+           location_geocoding_status = case
+             when v_location_changed then null else location_geocoding_status
+           end,
+           location_address_hash = case
+             when v_location_changed then null else location_address_hash
+           end,
+           location_geocoded_at = case
+             when v_location_changed then null else location_geocoded_at
+           end
      where id = v_appointment.id
      returning * into v_appointment;
 

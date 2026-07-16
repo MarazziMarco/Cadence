@@ -133,6 +133,56 @@ describe('calendar mutation SQL hardening contract', () => {
 })
 
 describe('client location and availability schema contract', () => {
+  it('authorizes the tenant before touching outer idempotency state', () => {
+    const locationMigration = readFileSync(locationMigrationPath, 'utf8')
+    const authorization = locationMigration.indexOf('from public.business')
+    const idempotencyInsert = locationMigration.indexOf(
+      'insert into public.calendar_mutation_requests',
+    )
+
+    expect(authorization).toBeGreaterThan(-1)
+    expect(idempotencyInsert).toBeGreaterThan(authorization)
+    expect(locationMigration).toMatch(
+      /from public\.business[\s\S]+where id = p_business_id[\s\S]+profile_id = auth\.uid\(\)[\s\S]+deleted_at is null[\s\S]+raise exception 'forbidden'/i,
+    )
+  })
+
+  it('invalidates geocoding when effective appointment location input changes', () => {
+    const locationMigration = readFileSync(locationMigrationPath, 'utf8')
+
+    expect(locationMigration).toMatch(
+      /v_location_changed :=[\s\S]+v_location_mode is distinct from v_appointment\.location_mode[\s\S]+v_location_address is distinct from v_appointment\.location_address[\s\S]+v_location_city is distinct from v_appointment\.location_city[\s\S]+v_location_postal_code is distinct from v_appointment\.location_postal_code/i,
+    )
+    expect(locationMigration).toMatch(
+      /set location_mode = v_location_mode[\s\S]+location_address = v_location_address[\s\S]+location_city = v_location_city[\s\S]+location_postal_code = v_location_postal_code[\s\S]+location_latitude = case[\s\S]+when v_location_changed then null else location_latitude[\s\S]+location_longitude = case[\s\S]+when v_location_changed then null else location_longitude[\s\S]+location_geocoding_status = case[\s\S]+when v_location_changed then null else location_geocoding_status[\s\S]+location_address_hash = case[\s\S]+when v_location_changed then null else location_address_hash[\s\S]+location_geocoded_at = case[\s\S]+when v_location_changed then null else location_geocoded_at/i,
+    )
+  })
+
+  it('matches Zod location text types and limits at the SQL boundary', () => {
+    const locationMigration = readFileSync(locationMigrationPath, 'utf8')
+
+    for (const field of [
+      'location_address',
+      'location_city',
+      'location_postal_code',
+    ]) {
+      expect(locationMigration).toMatch(
+        new RegExp(
+          `p_values \\? '${field}'[\\s\\S]+jsonb_typeof\\(p_values -> '${field}'\\) not in \\('string', 'null'\\)[\\s\\S]+char_length\\(btrim\\(p_values ->> '${field}'\\)\\) > 500`,
+          'i',
+        ),
+      )
+    }
+  })
+
+  it('keeps delegated requests transactional and rewrites the audit snapshot', () => {
+    const locationMigration = readFileSync(locationMigrationPath, 'utf8')
+
+    expect(locationMigration).toMatch(
+      /v_response := public\.calendar_validate_mutation_without_locations\([\s\S]+delete from public\.calendar_mutation_requests[\s\S]+if coalesce\(\(v_response ->> 'ok'\)::boolean, false\)[\s\S]+update public\.audit_log[\s\S]+set new_data = to_jsonb\(v_appointment\)[\s\S]+update public\.calendar_mutation_requests[\s\S]+set response = v_response/i,
+    )
+  })
+
   it('adds appointment location mode, custom location data, and geocoding metadata', () => {
     const locationMigration = readFileSync(locationMigrationPath, 'utf8')
 
