@@ -8,6 +8,10 @@ const migration = readFileSync(
   join(process.cwd(), 'supabase/migrations/202607160002_calendar_mutations_hardening.sql'),
   'utf8',
 )
+const locationMigrationPath = join(
+  process.cwd(),
+  'supabase/migrations/202607160004_client_locations_and_availability.sql',
+)
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {
@@ -124,6 +128,42 @@ describe('calendar mutation SQL hardening contract', () => {
     )
     expect(migration).toMatch(
       /grant execute on function public\.calendar_validate_mutation[\s\S]+to authenticated/i,
+    )
+  })
+})
+
+describe('client location and availability schema contract', () => {
+  it('adds appointment location mode, custom location data, and geocoding metadata', () => {
+    const locationMigration = readFileSync(locationMigrationPath, 'utf8')
+
+    expect(locationMigration).toMatch(
+      /add column if not exists location_mode text not null default 'inherit'/i,
+    )
+    expect(locationMigration).toMatch(/location_mode in\s*\(\s*'inherit',\s*'studio',\s*'patient',\s*'custom'\s*\)/i)
+    expect(locationMigration).toMatch(/add column if not exists location_address text/i)
+    expect(locationMigration).toMatch(/add column if not exists location_city text/i)
+    expect(locationMigration).toMatch(/add column if not exists location_postal_code text/i)
+    expect(locationMigration).toMatch(/add column if not exists location_latitude double precision/i)
+    expect(locationMigration).toMatch(/add column if not exists location_longitude double precision/i)
+    expect(locationMigration).toMatch(/add column if not exists location_geocoding_status text/i)
+    expect(locationMigration).toMatch(/add column if not exists location_address_hash text/i)
+    expect(locationMigration).toMatch(/add column if not exists location_geocoded_at timestamptz/i)
+    expect(locationMigration).toMatch(
+      /location_mode <> 'custom'[\s\S]+nullif\(btrim\(location_address\), ''\) is not null/i,
+    )
+  })
+
+  it('stores explicit recurring unavailability and keeps location indexes tenant scoped', () => {
+    const locationMigration = readFileSync(locationMigrationPath, 'utf8')
+
+    expect(locationMigration).toMatch(
+      /alter table public\.patient_availability[\s\S]+add column if not exists is_available boolean not null default true/i,
+    )
+    expect(locationMigration).toMatch(
+      /create index if not exists appointments_location_geocoding_idx[\s\S]+on public\.appointments \(business_id, location_geocoding_status\)/i,
+    )
+    expect(locationMigration).toMatch(
+      /create index if not exists appointments_location_hash_idx[\s\S]+on public\.appointments \(business_id, location_address_hash\)/i,
     )
   })
 })

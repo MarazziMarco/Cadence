@@ -27,6 +27,9 @@ export type AppointmentStatus = (typeof APPOINTMENT_STATUS)[number]
 export const BOOKING_SOURCE = ['manual', 'ai', 'future_customer_portal', 'calendar_import'] as const
 export type BookingSource = (typeof BOOKING_SOURCE)[number]
 
+export const APPOINTMENT_LOCATION_MODES = ['inherit', 'studio', 'patient', 'custom'] as const
+export type AppointmentLocationMode = (typeof APPOINTMENT_LOCATION_MODES)[number]
+
 export const AVAILABILITY_PRIORITY = ['low', 'normal', 'high'] as const
 export type AvailabilityPriority = (typeof AVAILABILITY_PRIORITY)[number]
 
@@ -85,6 +88,9 @@ export interface Business {
   profile_id: string
   business_name: string
   business_type: BusinessType
+  address: string | null
+  city: string | null
+  postal_code: string | null
   timezone: string
   language: string
   currency: string
@@ -138,6 +144,9 @@ export interface Patient {
   full_name: string | null
   email: string | null
   phone: string | null
+  address: string | null
+  city: string | null
+  postal_code: string | null
   notes: string | null
   color: string | null
   tags: string[] | null
@@ -169,6 +178,28 @@ export interface Appointment {
   locked: boolean
   generated_by_ai: boolean
   color: string | null
+  location_mode: AppointmentLocationMode
+  location_address: string | null
+  location_city: string | null
+  location_postal_code: string | null
+  location_latitude: number | null
+  location_longitude: number | null
+  location_geocoding_status: string | null
+  location_address_hash: string | null
+  location_geocoded_at: string | null
   manual_override: boolean
   version: number
+}
+
+export interface PatientAvailability {
+  id: string
+  patient_id: string
+  weekday: Weekday
+  start_time: string
+  end_time: string
+  priority: AvailabilityPriority
+  is_available: boolean
+  valid_from: string | null
+  valid_until: string | null
+  recurring: boolean
 }
