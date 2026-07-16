@@ -120,6 +120,8 @@ interface UseCalendarGestureOptions {
   density: number
   snapIntervalMinutes: number
   scrollRef: RefObject<HTMLElement | null>
+  disabled?: boolean
+  onActiveChange?(active: boolean): void
   onMove(request: MoveIntent): void
   onResize(request: ResizeIntent): void
 }
@@ -150,6 +152,8 @@ export function useCalendarGesture({
   density,
   snapIntervalMinutes,
   scrollRef,
+  disabled = false,
+  onActiveChange,
   onMove,
   onResize,
 }: UseCalendarGestureOptions) {
@@ -277,7 +281,7 @@ export function useCalendarGesture({
     mode: CalendarGestureMode,
     event: ReactPointerEvent<HTMLElement>,
   ) => {
-    if (!event.isPrimary || event.button !== 0) return
+    if (disabled || !event.isPrimary || event.button !== 0) return
     if (mode === 'resize') event.stopPropagation()
     clearActivationTimer()
     stopAutoScroll()
@@ -301,11 +305,14 @@ export function useCalendarGesture({
       })
       if (next.phase !== 'active') return
       suppressClickRef.current = true
+      onActiveChange?.(true)
       navigator.vibrate?.(15)
       schedulePreview(lastClientYRef.current)
     }, CALENDAR_LONG_PRESS_MS)
   }, [
     clearActivationTimer,
+    disabled,
+    onActiveChange,
     schedulePreview,
     scrollRef,
     stopAutoScroll,
@@ -378,6 +385,7 @@ export function useCalendarGesture({
     }
 
     transition({ type: cancelled ? 'pointer-cancel' : 'pointer-up' })
+    if (current.phase === 'active') onActiveChange?.(false)
     setPreview(null)
   }, [
     appointmentId,
@@ -388,6 +396,7 @@ export function useCalendarGesture({
     expectedVersion,
     onMove,
     onResize,
+    onActiveChange,
     preview,
     startMinute,
     stopAutoScroll,
@@ -401,6 +410,22 @@ export function useCalendarGesture({
       window.cancelAnimationFrame(previewFrameRef.current)
     }
   }, [clearActivationTimer, stopAutoScroll])
+
+  useEffect(() => {
+    if (!disabled) return
+    const wasActive = stateRef.current.phase === 'active'
+    clearActivationTimer()
+    stopAutoScroll()
+    transition({ type: 'pointer-cancel' })
+    setPreview(null)
+    if (wasActive) onActiveChange?.(false)
+  }, [
+    clearActivationTimer,
+    disabled,
+    onActiveChange,
+    stopAutoScroll,
+    transition,
+  ])
 
   return {
     state,

@@ -622,6 +622,10 @@ export function CalendarController() {
     mutateCalendarChange({ kind: 'resize', request })
   }, [mutateCalendarChange])
 
+  const handleDensityChange = useCallback((density: number) => {
+    dispatch({ type: 'set-density', density })
+  }, [])
+
   const handleOpenOptimizer = useCallback(() => {
     const activeElement = document.activeElement
     lastOptimizeButtonRef.current = activeElement instanceof HTMLButtonElement
@@ -920,6 +924,7 @@ export function CalendarController() {
                 }
                 onOptimize={businessId ? handleOpenOptimizer : undefined}
                 optimizeButtonRef={mobileOptimizeButtonRef}
+                onDensityChange={handleDensityChange}
               />
             </>
           )}

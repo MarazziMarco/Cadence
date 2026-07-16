@@ -24,6 +24,8 @@ interface AppointmentCardProps {
   density: number
   snapIntervalMinutes: number
   scrollRef: RefObject<HTMLElement | null>
+  gestureDisabled?: boolean
+  onGestureActiveChange?(active: boolean): void
   onSelect(id: string): void
   onMove(request: MoveIntent): void
   onResize(request: ResizeIntent): void
@@ -54,6 +56,8 @@ function AppointmentCardComponent({
   density,
   snapIntervalMinutes,
   scrollRef,
+  gestureDisabled,
+  onGestureActiveChange,
   onSelect,
   onMove,
   onResize,
@@ -96,6 +100,8 @@ function AppointmentCardComponent({
     density,
     snapIntervalMinutes,
     scrollRef,
+    disabled: gestureDisabled,
+    onActiveChange: onGestureActiveChange,
     onMove,
     onResize,
   })

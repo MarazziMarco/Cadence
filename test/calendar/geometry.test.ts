@@ -2,17 +2,23 @@ import { describe, expect, it } from 'vitest'
 
 import {
   clampDensity,
+  DEFAULT_DENSITY,
   minutesToY,
   snapMinutes,
   yToMinutes,
   zoomAroundFocalPoint,
 } from '@/lib/calendar/geometry'
+import { pinchZoomStep } from '@/hooks/use-pinch-zoom'
 
 describe('calendar geometry', () => {
   it('clamps density to 36-120 px per hour', () => {
     expect(clampDensity(20)).toBe(36)
     expect(clampDensity(60)).toBe(60)
     expect(clampDensity(150)).toBe(120)
+  })
+
+  it('resets density to exactly 60 px per hour', () => {
+    expect(DEFAULT_DENSITY).toBe(60)
   })
 
   it('snaps to the configured interval using nearest-interval rounding', () => {
@@ -37,6 +43,27 @@ describe('calendar geometry', () => {
         focalY: 200,
       }),
     ).toEqual({ density: 90, scrollTop: 550 })
+  })
+
+  it('keeps focal time within half a minute after repeated pinch steps', () => {
+    let density = 60
+    let scrollTop = 240
+    const focalY = 180
+    const focalMinute = ((scrollTop + focalY) / density) * 60
+
+    for (const scale of [1.12, 0.94, 1.18, 0.91, 1.08]) {
+      const next = pinchZoomStep({
+        density,
+        scale,
+        scrollTop,
+        focalY,
+      })
+      density = next.density
+      scrollTop = next.scrollTop
+    }
+
+    const finalMinute = ((scrollTop + focalY) / density) * 60
+    expect(Math.abs(finalMinute - focalMinute)).toBeLessThanOrEqual(0.5)
   })
 
   it('uses the clamped density when calculating zoom scroll position', () => {

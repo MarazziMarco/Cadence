@@ -28,8 +28,10 @@ import type { CalendarRendererProps } from '@/components/calendar/desktop-week-c
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
 import { WEEKDAYS } from '@/lib/types/db'
+import { usePinchZoom } from '@/hooks/use-pinch-zoom'
 import { AppointmentCard } from './appointment-card'
 import { CalendarToolbar } from './calendar-toolbar'
+import { CalendarZoomControls } from './calendar-zoom-controls'
 import { MobileDateStrip } from './mobile-date-strip'
 
 const FALLBACK_START_MINUTE = 8 * 60
@@ -40,6 +42,7 @@ interface MobileDayCalendarProps extends CalendarRendererProps {
   isLoading?: boolean
   onOptimize?(): void
   optimizeButtonRef?: Ref<HTMLButtonElement>
+  onDensityChange(density: number): void
 }
 
 interface OpenWindow {
@@ -171,14 +174,24 @@ export function MobileDayCalendar({
   onSelectDate,
   onSelectAppointment,
   onCreateAt,
+  onMove,
+  onResize,
   onOptimize,
   optimizeButtonRef,
+  onDensityChange,
 }: MobileDayCalendarProps) {
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
   const lastScrolledDateRef = useRef<string | null>(null)
   const [now, setNow] = useState<Date | null>(null)
+  const [calendarGestureActive, setCalendarGestureActive] = useState(false)
+  const pinch = usePinchZoom({
+    density,
+    disabled: calendarGestureActive,
+    scrollRef: timelineScrollRef,
+    onDensityChange,
+  })
   const selectedAppointments = useMemo(
     () => appointments
       .filter((appointment) => appointment.appointment_date === selectedDate)
@@ -343,100 +356,109 @@ export function MobileDayCalendar({
             </p>
           ) : null}
 
-          <div
-            ref={timelineScrollRef}
-            className="max-h-[calc(100dvh-16rem)] overflow-x-hidden overflow-y-auto overscroll-y-contain"
-          >
+          <div className="relative">
             <div
-              className="grid grid-cols-[3.25rem_minmax(0,1fr)]"
-              style={{ height: totalHeight }}
+              ref={timelineScrollRef}
+              className="max-h-[calc(100dvh-16rem)] touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain"
+              {...pinch.handlers}
             >
-              <div className="relative border-r border-border bg-muted/20">
-                {hourMarks.map((minute) => (
-                  <span
-                    key={minute}
-                    className="absolute right-2 -translate-y-1/2 text-[10px] font-medium tabular-nums text-muted-foreground"
-                    style={{
-                      top: minutesToY(minute, schedule.rangeStart, density),
-                    }}
-                  >
-                    {hourLabel(minute)}
-                  </span>
-                ))}
-              </div>
-
               <div
-                data-testid="mobile-day-timeline"
-                className="relative touch-manipulation overflow-hidden"
+                className="grid grid-cols-[3.25rem_minmax(0,1fr)]"
                 style={{ height: totalHeight }}
-                aria-disabled={schedule.isClosed || undefined}
-                onClick={schedule.isClosed ? undefined : handleTimelineClick}
               >
-                {hourMarks.map((minute) => (
-                  <div
-                    key={minute}
-                    aria-hidden="true"
-                    className="absolute inset-x-0 border-t border-border/60"
-                    style={{
-                      top: minutesToY(minute, schedule.rangeStart, density),
-                    }}
-                  />
-                ))}
+                <div className="relative border-r border-border bg-muted/20">
+                  {hourMarks.map((minute) => (
+                    <span
+                      key={minute}
+                      className="absolute right-2 -translate-y-1/2 text-[10px] font-medium tabular-nums text-muted-foreground"
+                      style={{
+                        top: minutesToY(minute, schedule.rangeStart, density),
+                      }}
+                    >
+                      {hourLabel(minute)}
+                    </span>
+                  ))}
+                </div>
 
-                {schedule.closedWindows.map((window) => (
-                  <div
-                    key={`${window.start}-${window.end}`}
-                    data-testid={`closed-window-${window.start}-${window.end}`}
-                    aria-hidden="true"
-                    className="absolute inset-x-0 bg-muted/45 [background-image:repeating-linear-gradient(135deg,transparent,transparent_8px,hsl(var(--border)/.35)_8px,hsl(var(--border)/.35)_9px)]"
-                    style={{
-                      top: minutesToY(
-                        window.start,
-                        schedule.rangeStart,
-                        density,
-                      ),
-                      height: minutesToY(window.end, window.start, density),
-                    }}
-                  />
-                ))}
+                <div
+                  data-testid="mobile-day-timeline"
+                  className="relative touch-manipulation overflow-hidden"
+                  style={{ height: totalHeight }}
+                  aria-disabled={schedule.isClosed || undefined}
+                  onClick={schedule.isClosed ? undefined : handleTimelineClick}
+                >
+                  {hourMarks.map((minute) => (
+                    <div
+                      key={minute}
+                      aria-hidden="true"
+                      className="absolute inset-x-0 border-t border-border/60"
+                      style={{
+                        top: minutesToY(minute, schedule.rangeStart, density),
+                      }}
+                    />
+                  ))}
 
-                {appointmentLayouts.map((layout) => (
-                  <AppointmentCard
-                    key={layout.id}
-                    appointment={layout.appointment}
-                    top={layout.top}
-                    height={layout.height}
-                    leftPercent={layout.leftPercent}
-                    widthPercent={layout.widthPercent}
-                    rangeStart={schedule.rangeStart}
-                    rangeEnd={schedule.rangeEnd}
-                    density={density}
-                    snapIntervalMinutes={config.slotIntervalMinutes}
-                    scrollRef={timelineScrollRef}
-                    onSelect={onSelectAppointment}
-                    onMove={onMove}
-                    onResize={onResize}
-                  />
-                ))}
+                  {schedule.closedWindows.map((window) => (
+                    <div
+                      key={`${window.start}-${window.end}`}
+                      data-testid={`closed-window-${window.start}-${window.end}`}
+                      aria-hidden="true"
+                      className="absolute inset-x-0 bg-muted/45 [background-image:repeating-linear-gradient(135deg,transparent,transparent_8px,hsl(var(--border)/.35)_8px,hsl(var(--border)/.35)_9px)]"
+                      style={{
+                        top: minutesToY(
+                          window.start,
+                          schedule.rangeStart,
+                          density,
+                        ),
+                        height: minutesToY(window.end, window.start, density),
+                      }}
+                    />
+                  ))}
 
-                {showCurrentTime && currentMinute !== null ? (
-                  <div
-                    role="separator"
-                    aria-label={t('cal.currentTime')}
-                    className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-destructive"
-                    style={{
-                      top: minutesToY(
-                        currentMinute,
-                        schedule.rangeStart,
-                        density,
-                      ),
-                    }}
-                  >
-                    <span className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-destructive" />
-                  </div>
-                ) : null}
+                  {appointmentLayouts.map((layout) => (
+                    <AppointmentCard
+                      key={layout.id}
+                      appointment={layout.appointment}
+                      top={layout.top}
+                      height={layout.height}
+                      leftPercent={layout.leftPercent}
+                      widthPercent={layout.widthPercent}
+                      rangeStart={schedule.rangeStart}
+                      rangeEnd={schedule.rangeEnd}
+                      density={density}
+                      snapIntervalMinutes={config.slotIntervalMinutes}
+                      scrollRef={timelineScrollRef}
+                      gestureDisabled={pinch.isPinching}
+                      onGestureActiveChange={setCalendarGestureActive}
+                      onSelect={onSelectAppointment}
+                      onMove={onMove}
+                      onResize={onResize}
+                    />
+                  ))}
+
+                  {showCurrentTime && currentMinute !== null ? (
+                    <div
+                      role="separator"
+                      aria-label={t('cal.currentTime')}
+                      className="pointer-events-none absolute inset-x-0 z-30 border-t-2 border-destructive"
+                      style={{
+                        top: minutesToY(
+                          currentMinute,
+                          schedule.rangeStart,
+                          density,
+                        ),
+                      }}
+                    >
+                      <span className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-destructive" />
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
+            <CalendarZoomControls
+              density={density}
+              onDensityChange={onDensityChange}
+            />
           </div>
         </>
       )}
