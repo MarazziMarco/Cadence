@@ -5,6 +5,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Mic, MicOff, Loader2, CalendarPlus, Sparkles } from 'lucide-react'
 import { listPatientsForSelect, createAppointment } from '@/lib/api/appointments'
+import {
+  confirmCalendarMutationInteractively,
+  isCalendarWarningConfirmation,
+} from '@/lib/api/calendar'
 import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
@@ -117,15 +121,21 @@ export function VoiceAppointment() {
       // Existing client wins; otherwise create a new one from the typed name.
       let pid = parsed.patientId
       if (!pid && newClient.trim()) { const np = await createPatient(businessId, { first_name: newClient.trim() }); pid = np.id }
-      await createAppointment(businessId, {
-        patient_id: pid,
-        service_id: parsed.serviceId,
-        appointment_date: parsed.date,
-        start_time: `${parsed.time}:00`,
-        end_time: endTime(parsed.time, dur),
-        duration_minutes: dur,
-        price: services.find((s) => s.id === parsed.serviceId)?.price ?? null,
-      })
+      try {
+        await createAppointment(businessId, {
+          patient_id: pid,
+          service_id: parsed.serviceId,
+          appointment_date: parsed.date,
+          start_time: `${parsed.time}:00`,
+          end_time: endTime(parsed.time, dur),
+          duration_minutes: dur,
+          price: services.find((s) => s.id === parsed.serviceId)?.price ?? null,
+        })
+      } catch (error) {
+        if (!isCalendarWarningConfirmation(error)) throw error
+        const confirmed = await confirmCalendarMutationInteractively(error)
+        if (!confirmed) return
+      }
       // Persist any availability / preference the phrase carried about this client.
       if (pid && (parsed.availableWeekdays?.length || parsed.preferredPartOfDay)) {
         await setPatientWeekdayAvailability(pid, (parsed.availableWeekdays ?? []) as any, parsed.preferredPartOfDay)

@@ -8,6 +8,10 @@ import { listAppointments, updateAppointment, minToTime, timeToMin, fmtTime, typ
 import { useWorkspace } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
 import { bcp47 } from '@/lib/i18n'
+import {
+  confirmCalendarMutationInteractively,
+  isCalendarWarningConfirmation,
+} from '@/lib/api/calendar'
 import { AppointmentDialog } from './appointment-dialog'
 import { OptimizeDialog } from './optimize-dialog'
 import { Button } from '@/components/ui/button'
@@ -55,9 +59,30 @@ export function CalendarClient() {
   })
 
   const moveMut = useMutation({
-    mutationFn: ({ id, date, startMin, dur }: any) => updateAppointment(id, { appointment_date: date, start_time: minToTime(startMin), end_time: minToTime(startMin + dur), duration_minutes: dur }),
+    mutationFn: ({ appointment, date, startMin, dur }: { appointment: CalendarAppointment; date: string; startMin: number; dur: number }) => updateAppointment(
+      businessId,
+      appointment.id,
+      appointment.version,
+      {
+        appointment_date: date,
+        start_time: minToTime(startMin),
+        end_time: minToTime(startMin + dur),
+        duration_minutes: dur,
+      },
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
-    onError: (e: any) => toast.error(e.message),
+    onError: async (error: unknown) => {
+      if (!isCalendarWarningConfirmation(error)) {
+        toast.error(error instanceof Error ? error.message : 'Calendar update failed')
+        return
+      }
+      try {
+        const confirmed = await confirmCalendarMutationInteractively(error)
+        if (confirmed) qc.invalidateQueries({ queryKey: ['appointments'] })
+      } catch (retryError) {
+        toast.error(retryError instanceof Error ? retryError.message : 'Calendar update failed')
+      }
+    },
   })
 
   const byDay = useMemo(() => {
@@ -96,7 +121,7 @@ export function CalendarClient() {
     let startMin = START_HOUR * 60 + Math.round((y / HOUR_H * 60) / SLOT) * SLOT
     startMin = Math.max(START_HOUR * 60, Math.min(startMin, END_HOUR * 60 - a.duration_minutes))
     if (date === a.appointment_date && startMin === timeToMin(a.start_time)) return
-    moveMut.mutate({ id, date, startMin, dur: a.duration_minutes })
+    moveMut.mutate({ appointment: a, date, startMin, dur: a.duration_minutes })
   }
 
   // ---- touch drag (long-press) ------------------------------------------
@@ -137,7 +162,7 @@ export function CalendarClient() {
     if (touchDragId === a.id && dragPreview) {
       const { date, startMin } = dragPreview
       if (!(date === a.appointment_date && startMin === timeToMin(a.start_time))) {
-        moveMut.mutate({ id: a.id, date, startMin, dur: a.duration_minutes })
+        moveMut.mutate({ appointment: a, date, startMin, dur: a.duration_minutes })
       }
       suppressClick.current = true
       setTimeout(() => { suppressClick.current = false }, 450)

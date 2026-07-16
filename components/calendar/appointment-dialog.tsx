@@ -13,6 +13,10 @@ import { useT } from '@/lib/i18n/use-t'
 import { bcp47 } from '@/lib/i18n'
 import { parseAppointment } from '@/lib/voice/parse-appointment'
 import { useSpeech, speechLang } from '@/lib/voice/use-speech'
+import {
+  confirmCalendarMutationInteractively,
+  isCalendarWarningConfirmation,
+} from '@/lib/api/calendar'
 import { WEEKDAYS, type Weekday } from '@/lib/types/db'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -120,22 +124,71 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
         color: svc?.color ?? '#4f46e5',
         title: svc?.name ?? null,
       }
-      if (editing) return updateAppointment(appt!.id, values)
+      if (editing) return updateAppointment(businessId, appt!.id, appt!.version, values)
       const created = await createAppointment(businessId, values)
       if (advanceUp && created?.id) {
         await createAdvanceWaiting(businessId, { patientId: pid, appointmentId: created.id, appointmentDate: date, serviceId: values.service_id, durationMinutes: dur })
       }
       return created
     },
-    onSuccess: () => { toast.success(editing ? t('appt.updated') : t('appt.created')); qc.invalidateQueries({ queryKey: ['appointments'] }); qc.invalidateQueries({ queryKey: ['patients'] }); qc.invalidateQueries({ queryKey: ['patients-select'] }); qc.invalidateQueries({ queryKey: ['waiting'] }); onOpenChange(false) },
-    onError: (e: any) => toast.error(e.message || t('appt.saveFailed')),
+    onSuccess: () => finishSave(),
+    onError: async (error: unknown) => {
+      if (!isCalendarWarningConfirmation(error)) {
+        toast.error(error instanceof Error ? error.message : t('appt.saveFailed'))
+        return
+      }
+      try {
+        const confirmed = await confirmCalendarMutationInteractively(error)
+        if (!confirmed) return
+        const created = confirmed.appointment
+        if (!editing && advanceUp && created?.id) {
+          const values = error.request.values
+          await createAdvanceWaiting(businessId, {
+            patientId: String(values.patient_id),
+            appointmentId: created.id,
+            appointmentDate: String(values.appointment_date),
+            serviceId: (values.service_id as string | null) ?? null,
+            durationMinutes: Number(values.duration_minutes),
+          })
+        }
+        finishSave()
+      } catch (retryError) {
+        toast.error(retryError instanceof Error ? retryError.message : t('appt.saveFailed'))
+      }
+    },
   })
 
   const del = useMutation({
-    mutationFn: () => deleteAppointment(appt!.id),
-    onSuccess: () => { toast.success(t('appt.deleted')); qc.invalidateQueries({ queryKey: ['appointments'] }); onOpenChange(false) },
-    onError: (e: any) => toast.error(e.message),
+    mutationFn: () => deleteAppointment(businessId, appt!.id, appt!.version),
+    onSuccess: () => finishDelete(),
+    onError: async (error: unknown) => {
+      if (!isCalendarWarningConfirmation(error)) {
+        toast.error(error instanceof Error ? error.message : t('appt.saveFailed'))
+        return
+      }
+      try {
+        const confirmed = await confirmCalendarMutationInteractively(error)
+        if (confirmed) finishDelete()
+      } catch (retryError) {
+        toast.error(retryError instanceof Error ? retryError.message : t('appt.saveFailed'))
+      }
+    },
   })
+
+  function finishSave() {
+    toast.success(editing ? t('appt.updated') : t('appt.created'))
+    qc.invalidateQueries({ queryKey: ['appointments'] })
+    qc.invalidateQueries({ queryKey: ['patients'] })
+    qc.invalidateQueries({ queryKey: ['patients-select'] })
+    qc.invalidateQueries({ queryKey: ['waiting'] })
+    onOpenChange(false)
+  }
+
+  function finishDelete() {
+    toast.success(t('appt.deleted'))
+    qc.invalidateQueries({ queryKey: ['appointments'] })
+    onOpenChange(false)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
