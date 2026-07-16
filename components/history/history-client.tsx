@@ -7,6 +7,8 @@ import { History, Clock, Undo2, Loader2, Sparkles, ChevronRight } from 'lucide-r
 import { cn } from '@/lib/utils'
 import { getOptimizationHistory, undoLastOptimization } from '@/lib/api/optimization-history'
 import { useWorkspace } from '@/lib/workspace-context'
+import { useT } from '@/lib/i18n/use-t'
+import { bcp47 } from '@/lib/i18n'
 import { PageHeader } from '@/components/common/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,17 +25,19 @@ function fmtMinutes(min: number): string {
   const h = Math.floor(min / 60), m = min % 60
   return h ? `${h}h ${m}m` : `${m} min`
 }
-function fmtDateTime(iso: string): string {
-  try { return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) } catch { return iso }
+function fmtDateTime(iso: string, dloc: string): string {
+  try { return new Intl.DateTimeFormat(dloc, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) } catch { return iso }
 }
-function fmtRange(from: string | null, to: string | null): string | null {
+function fmtRange(from: string | null, to: string | null, dloc: string): string | null {
   if (!from) return null
-  const f = (d: string) => { try { return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' }).format(new Date(d + 'T00:00:00')) } catch { return d } }
+  const f = (d: string) => { try { return new Intl.DateTimeFormat(dloc, { day: 'numeric', month: 'short' }).format(new Date(d + 'T00:00:00')) } catch { return d } }
   return from === to || !to ? f(from) : `${f(from)} – ${f(to)}`
 }
 
 export function HistoryClient({ embedded = false }: { embedded?: boolean } = {}) {
   const { business } = useWorkspace()
+  const { t, locale } = useT()
+  const dloc = bcp47(locale)
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
 
@@ -47,33 +51,31 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
   const undo = useMutation({
     mutationFn: () => undoLastOptimization(businessId),
     onSuccess: (res) => {
-      if (res.undone === 0) toast('Nothing to undo')
-      else toast.success(`Reverted ${res.undone} appointment${res.undone === 1 ? '' : 's'}`)
+      if (res.undone === 0) toast(t('hist.nothingUndo'))
+      else toast.success(t('hist.reverted', { n: res.undone }))
       qc.invalidateQueries({ queryKey: ['optimizations'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['schedule-health'] })
     },
-    onError: (e: any) => toast.error(e.message || 'Undo failed'),
+    onError: (e: any) => toast.error(e.message || t('hist.undoFailed')),
   })
 
   const undoButton = (
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button size="lg" className="w-full font-bold tracking-wide sm:w-auto" disabled={!canUndo || undo.isPending}>
-          {undo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />} UNDO last optimization
+          {undo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />} {t('hist.undoBtn')}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Undo the last optimization?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This moves every appointment from the most recent applied optimization back to its previous time. Waiting-list inserts from that run are removed. This can't be redone automatically.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{t('hist.undoTitle')}</AlertDialogTitle>
+          <AlertDialogDescription>{t('hist.undoDesc')}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={() => undo.mutate()}>Undo</AlertDialogAction>
+          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+          <AlertDialogAction onClick={() => undo.mutate()}>{t('hist.undo')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -82,23 +84,23 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
   return (
     <div>
       {embedded ? (
-        <h2 className="mb-4 text-xl font-bold tracking-tight">Optimization history</h2>
+        <h2 className="mb-4 text-xl font-bold tracking-tight">{t('hist.title')}</h2>
       ) : (
-        <PageHeader title="Optimization history" description="Every optimization Cadence has run for your business." />
+        <PageHeader title={t('hist.title')} description={t('hist.subtitle')} />
       )}
 
       {/* Undo — prominent, right above the history */}
       <div className="mb-6">
         {undoButton}
-        {!canUndo && <p className="mt-2 text-xs text-muted-foreground">Nothing to undo yet — apply an optimization first.</p>}
+        {!canUndo && <p className="mt-2 text-xs text-muted-foreground">{t('hist.nothingYet')}</p>}
       </div>
 
       {/* Aggregate summary */}
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         {[
-          { label: 'Recovered this week', value: fmtMinutes(summary?.weekRecovered ?? 0), icon: Clock },
-          { label: 'Recovered total', value: fmtMinutes(summary?.totalRecovered ?? 0), icon: Sparkles },
-          { label: 'Optimizations run', value: String(summary?.runCount ?? 0), icon: History },
+          { label: t('hist.recoveredWeek'), value: fmtMinutes(summary?.weekRecovered ?? 0), icon: Clock },
+          { label: t('hist.recoveredTotal'), value: fmtMinutes(summary?.totalRecovered ?? 0), icon: Sparkles },
+          { label: t('hist.runs'), value: String(summary?.runCount ?? 0), icon: History },
         ].map((s) => (
           <Card key={s.label} className="shadow-sm"><CardContent className="flex items-center justify-between p-4">
             <div><p className="text-sm text-muted-foreground">{s.label}</p><p className="mt-1 text-xl font-bold tabular-nums">{isLoading ? '—' : s.value}</p></div>
@@ -110,7 +112,7 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
       {isLoading ? (
         <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}</div>
       ) : runs.length === 0 ? (
-        <EmptyState icon={History} title="No optimizations yet" description="Once you run an optimization from the Scheduler or Calendar, it will show up here." />
+        <EmptyState icon={History} title={t('hist.emptyTitle')} description={t('hist.emptyDesc')} />
       ) : (
         <div className="space-y-2">
           {runs.map((r) => {
@@ -122,20 +124,20 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
                   <div className="flex min-w-0 items-center gap-2">
                     <ChevronRight className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{fmtDateTime(r.created_at)}</p>
-                      <p className="truncate text-xs text-muted-foreground">{fmtMinutes(r.idleRecovered)} recovered · {r.moved} moved{r.created > 0 ? ` · ${r.created} from waiting list` : ''}</p>
+                      <p className="truncate text-sm font-semibold">{fmtDateTime(r.created_at, dloc)}</p>
+                      <p className="truncate text-xs text-muted-foreground">{t('hist.recovered', { v: fmtMinutes(r.idleRecovered) })} · {t('hist.moved', { n: r.moved })}{r.created > 0 ? ` · ${t('hist.fromWaiting', { n: r.created })}` : ''}</p>
                     </div>
                   </div>
-                  {r.appliedCount > 0 && <Badge className="shrink-0 bg-success/15 text-success hover:bg-success/15">Applied</Badge>}
+                  {r.appliedCount > 0 && <Badge className="shrink-0 bg-success/15 text-success hover:bg-success/15">{t('hist.applied')}</Badge>}
                 </button>
                 {open && (
                   <div className="border-t border-border p-3">
                     <div className="flex flex-wrap gap-1.5">
-                      {fmtRange(r.rangeFrom, r.rangeTo) && <Badge variant="secondary">{fmtRange(r.rangeFrom, r.rangeTo)}</Badge>}
+                      {fmtRange(r.rangeFrom, r.rangeTo, dloc) && <Badge variant="secondary">{fmtRange(r.rangeFrom, r.rangeTo, dloc)}</Badge>}
                       <Badge variant="secondary" className="capitalize">{r.mode}</Badge>
-                      <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" /> {fmtMinutes(r.idleRecovered)} recovered</Badge>
-                      <Badge variant="secondary">{r.moved} moved</Badge>
-                      {r.created > 0 && <Badge variant="secondary">{r.created} from waiting list</Badge>}
+                      <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" /> {t('hist.recovered', { v: fmtMinutes(r.idleRecovered) })}</Badge>
+                      <Badge variant="secondary">{t('hist.moved', { n: r.moved })}</Badge>
+                      {r.created > 0 && <Badge variant="secondary">{t('hist.fromWaiting', { n: r.created })}</Badge>}
                     </div>
                     {r.ai_summary && <p className="mt-2 text-sm text-muted-foreground">{r.ai_summary}</p>}
                   </div>
