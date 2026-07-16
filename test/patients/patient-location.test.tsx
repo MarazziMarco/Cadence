@@ -187,13 +187,25 @@ function renderWithProviders(node: React.ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <WorkspaceProvider business={business}>
         {node}
       </WorkspaceProvider>
     </QueryClientProvider>,
   )
+  return {
+    ...result,
+    rerenderWithProviders(nextNode: React.ReactNode) {
+      result.rerender(
+        <QueryClientProvider client={queryClient}>
+          <WorkspaceProvider business={business}>
+            {nextNode}
+          </WorkspaceProvider>
+        </QueryClientProvider>,
+      )
+    },
+  }
 }
 
 describe('patient location', () => {
@@ -237,5 +249,110 @@ describe('patient location', () => {
 
     expect(await screen.findByText('Via Roma 10, 00100 Roma')).toBeInTheDocument()
     expect(screen.getByText('patient.location')).toBeInTheDocument()
+  })
+
+  it('resets the complete form when switching patient or reopening create mode', async () => {
+    const user = userEvent.setup()
+    const secondPatient: Patient = {
+      ...patient,
+      id: 'patient-2',
+      first_name: 'Bruno',
+      last_name: 'Verdi',
+      full_name: 'Bruno Verdi',
+      email: 'bruno@example.com',
+      phone: '+39 222',
+      address: 'Corso Milano 22',
+      city: 'Milano',
+      postal_code: '20100',
+      notes: 'Second patient notes',
+      color: '#ef4444',
+      is_vip: true,
+    }
+    vi.mocked(updatePatient).mockResolvedValue(secondPatient)
+
+    const view = renderWithProviders(
+      <PatientFormDialog
+        businessId={business.id}
+        patient={patient}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    )
+
+    const firstName = screen.getByLabelText('patf.first')
+    const address = screen.getByLabelText('patf.address')
+    await user.clear(firstName)
+    await user.type(firstName, 'Draft Ada')
+    await user.clear(address)
+    await user.type(address, 'Draft address')
+
+    view.rerenderWithProviders(
+      <PatientFormDialog
+        businessId={business.id}
+        patient={{ ...patient }}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    )
+    expect(firstName).toHaveValue('Draft Ada')
+    expect(address).toHaveValue('Draft address')
+
+    view.rerenderWithProviders(
+      <PatientFormDialog
+        businessId={business.id}
+        patient={secondPatient}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('patf.first')).toHaveValue('Bruno')
+      expect(screen.getByLabelText('patf.email')).toHaveValue('bruno@example.com')
+      expect(screen.getByLabelText('patf.address')).toHaveValue('Corso Milano 22')
+      expect(screen.getByLabelText('patf.notes')).toHaveValue('Second patient notes')
+      expect(screen.getByRole('checkbox')).toBeChecked()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'common.save' }))
+    await waitFor(() => {
+      expect(updatePatient).toHaveBeenCalledWith(
+        'patient-2',
+        expect.objectContaining({
+          first_name: 'Bruno',
+          email: 'bruno@example.com',
+          address: 'Corso Milano 22',
+          city: 'Milano',
+          postal_code: '20100',
+          notes: 'Second patient notes',
+          color: '#ef4444',
+          is_vip: true,
+        }),
+      )
+    })
+
+    view.rerenderWithProviders(
+      <PatientFormDialog
+        businessId={business.id}
+        patient={null}
+        open={false}
+        onOpenChange={vi.fn()}
+      />,
+    )
+    view.rerenderWithProviders(
+      <PatientFormDialog
+        businessId={business.id}
+        patient={null}
+        open
+        onOpenChange={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('patf.first')).toHaveValue('')
+      expect(screen.getByLabelText('patf.address')).toHaveValue('')
+      expect(screen.getByLabelText('patf.notes')).toHaveValue('')
+      expect(screen.getByRole('checkbox')).not.toBeChecked()
+    })
   })
 })

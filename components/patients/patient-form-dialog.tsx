@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -30,6 +30,24 @@ export function PatientFormDialog({ businessId, patient, open, onOpenChange }: {
   const [notes, setNotes] = useState(patient?.notes ?? '')
   const [color, setColor] = useState(patient?.color ?? COLORS[0])
   const [isVip, setIsVip] = useState(patient?.is_vip ?? false)
+  const patientRef = useRef(patient)
+  patientRef.current = patient
+  const patientIdentity = patient?.id ?? 'new'
+
+  useEffect(() => {
+    if (!open) return
+    const nextPatient = patientRef.current
+    setFirstName(nextPatient?.first_name ?? '')
+    setLastName(nextPatient?.last_name ?? '')
+    setEmail(nextPatient?.email ?? '')
+    setPhone(nextPatient?.phone ?? '')
+    setAddress(nextPatient?.address ?? '')
+    setCity(nextPatient?.city ?? '')
+    setPostalCode(nextPatient?.postal_code ?? '')
+    setNotes(nextPatient?.notes ?? '')
+    setColor(nextPatient?.color ?? COLORS[0])
+    setIsVip(nextPatient?.is_vip ?? false)
+  }, [open, patientIdentity])
 
   const mutation = useMutation({
     mutationFn: async () => {

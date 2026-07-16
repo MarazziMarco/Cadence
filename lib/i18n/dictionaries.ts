@@ -85,6 +85,7 @@ const en: Dict = {
   'prefs.positionDenied': 'Location permission was denied.',
   'prefs.positionUnavailable': 'Current position is unavailable. Try again.',
   'prefs.positionUnsupported': 'Location is not supported by this browser.',
+  'prefs.loadError': 'Preferences could not be loaded. Try again later.',
 
   // Auth
   'auth.login.title': 'Welcome back',
@@ -582,6 +583,7 @@ const it: Dict = {
   'prefs.positionDenied': 'Il permesso per la posizione è stato negato.',
   'prefs.positionUnavailable': 'Posizione attuale non disponibile. Riprova.',
   'prefs.positionUnsupported': 'La posizione non è supportata da questo browser.',
+  'prefs.loadError': 'Impossibile caricare le preferenze. Riprova più tardi.',
 
   'auth.login.title': 'Bentornato',
   'auth.login.subtitle': 'Accedi al tuo spazio di lavoro.',
@@ -1063,6 +1065,7 @@ const es: Dict = {
   'prefs.positionDenied': 'Se denegó el permiso de ubicación.',
   'prefs.positionUnavailable': 'La posición actual no está disponible. Inténtalo de nuevo.',
   'prefs.positionUnsupported': 'Este navegador no admite la ubicación.',
+  'prefs.loadError': 'No se pudieron cargar las preferencias. Inténtalo más tarde.',
   'patf.address': 'Dirección',
   'patf.city': 'Ciudad',
   'patf.postalCode': 'Código postal',

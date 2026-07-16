@@ -9,6 +9,7 @@ import { PreferencesClient } from '@/components/settings/preferences-client'
 import {
   getBusinessSettings,
   updateBusinessSettings,
+  type BusinessSettings,
 } from '@/lib/api/working-hours'
 
 const refresh = vi.fn()
@@ -21,6 +22,37 @@ const locationMigration = readFileSync(
   ),
   'utf8',
 )
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
+const loadedSettings: BusinessSettings = {
+  id: 'business-1',
+  default_appointment_duration: 30,
+  slot_interval_minutes: 15,
+  default_buffer_minutes: 0,
+  max_daily_appointments: null,
+  lunch_break_enabled: false,
+  lunch_start: null,
+  lunch_end: null,
+  currency: 'EUR',
+  language: 'en',
+  address: 'Via Vecchia 1',
+  city: 'Roma',
+  postal_code: '00100',
+  location_latitude: null,
+  location_longitude: null,
+  location_accuracy_meters: null,
+  location_source: null,
+  location_captured_at: null,
+}
 
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -102,26 +134,7 @@ describe('studio location preferences', () => {
       value: { getCurrentPosition, watchPosition },
     })
     vi.mocked(updateBusinessSettings).mockReset()
-    vi.mocked(getBusinessSettings).mockResolvedValue({
-      id: 'business-1',
-      default_appointment_duration: 30,
-      slot_interval_minutes: 15,
-      default_buffer_minutes: 0,
-      max_daily_appointments: null,
-      lunch_break_enabled: false,
-      lunch_start: null,
-      lunch_end: null,
-      currency: 'EUR',
-      language: 'en',
-      address: 'Via Vecchia 1',
-      city: 'Roma',
-      postal_code: '00100',
-      location_latitude: null,
-      location_longitude: null,
-      location_accuracy_meters: null,
-      location_source: null,
-      location_captured_at: null,
-    })
+    vi.mocked(getBusinessSettings).mockResolvedValue(loadedSettings)
   })
 
   it('loads localized address fields and saves blanks as null', async () => {
@@ -152,19 +165,91 @@ describe('studio location preferences', () => {
         address: 'Via Nuova 20',
         city: null,
         postal_code: null,
-        location_latitude: null,
-        location_longitude: null,
-        location_accuracy_meters: null,
-        location_source: null,
-        location_captured_at: null,
       })
     })
     expect(refresh).toHaveBeenCalled()
   })
 
+  it('gates actions during load and does not erase address edits when load resolves late', async () => {
+    const user = userEvent.setup()
+    const pending = deferred<BusinessSettings>()
+    vi.mocked(getBusinessSettings).mockReturnValue(pending.promise)
+
+    render(<PreferencesClient />)
+
+    const address = screen.getByLabelText('prefs.address')
+    const save = screen.getByRole('button', { name: 'common.save' })
+    const capture = screen.getByRole('button', {
+      name: 'prefs.useApproximatePosition',
+    })
+    expect(save).toBeDisabled()
+    expect(capture).toBeDisabled()
+
+    await user.type(address, 'Draft dell utente')
+    await user.click(capture)
+    expect(getCurrentPosition).not.toHaveBeenCalled()
+
+    pending.resolve(loadedSettings)
+
+    await waitFor(() => {
+      expect(address).toHaveValue('Draft dell utente')
+      expect(capture).toBeEnabled()
+      expect(save).toBeEnabled()
+    })
+  })
+
+  it('surfaces settings load failure and keeps save and capture disabled', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getBusinessSettings).mockRejectedValue(new Error('offline'))
+
+    render(<PreferencesClient />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('prefs.loadError')
+    const save = screen.getByRole('button', { name: 'common.save' })
+    const capture = screen.getByRole('button', {
+      name: 'prefs.useApproximatePosition',
+    })
+    expect(save).toBeDisabled()
+    expect(capture).toBeDisabled()
+
+    await user.click(save)
+    await user.click(capture)
+    expect(updateBusinessSettings).not.toHaveBeenCalled()
+    expect(getCurrentPosition).not.toHaveBeenCalled()
+  })
+
+  it('does not resend untouched stored location metadata', async () => {
+    const user = userEvent.setup()
+    vi.mocked(updateBusinessSettings).mockResolvedValue()
+    vi.mocked(getBusinessSettings).mockResolvedValue({
+      ...loadedSettings,
+      location_latitude: 41.90278,
+      location_longitude: 12.49637,
+      location_accuracy_meters: 19,
+      location_source: 'device_geolocation',
+      location_captured_at: '2026-07-15T08:00:00.000Z',
+    })
+
+    render(<PreferencesClient />)
+
+    const address = await screen.findByLabelText('prefs.address')
+    await user.clear(address)
+    await user.type(address, 'Via Nuova 30')
+    await user.click(screen.getByRole('button', { name: 'common.save' }))
+
+    await waitFor(() => expect(updateBusinessSettings).toHaveBeenCalled())
+    const patch = vi.mocked(updateBusinessSettings).mock.calls[0][1]
+    expect(patch).not.toHaveProperty('location_latitude')
+    expect(patch).not.toHaveProperty('location_longitude')
+    expect(patch).not.toHaveProperty('location_accuracy_meters')
+    expect(patch).not.toHaveProperty('location_source')
+    expect(patch).not.toHaveProperty('location_captured_at')
+  })
+
   it('captures one approximate position, rounds it, and persists capture metadata', async () => {
     const user = userEvent.setup()
     vi.mocked(updateBusinessSettings).mockResolvedValue()
+    const capturedAt = Date.parse('2026-07-14T10:20:30.000Z')
     getCurrentPosition.mockImplementation((success: PositionCallback) => {
       success({
         coords: {
@@ -177,7 +262,7 @@ describe('studio location preferences', () => {
           speed: null,
           toJSON: () => ({}),
         },
-        timestamp: Date.now(),
+        timestamp: capturedAt,
         toJSON: () => ({}),
       })
     })
@@ -208,9 +293,7 @@ describe('studio location preferences', () => {
           location_longitude: 12.49637,
           location_accuracy_meters: 19,
           location_source: 'device_geolocation',
-          location_captured_at: expect.stringMatching(
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-          ),
+          location_captured_at: '2026-07-14T10:20:30.000Z',
         }),
       )
     })

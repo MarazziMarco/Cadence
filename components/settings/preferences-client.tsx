@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -26,6 +26,22 @@ import {
   type PhoneWeekLayout,
 } from '@/lib/calendar/week-layout'
 
+const EMPTY_LOCATION: BusinessLocationCapture = {
+  location_latitude: null,
+  location_longitude: null,
+  location_accuracy_meters: null,
+  location_source: null,
+  location_captured_at: null,
+}
+
+function geolocationCapturedAt(timestamp: number) {
+  if (Number.isFinite(timestamp)) {
+    const capturedAt = new Date(timestamp)
+    if (!Number.isNaN(capturedAt.getTime())) return capturedAt.toISOString()
+  }
+  return new Date().toISOString()
+}
+
 // Business preferences that aren't tied to the daily flow. Currency lives on the
 // existing business.currency column (no schema change); saving refreshes the
 // server components so amounts re-render in the chosen currency everywhere.
@@ -42,20 +58,17 @@ export function PreferencesClient() {
   const [storedAddress, setStoredAddress] = useState(business?.address ?? '')
   const [storedCity, setStoredCity] = useState(business?.city ?? '')
   const [storedPostalCode, setStoredPostalCode] = useState(business?.postal_code ?? '')
-  const [location, setLocation] = useState<BusinessLocationCapture>({
-    location_latitude: null,
-    location_longitude: null,
-    location_accuracy_meters: null,
-    location_source: null,
-    location_captured_at: null,
+  const [location, setLocation] =
+    useState<BusinessLocationCapture>(EMPTY_LOCATION)
+  const [locationDirty, setLocationDirty] = useState(false)
+  const editedAddressFieldsRef = useRef({
+    address: false,
+    city: false,
+    postalCode: false,
   })
-  const [storedLocation, setStoredLocation] = useState<BusinessLocationCapture>({
-    location_latitude: null,
-    location_longitude: null,
-    location_accuracy_meters: null,
-    location_source: null,
-    location_captured_at: null,
-  })
+  const [loadStatus, setLoadStatus] = useState<
+    'loading' | 'loaded' | 'error'
+  >(businessId ? 'loading' : 'error')
   const [locationStatus, setLocationStatus] = useState<
     'idle' | 'locating' | 'ready' | 'denied' | 'error' | 'unsupported'
   >('idle')
@@ -70,17 +83,29 @@ export function PreferencesClient() {
   }, [])
 
   useEffect(() => {
-    if (!businessId) return
+    if (!businessId) {
+      setLoadStatus('error')
+      return
+    }
     let active = true
+    editedAddressFieldsRef.current = {
+      address: false,
+      city: false,
+      postalCode: false,
+    }
+    setLoadStatus('loading')
+    setLocationDirty(false)
     getBusinessSettings(businessId)
       .then((settings) => {
         if (!active) return
         const nextAddress = settings?.address ?? ''
         const nextCity = settings?.city ?? ''
         const nextPostalCode = settings?.postal_code ?? ''
-        setAddress(nextAddress)
-        setCity(nextCity)
-        setPostalCode(nextPostalCode)
+        if (!editedAddressFieldsRef.current.address) setAddress(nextAddress)
+        if (!editedAddressFieldsRef.current.city) setCity(nextCity)
+        if (!editedAddressFieldsRef.current.postalCode) {
+          setPostalCode(nextPostalCode)
+        }
         setStoredAddress(nextAddress)
         setStoredCity(nextCity)
         setStoredPostalCode(nextPostalCode)
@@ -92,21 +117,28 @@ export function PreferencesClient() {
           location_captured_at: settings?.location_captured_at ?? null,
         }
         setLocation(nextLocation)
-        setStoredLocation(nextLocation)
-        if (nextLocation.location_latitude !== null) setLocationStatus('ready')
+        setLocationStatus(
+          nextLocation.location_latitude !== null ? 'ready' : 'idle',
+        )
+        setLoadStatus('loaded')
       })
-      .catch(() => {})
+      .catch(() => {
+        if (active) setLoadStatus('error')
+      })
     return () => { active = false }
   }, [businessId])
 
-  const dirty = currency !== business?.currency
+  const dirty = loadStatus === 'loaded' && (
+    currency !== business?.currency
     || language !== business?.language
     || address !== storedAddress
     || city !== storedCity
     || postalCode !== storedPostalCode
-    || JSON.stringify(location) !== JSON.stringify(storedLocation)
+    || locationDirty
+  )
 
   function captureApproximatePosition() {
+    if (loadStatus !== 'loaded') return
     if (!navigator.geolocation) {
       setLocationStatus('unsupported')
       return
@@ -119,8 +151,9 @@ export function PreferencesClient() {
           location_longitude: roundApproximateCoordinate(position.coords.longitude),
           location_accuracy_meters: Math.round(Math.max(0, position.coords.accuracy)),
           location_source: 'device_geolocation',
-          location_captured_at: new Date().toISOString(),
+          location_captured_at: geolocationCapturedAt(position.timestamp),
         })
+        setLocationDirty(true)
         setLocationStatus('ready')
       },
       (error) => {
@@ -135,19 +168,20 @@ export function PreferencesClient() {
   }
 
   async function save() {
-    if (!businessId) return
+    if (!businessId || loadStatus !== 'loaded') return
     setSaving(true)
     try {
       const nextAddress = address.trim()
       const nextCity = city.trim()
       const nextPostalCode = postalCode.trim()
+      const locationPatch = locationDirty ? location : {}
       await updateBusinessSettings(businessId, {
         currency,
         language,
         address: nextAddress || null,
         city: nextCity || null,
         postal_code: nextPostalCode || null,
-        ...location,
+        ...locationPatch,
       })
       setAddress(nextAddress)
       setCity(nextCity)
@@ -155,7 +189,7 @@ export function PreferencesClient() {
       setStoredAddress(nextAddress)
       setStoredCity(nextCity)
       setStoredPostalCode(nextPostalCode)
-      setStoredLocation(location)
+      setLocationDirty(false)
       toast.success(t('prefs.saved'))
       router.refresh()
     } catch (e: any) {
@@ -196,7 +230,10 @@ export function PreferencesClient() {
             <Input
               id="studio-address"
               value={address}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setAddress(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                editedAddressFieldsRef.current.address = true
+                setAddress(event.target.value)
+              }}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -205,7 +242,10 @@ export function PreferencesClient() {
               <Input
                 id="studio-city"
                 value={city}
-                onChange={(event: ChangeEvent<HTMLInputElement>) => setCity(event.target.value)}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  editedAddressFieldsRef.current.city = true
+                  setCity(event.target.value)
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -213,7 +253,10 @@ export function PreferencesClient() {
               <Input
                 id="studio-postal-code"
                 value={postalCode}
-                onChange={(event: ChangeEvent<HTMLInputElement>) => setPostalCode(event.target.value)}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  editedAddressFieldsRef.current.postalCode = true
+                  setPostalCode(event.target.value)
+                }}
               />
             </div>
           </div>
@@ -222,7 +265,7 @@ export function PreferencesClient() {
               type="button"
               variant="outline"
               onClick={captureApproximatePosition}
-              disabled={locationStatus === 'locating'}
+              disabled={loadStatus !== 'loaded' || locationStatus === 'locating'}
             >
               {locationStatus === 'locating'
                 ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -251,8 +294,16 @@ export function PreferencesClient() {
                 {t('prefs.positionUnsupported')}
               </p>
             )}
+            {loadStatus === 'error' && (
+              <p className="text-xs text-destructive" role="alert">
+                {t('prefs.loadError')}
+              </p>
+            )}
           </div>
-          <Button onClick={save} disabled={saving || !dirty}>
+          <Button
+            onClick={save}
+            disabled={loadStatus !== 'loaded' || saving || !dirty}
+          >
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {t('common.save')}
           </Button>
         </CardContent>
