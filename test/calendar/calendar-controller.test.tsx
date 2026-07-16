@@ -107,6 +107,8 @@ vi.mock('@/components/calendar/optimize-dialog', async () => {
   const React = await import('react')
   return {
     OptimizeDialog: (props: {
+      dateFrom: string
+      dateTo: string
       open?: boolean
       onOpenChange?(open: boolean): void
     }) => {
@@ -116,7 +118,11 @@ vi.mock('@/components/calendar/optimize-dialog', async () => {
         wasOpen.current = Boolean(props.open)
       }, [props.open])
       return (
-        <div data-testid="optimizer-dialog">
+        <div
+          data-testid="optimizer-dialog"
+          data-date-from={props.dateFrom}
+          data-date-to={props.dateTo}
+        >
           {props.open ? (
             <>
               <span>Optimizer open</span>
@@ -383,5 +389,63 @@ describe('CalendarController', () => {
 
     await user.click(screen.getByRole('button', { name: 'Close optimizer' }))
     expect(screen.getByRole('button', { name: 'Optimize' })).toHaveFocus()
+  })
+
+  it('switches an open desktop week optimizer to the mobile day scope once', async () => {
+    localStorage.setItem('cadence.calendar.view', 'week')
+    const media = installMatchMedia(true)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderController()
+
+    const renderer = await screen.findByTestId('calendar-renderer')
+    await waitFor(() => expect(renderer).toHaveAttribute('data-view', 'week'))
+    await user.click(screen.getByRole('button', { name: 'Optimize' }))
+    await waitFor(() => expect(optimizerRuns).toHaveBeenCalledTimes(1))
+
+    act(() => media.setMatches(false))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-renderer')).toHaveAttribute(
+        'data-view',
+        'day',
+      )
+    })
+    const optimizer = screen.getByTestId('optimizer-dialog')
+    expect(optimizer).toHaveAttribute('data-date-from', '2026-07-17')
+    expect(optimizer).toHaveAttribute('data-date-to', '2026-07-17')
+    expect(listAppointments).toHaveBeenCalledWith(
+      business.id,
+      '2026-07-17',
+      '2026-07-17',
+    )
+    expect(optimizerRuns).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(localStorage.getItem('cadence.calendar.view')).toBe('day')
+    })
+  })
+
+  it('ignores the week shortcut on mobile and keeps day query and optimizer scope', async () => {
+    installMatchMedia(false)
+    renderController()
+
+    await screen.findByTestId('calendar-renderer')
+    fireEvent.keyDown(window, { key: 'w' })
+
+    await waitFor(() => {
+      expect(listAppointments).toHaveBeenCalledWith(
+        business.id,
+        '2026-07-17',
+        '2026-07-17',
+      )
+      expect(listAppointments).not.toHaveBeenCalledWith(
+        business.id,
+        '2026-07-13',
+        '2026-07-19',
+      )
+    })
+    const optimizer = screen.getByTestId('optimizer-dialog')
+    expect(optimizer).toHaveAttribute('data-date-from', '2026-07-17')
+    expect(optimizer).toHaveAttribute('data-date-to', '2026-07-17')
+    expect(localStorage.getItem('cadence.calendar.view')).toBe('day')
   })
 })

@@ -179,17 +179,18 @@ export function CalendarController() {
   const supportedView: SupportedCalendarView = isSupportedCalendarView(state.view)
     ? state.view
     : 'week'
+  const rendererView: SupportedCalendarView = isDesktop ? supportedView : 'day'
   const range = useMemo(
-    () => visibleSupportedRange(state.selectedDate, supportedView),
-    [state.selectedDate, supportedView],
+    () => visibleSupportedRange(state.selectedDate, rendererView),
+    [rendererView, state.selectedDate],
   )
   const previousRange = useMemo(
-    () => adjacentRange(state.selectedDate, supportedView, range, -1),
-    [range, state.selectedDate, supportedView],
+    () => adjacentRange(state.selectedDate, rendererView, range, -1),
+    [range, rendererView, state.selectedDate],
   )
   const nextRange = useMemo(
-    () => adjacentRange(state.selectedDate, supportedView, range, 1),
-    [range, state.selectedDate, supportedView],
+    () => adjacentRange(state.selectedDate, rendererView, range, 1),
+    [range, rendererView, state.selectedDate],
   )
 
   const [appointmentsQuery, configQuery] = useQueries({
@@ -233,7 +234,6 @@ export function CalendarController() {
   const selectedAppointment = state.selectedAppointmentId
     ? appointmentById.get(state.selectedAppointmentId) ?? null
     : null
-  const rendererView = supportedView
 
   useEffect(() => {
     const storedView = parseStoredCalendarView(
@@ -255,9 +255,18 @@ export function CalendarController() {
   }, [])
 
   useEffect(() => {
+    if (
+      !preferencesRestored
+      || isDesktop
+      || state.view === 'day'
+    ) return
+    dispatch({ type: 'set-view', view: 'day' })
+  }, [isDesktop, preferencesRestored, state.view])
+
+  useEffect(() => {
     if (!preferencesRestored) return
-    localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, supportedView)
-  }, [preferencesRestored, supportedView])
+    localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, rendererView)
+  }, [preferencesRestored, rendererView])
 
   useEffect(() => {
     if (!preferencesRestored) return
@@ -473,7 +482,7 @@ export function CalendarController() {
         event.preventDefault()
         openNew()
       } else if (event.key === 'w') {
-        dispatch({ type: 'set-view', view: 'week' })
+        if (isDesktop) dispatch({ type: 'set-view', view: 'week' })
       } else if (event.key === 'd') {
         dispatch({ type: 'set-view', view: 'day' })
       } else if (event.key === 'ArrowLeft') {
@@ -487,7 +496,7 @@ export function CalendarController() {
 
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [dialogOpen, navigate, openNew, section, timezone])
+  }, [dialogOpen, isDesktop, navigate, openNew, section, timezone])
 
   const label = rendererView === 'day'
     ? formatBusinessDate(state.selectedDate, dateLocale, {
