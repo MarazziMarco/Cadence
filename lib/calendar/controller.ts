@@ -1,9 +1,139 @@
 import { addBusinessDays, monthRange, weekRange } from './date'
 import { clampDensity } from './geometry'
 import type { CalendarView, DateRange } from './types'
+import type { CalendarAppointment } from '@/lib/api/appointments'
+import type { CalendarConfig } from '@/lib/api/calendar'
+import { WEEKDAYS } from '@/lib/types/db'
 
 export const CALENDAR_VIEW_STORAGE_KEY = 'cadence.calendar.view'
 export const CALENDAR_DENSITY_STORAGE_KEY = 'cadence.calendar.density'
+
+export type ResponsiveCalendarLayout =
+  | 'phone'
+  | 'three-day'
+  | 'seven-day'
+  | 'desktop'
+
+export interface DayCapacitySummary {
+  date: string
+  appointmentCount: number
+  bookedMinutes: number
+  idleMinutes: number
+  gapCount: number
+  closed: boolean
+}
+
+function minuteOfDay(value: string) {
+  const [hour, minute] = value.split(':').map(Number)
+  return hour * 60 + minute
+}
+
+function weekdayForDate(date: string) {
+  const day = new Date(`${date}T12:00:00.000Z`).getUTCDay()
+  return WEEKDAYS[(day + 6) % 7]
+}
+
+export function responsiveCalendarLayout(
+  width: number,
+  height: number,
+  finePointer: boolean,
+): ResponsiveCalendarLayout {
+  if (finePointer && width >= 1024) return 'desktop'
+  if (width >= 1180) return 'seven-day'
+  if (width >= 700 || (width > height && width >= 700)) return 'three-day'
+  return 'phone'
+}
+
+export function summarizeDayCapacity({
+  date,
+  appointments,
+  config,
+}: {
+  date: string
+  appointments: CalendarAppointment[]
+  config: CalendarConfig
+}): DayCapacitySummary {
+  const holidayClosed = config.holidays.some((holiday) => (
+    holiday.is_closed
+    && holiday.start_date <= date
+    && holiday.end_date >= date
+  ))
+  const hours = config.workingHours.find(
+    (workingHour) => workingHour.weekday === weekdayForDate(date),
+  )
+  const openWindows = hours?.is_open && !holidayClosed
+    ? [
+        hours.morning_start && hours.morning_end
+          ? {
+              start: minuteOfDay(hours.morning_start),
+              end: minuteOfDay(hours.morning_end),
+            }
+          : null,
+        hours.afternoon_start && hours.afternoon_end
+          ? {
+              start: minuteOfDay(hours.afternoon_start),
+              end: minuteOfDay(hours.afternoon_end),
+            }
+          : null,
+      ].filter(
+        (window): window is { start: number; end: number } => (
+          window !== null && window.end > window.start
+        ),
+      )
+    : []
+  const dayAppointments = appointments
+    .filter((appointment) => appointment.appointment_date === date)
+    .sort((left, right) => left.start_time.localeCompare(right.start_time))
+  const bookedMinutes = dayAppointments.reduce(
+    (total, appointment) => total + appointment.duration_minutes,
+    0,
+  )
+  const closed = holidayClosed || !hours?.is_open || openWindows.length === 0
+  if (closed || dayAppointments.length < 2) {
+    return {
+      date,
+      appointmentCount: dayAppointments.length,
+      bookedMinutes,
+      idleMinutes: 0,
+      gapCount: 0,
+      closed,
+    }
+  }
+
+  const intervals = dayAppointments.map((appointment) => ({
+    start: minuteOfDay(appointment.start_time),
+    end: minuteOfDay(appointment.end_time),
+  }))
+  let idleMinutes = 0
+  let gapCount = 0
+  for (const window of openWindows) {
+    const occupied = intervals
+      .map((interval) => ({
+        start: Math.max(window.start, interval.start),
+        end: Math.min(window.end, interval.end),
+      }))
+      .filter((interval) => interval.end > interval.start)
+      .sort((left, right) => left.start - right.start)
+    if (occupied.length < 2) continue
+    let cursor = occupied[0].end
+    for (const interval of occupied.slice(1)) {
+      if (interval.start > cursor) {
+        idleMinutes += interval.start - cursor
+        gapCount += 1
+      }
+      cursor = Math.max(cursor, interval.end)
+    }
+  }
+
+  return {
+    date,
+    appointmentCount: dayAppointments.length,
+    bookedMinutes,
+    idleMinutes,
+    gapCount,
+    closed,
+  }
+}
 
 export interface CalendarState {
   view: CalendarView

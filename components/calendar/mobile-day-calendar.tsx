@@ -43,6 +43,8 @@ interface MobileDayCalendarProps extends CalendarRendererProps {
   onOptimize?(): void
   optimizeButtonRef?: Ref<HTMLButtonElement>
   onDensityChange(density: number): void
+  view?: 'day' | 'week'
+  onViewChange?(view: 'day' | 'week'): void
 }
 
 interface OpenWindow {
@@ -179,6 +181,8 @@ export function MobileDayCalendar({
   onOptimize,
   optimizeButtonRef,
   onDensityChange,
+  view = 'day',
+  onViewChange = ignoreViewChange,
 }: MobileDayCalendarProps) {
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
@@ -324,9 +328,12 @@ export function MobileDayCalendar({
       <div className="sticky top-0 z-40 bg-card">
         <CalendarToolbar
           selectedDate={selectedDate}
-          view="day"
+          view={view}
+          enabledViews={['day', 'week']}
           onToday={handleToday}
-          onViewChange={ignoreViewChange}
+          onViewChange={(nextView) => onViewChange(
+            nextView as 'day' | 'week',
+          )}
           onOptimize={onOptimize}
           optimizeButtonRef={optimizeButtonRef}
         />

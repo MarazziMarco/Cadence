@@ -42,6 +42,8 @@ import {
   parseStoredCalendarDensity,
   parseStoredCalendarView,
   visibleRange,
+  responsiveCalendarLayout,
+  type ResponsiveCalendarLayout,
   type CalendarState,
 } from '@/lib/calendar/controller'
 import {
@@ -81,8 +83,10 @@ import {
   type CalendarRendererProps,
 } from './desktop-week-calendar'
 import { MobileDayCalendar } from './mobile-day-calendar'
+import { MobileWeekOverview } from './mobile-week-overview'
 import { MoveAppointmentSheet } from './move-appointment-sheet'
 import { OptimizeDialog } from './optimize-dialog'
+import { TabletMultiDayCalendar } from './tablet-multi-day-calendar'
 
 type CalendarSection = 'calendar' | 'waiting'
 type QuickAction = 'delete' | 'toggle-lock'
@@ -203,6 +207,28 @@ export function useDesktopMediaQuery() {
   return isDesktop
 }
 
+export function useResponsiveCalendarLayout() {
+  const [layout, setLayout] = useState<ResponsiveCalendarLayout>('phone')
+
+  useEffect(() => {
+    const finePointer = window.matchMedia('(pointer: fine)')
+    const update = () => setLayout(responsiveCalendarLayout(
+      window.innerWidth,
+      window.innerHeight,
+      finePointer.matches,
+    ))
+    window.addEventListener('resize', update)
+    finePointer.addEventListener('change', update)
+    update()
+    return () => {
+      window.removeEventListener('resize', update)
+      finePointer.removeEventListener('change', update)
+    }
+  }, [])
+
+  return layout
+}
+
 export function CalendarController() {
   const { business } = useWorkspace()
   const { t, locale } = useT()
@@ -228,22 +254,56 @@ export function CalendarController() {
   const mobileOptimizeButtonRef = useRef<HTMLButtonElement>(null)
   const lastOptimizeButtonRef = useRef<HTMLButtonElement | null>(null)
   const wasOptimizeOpenRef = useRef(false)
-  const isDesktop = useDesktopMediaQuery()
+  const responsiveLayout = useResponsiveCalendarLayout()
+  const isDesktop = responsiveLayout === 'desktop'
   const supportedView: SupportedCalendarView = isSupportedCalendarView(state.view)
     ? state.view
     : 'week'
-  const rendererView: SupportedCalendarView = isDesktop ? supportedView : 'day'
+  const rendererView: SupportedCalendarView = supportedView
   const range = useMemo(
-    () => visibleSupportedRange(state.selectedDate, rendererView),
-    [rendererView, state.selectedDate],
+    () => {
+      if (responsiveLayout === 'three-day') {
+        return {
+          from: state.selectedDate,
+          to: addBusinessDays(state.selectedDate, 2),
+        }
+      }
+      if (responsiveLayout === 'seven-day') {
+        return visibleSupportedRange(state.selectedDate, 'week')
+      }
+      return visibleSupportedRange(state.selectedDate, rendererView)
+    },
+    [rendererView, responsiveLayout, state.selectedDate],
   )
   const previousRange = useMemo(
-    () => adjacentRange(state.selectedDate, rendererView, range, -1),
-    [range, rendererView, state.selectedDate],
+    () => {
+      if (responsiveLayout === 'three-day') {
+        return {
+          from: addBusinessDays(range.from, -3),
+          to: addBusinessDays(range.to, -3),
+        }
+      }
+      if (responsiveLayout === 'seven-day') {
+        return adjacentRange(state.selectedDate, 'week', range, -1)
+      }
+      return adjacentRange(state.selectedDate, rendererView, range, -1)
+    },
+    [range, rendererView, responsiveLayout, state.selectedDate],
   )
   const nextRange = useMemo(
-    () => adjacentRange(state.selectedDate, rendererView, range, 1),
-    [range, rendererView, state.selectedDate],
+    () => {
+      if (responsiveLayout === 'three-day') {
+        return {
+          from: addBusinessDays(range.from, 3),
+          to: addBusinessDays(range.to, 3),
+        }
+      }
+      if (responsiveLayout === 'seven-day') {
+        return adjacentRange(state.selectedDate, 'week', range, 1)
+      }
+      return adjacentRange(state.selectedDate, rendererView, range, 1)
+    },
+    [range, rendererView, responsiveLayout, state.selectedDate],
   )
 
   const [appointmentsQuery, configQuery] = useQueries({
@@ -297,10 +357,9 @@ export function CalendarController() {
     const storedDensity = parseStoredCalendarDensity(
       localStorage.getItem(CALENDAR_DENSITY_STORAGE_KEY),
     )
-    const desktop = window.matchMedia('(min-width: 1024px)').matches
-    if (desktop && isSupportedCalendarView(storedView)) {
+    if (isSupportedCalendarView(storedView)) {
       dispatch({ type: 'set-view', view: storedView })
-    } else if (!desktop) {
+    } else {
       dispatch({ type: 'set-view', view: 'day' })
     }
     if (storedDensity !== null) {
@@ -308,15 +367,6 @@ export function CalendarController() {
     }
     setPreferencesRestored(true)
   }, [])
-
-  useEffect(() => {
-    if (
-      !preferencesRestored
-      || isDesktop
-      || state.view === 'day'
-    ) return
-    dispatch({ type: 'set-view', view: 'day' })
-  }, [isDesktop, preferencesRestored, state.view])
 
   useEffect(() => {
     if (!preferencesRestored) return
@@ -626,6 +676,15 @@ export function CalendarController() {
     dispatch({ type: 'set-density', density })
   }, [])
 
+  const handleViewChange = useCallback((view: 'day' | 'week') => {
+    dispatch({ type: 'set-view', view })
+  }, [])
+
+  const handleOverviewDay = useCallback((date: string) => {
+    dispatch({ type: 'select-date', date })
+    dispatch({ type: 'set-view', view: 'day' })
+  }, [])
+
   const handleOpenOptimizer = useCallback(() => {
     const activeElement = document.activeElement
     lastOptimizeButtonRef.current = activeElement instanceof HTMLButtonElement
@@ -688,12 +747,18 @@ export function CalendarController() {
     || moveSheetOpen
   )
   const navigate = useCallback((direction: -1 | 1) => {
-    const amount = rendererView === 'day' ? 1 : 7
+    const amount = responsiveLayout === 'three-day'
+      ? 3
+      : responsiveLayout === 'seven-day'
+        ? 7
+        : rendererView === 'day'
+          ? 1
+          : 7
     dispatch({
       type: 'select-date',
       date: addBusinessDays(state.selectedDate, direction * amount),
     })
-  }, [rendererView, state.selectedDate])
+  }, [rendererView, responsiveLayout, state.selectedDate])
 
   const openNew = useCallback(() => {
     handleCreateAt(state.selectedDate, 9 * 60)
@@ -844,7 +909,7 @@ export function CalendarController() {
         <WaitingListClient hideHeader />
       ) : (
         <>
-          {isDesktop ? (
+          {responsiveLayout === 'desktop' ? (
             <>
               <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
                 <Button size="lg" onClick={openNew}>
@@ -912,7 +977,17 @@ export function CalendarController() {
 
               <DesktopWeekCalendar {...rendererProps} view={rendererView} />
             </>
-          ) : (
+          ) : responsiveLayout === 'phone' && rendererView === 'week' ? (
+            <MobileWeekOverview
+              appointments={appointments}
+              config={config}
+              selectedDate={state.selectedDate}
+              onSelectDay={handleOverviewDay}
+              onViewChange={handleViewChange}
+              onOptimize={businessId ? handleOpenOptimizer : undefined}
+              optimizeButtonRef={mobileOptimizeButtonRef}
+            />
+          ) : responsiveLayout === 'phone' ? (
             <>
               <MobileDayCalendar
                 {...rendererProps}
@@ -925,8 +1000,20 @@ export function CalendarController() {
                 onOptimize={businessId ? handleOpenOptimizer : undefined}
                 optimizeButtonRef={mobileOptimizeButtonRef}
                 onDensityChange={handleDensityChange}
+                view={rendererView}
+                onViewChange={handleViewChange}
               />
             </>
+          ) : (
+            <TabletMultiDayCalendar
+              {...rendererProps}
+              dayCount={responsiveLayout === 'seven-day' ? 7 : 3}
+              view={rendererView}
+              onDensityChange={handleDensityChange}
+              onViewChange={handleViewChange}
+              onOptimize={businessId ? handleOpenOptimizer : undefined}
+              optimizeButtonRef={mobileOptimizeButtonRef}
+            />
           )}
 
           {businessId ? (
