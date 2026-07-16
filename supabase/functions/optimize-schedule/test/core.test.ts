@@ -7,7 +7,7 @@ import {
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { findHardViolation, runSolver } from "../solver/core.ts";
-import { capacityWindows } from "../solver/time.ts";
+import { capacityWindows, dayDiff } from "../solver/time.ts";
 import type { SolverInput } from "../solver/types.ts";
 
 async function load(name: string): Promise<SolverInput> {
@@ -201,6 +201,21 @@ Deno.test("H: advance pre-pass pulls a 'move me up' client into an earlier slot"
   const move = res.output.changes.find((c) => c.kind === "move" && c.appointment_id === "appt-far")
   assert(move, "expected a move for the advanced appointment")
   assertEquals(res.output.run.created_appointments, 0)
+})
+
+Deno.test("I: month moves stay in their week unless cross-week is enabled", async () => {
+  const isolated = await load("i_month_week_isolation.json")
+  const isolatedResult = runSolver(isolated)
+  const isolatedSlot = isolatedResult.slots.find((slot) => slot.id === "appt-week")!
+  assertEquals(isolatedSlot.date, "2026-07-13")
+
+  const enabled = structuredClone(isolated)
+  enabled.context.allow_cross_week = true
+  enabled.context.max_cross_week_days = 7
+  const enabledResult = runSolver(enabled)
+  const moved = enabledResult.slots.find((slot) => slot.id === "appt-week")!
+  assertEquals(moved.date, "2026-07-10")
+  assert(Math.abs(dayDiff("2026-07-13", moved.date)) <= 7)
 })
 
 Deno.test("determinism: same input yields identical output", async () => {

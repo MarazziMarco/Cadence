@@ -118,6 +118,25 @@ export interface OptimizationApplyRequest {
   idempotencyKey: string
 }
 
+export interface ContextualOptimizationRequest {
+  businessId: string
+  scope: 'day' | 'week' | 'month' | 'custom'
+  dateFrom: string
+  dateTo: string
+  allowCrossWeek: boolean
+  maxCrossWeekDays: number
+}
+
+export interface ContextualOptimizationResponse {
+  batchId: string
+  runs: Array<{
+    runId: string
+    weekKey: string | null
+    from: string
+    to: string
+  }>
+}
+
 async function optimizerMutation(body: Record<string, unknown>) {
   const response = await fetch('/api/calendar/optimize/apply', {
     method: 'POST',
@@ -155,4 +174,19 @@ export async function undoOptimizationRun(
     runId,
     idempotencyKey: crypto.randomUUID(),
   })
+}
+
+export async function runContextualOptimization(
+  request: ContextualOptimizationRequest,
+): Promise<ContextualOptimizationResponse> {
+  const response = await fetch('/api/calendar/optimize', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  const body = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new Error(body?.error || 'Contextual optimization failed')
+  }
+  return body as ContextualOptimizationResponse
 }

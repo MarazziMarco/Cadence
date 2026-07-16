@@ -51,6 +51,7 @@ Deno.serve(async (req: Request) => {
   ) ?? (date_from === date_to ? "day" : "custom");
   const week_key = (body.week_key as string | undefined) ?? null;
   const allow_cross_week = body.allow_cross_week === true;
+  const max_cross_week_days = Number(body.max_cross_week_days ?? 7);
 
   if (!business_id) return json({ error: "business_id is required" }, 400);
   if (!date_from || !DATE_RE.test(date_from)) {
@@ -67,6 +68,13 @@ Deno.serve(async (req: Request) => {
   }
   if (!["day", "week", "month", "custom"].includes(scope_kind)) {
     return json({ error: "invalid scope_kind" }, 400);
+  }
+  if (
+    !Number.isInteger(max_cross_week_days) ||
+    max_cross_week_days < 1 ||
+    max_cross_week_days > 31
+  ) {
+    return json({ error: "max_cross_week_days must be between 1 and 31" }, 400);
   }
 
   const url = Deno.env.get("SUPABASE_URL");
@@ -108,6 +116,10 @@ Deno.serve(async (req: Request) => {
       date_to,
       settings_id,
       mode,
+      scope_kind,
+      week_key,
+      allow_cross_week,
+      max_cross_week_days,
     });
     const output = solveCore(input);
     const run_id = await persistOutput(supabase, {

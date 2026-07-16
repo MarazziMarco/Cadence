@@ -51,6 +51,10 @@ export interface SolverContext {
   now: string; // ISO timestamp, for minimum_notice_hours
   mode: Mode;
   settings: Settings;
+  scope_kind?: "day" | "week" | "month" | "custom";
+  week_key?: string | null;
+  allow_cross_week?: boolean;
+  max_cross_week_days?: number;
 }
 
 export interface WorkingHour {

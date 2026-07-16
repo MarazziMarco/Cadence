@@ -26,6 +26,10 @@ export interface LoadArgs {
   date_to: string;
   settings_id?: string;
   mode?: Mode;
+  scope_kind?: "day" | "week" | "month" | "custom";
+  week_key?: string | null;
+  allow_cross_week?: boolean;
+  max_cross_week_days?: number;
 }
 
 // "advance" waiting-list entries store {"advance_for":"<appointmentId>"} in notes.
@@ -239,6 +243,10 @@ export async function loadInput(
       now: new Date().toISOString(),
       mode,
       settings,
+      scope_kind: args.scope_kind,
+      week_key: args.week_key ?? null,
+      allow_cross_week: args.allow_cross_week ?? false,
+      max_cross_week_days: args.max_cross_week_days ?? 7,
     },
     working_hours,
     holidays,

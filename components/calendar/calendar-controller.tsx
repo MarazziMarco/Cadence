@@ -79,6 +79,7 @@ import {
 } from './appointment-dialog'
 import { AppointmentQuickSheet } from './appointment-quick-sheet'
 import { CalendarAgenda } from './calendar-agenda'
+import { ContextualOptimizeDialog } from './contextual-optimize-dialog'
 import {
   DesktopWeekCalendar,
   type CalendarRendererProps,
@@ -87,7 +88,6 @@ import { MobileDayCalendar } from './mobile-day-calendar'
 import { MobileMonthCalendar } from './mobile-month-calendar'
 import { MobileWeekOverview } from './mobile-week-overview'
 import { MoveAppointmentSheet } from './move-appointment-sheet'
-import { OptimizeDialog } from './optimize-dialog'
 import { TabletMultiDayCalendar } from './tablet-multi-day-calendar'
 
 type CalendarSection = 'calendar' | 'waiting'
@@ -328,6 +328,15 @@ export function CalendarController() {
       )
     },
     [range, rendererView, responsiveLayout, state.selectedDate, timelineView],
+  )
+  const optimizationScope: 'day' | 'week' | 'month' | 'custom' = (
+    responsiveLayout === 'phone'
+      ? rendererView === 'agenda' ? 'custom' : rendererView
+      : responsiveLayout === 'desktop'
+        ? timelineView
+        : responsiveLayout === 'seven-day'
+          ? 'week'
+          : 'custom'
   )
 
   const [appointmentsQuery, configQuery] = useQueries({
@@ -1086,13 +1095,13 @@ export function CalendarController() {
           )}
 
           {businessId ? (
-            <OptimizeDialog
+            <ContextualOptimizeDialog
               businessId={businessId}
+              scope={optimizationScope}
               dateFrom={range.from}
               dateTo={range.to}
               open={optimizeOpen}
               onOpenChange={handleOptimizeOpenChange}
-              showTrigger={false}
             />
           ) : null}
 

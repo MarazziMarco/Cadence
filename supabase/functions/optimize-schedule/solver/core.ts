@@ -103,6 +103,29 @@ function tuning(settings: Settings) {
   };
 }
 
+function mondayKey(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day));
+  const mondayIndex = (value.getUTCDay() + 6) % 7;
+  value.setUTCDate(value.getUTCDate() - mondayIndex);
+  return `${value.getUTCFullYear()}-${
+    String(value.getUTCMonth() + 1).padStart(2, "0")
+  }-${String(value.getUTCDate()).padStart(2, "0")}`;
+}
+
+function existingDateAllowed(
+  input: SolverInput,
+  originDate: string,
+  candidateDate: string,
+): boolean {
+  if (input.context.scope_kind !== "month") return true;
+  if (!input.context.allow_cross_week) {
+    return mondayKey(candidateDate) === mondayKey(originDate);
+  }
+  const maxDays = input.context.max_cross_week_days ?? 7;
+  return Math.abs(dayDiff(originDate, candidateDate)) <= maxDays;
+}
+
 /** Slots that conflict (footprint overlap) on the same date, excluding self. */
 function conflicts(slot: Slot, slots: Slot[]): boolean {
   const s0 = occStart(slot), e0 = occEnd(slot);
@@ -738,6 +761,7 @@ export function runSolver(input: SolverInput): SolverResult {
       for (const date of advDates) {
         if (date >= curDate) break;
         if (dayDiff(date, curDate) < minDays) continue;
+        if (!existingDateAllowed(input, curDate, date)) continue;
         for (const cand of candidateStarts(input, slots, s, date)) {
           const prevDate = s.date, prevStart = s.start;
           s.date = date;
@@ -773,6 +797,37 @@ export function runSolver(input: SolverInput): SolverResult {
           }
           s.start = prevStart;
         }
+      }
+    }
+  }
+
+  // Contextual month runs may consider cross-day moves. Isolated month runs
+  // stay inside the appointment's Monday-Sunday bucket; explicitly enabled
+  // runs may move no farther than max_cross_week_days.
+  if (input.context.scope_kind === "month") {
+    const days = dateRange(input.context.date_from, input.context.date_to);
+    for (const s of slots.filter((slot) => slot.movable)) {
+      const original = origin.get(s.id);
+      if (!original) continue;
+      let placed = false;
+      for (const date of days) {
+        if (date === s.date) continue;
+        if (!existingDateAllowed(input, original.date, date)) continue;
+        for (const cand of candidateStarts(input, slots, s, date)) {
+          const previousDate = s.date;
+          const previousStart = s.start;
+          s.date = date;
+          s.start = cand;
+          const candidate = cost();
+          if (accept(candidate)) {
+            cur = candidate;
+            placed = true;
+            break;
+          }
+          s.date = previousDate;
+          s.start = previousStart;
+        }
+        if (placed) break;
       }
     }
   }

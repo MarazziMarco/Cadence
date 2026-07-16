@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Wand2, Loader2, Clock, DollarSign, ListChecks, ArrowRightLeft, ShieldCheck, Check, X, ArrowRight, Sparkles, PlusCircle, Star, CalendarClock, MoveHorizontal, ChevronsUp } from 'lucide-react'
-import { runOptimization, fetchRun, acceptChange, rejectChange, ensureAlgorithmSettings, getAlgorithmSettings, saveAlgorithmSettings, saveAlgorithmMetadata } from '@/lib/api/scheduler'
+import { runOptimization, fetchRun, ensureAlgorithmSettings, getAlgorithmSettings, saveAlgorithmSettings, saveAlgorithmMetadata } from '@/lib/api/scheduler'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
 import { PageHeader } from '@/components/common/page-header'
@@ -56,6 +56,8 @@ export function SchedulerClient() {
   const [protectVips, setProtectVips] = useState(true)
   const [respectPreferred, setRespectPreferred] = useState(true)
   const [prioritizeAdvance, setPrioritizeAdvance] = useState(true)
+  const [allowCrossWeek, setAllowCrossWeek] = useState(false)
+  const [maxCrossWeekDays, setMaxCrossWeekDays] = useState(7)
 
   const [loading, setLoading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -74,6 +76,11 @@ export function SchedulerClient() {
         setProtectVips((s.weight_vip ?? 100) > 0)
         setRespectPreferred((s.weight_patient_preference ?? 5) > 0)
         setPrioritizeAdvance((s.metadata?.PRIORITIZE_ADVANCE ?? true) !== false)
+        setAllowCrossWeek(s.metadata?.ALLOW_CROSS_WEEK === true)
+        setMaxCrossWeekDays(Math.min(
+          31,
+          Math.max(1, Number(s.metadata?.MAX_CROSS_WEEK_DAYS ?? 7)),
+        ))
       })
       .catch(() => {})
   }, [businessId])
@@ -84,6 +91,17 @@ export function SchedulerClient() {
   const changeVips = (v: boolean) => { setProtectVips(v); persist({ weight_vip: v ? 100 : 0 }) }
   const changePreferred = (v: boolean) => { setRespectPreferred(v); persist({ weight_patient_preference: v ? 5 : 0 }) }
   const changeAdvance = (v: boolean) => { setPrioritizeAdvance(v); saveAlgorithmMetadata(businessId, { PRIORITIZE_ADVANCE: v }).catch(() => {}) }
+  const changeCrossWeek = (v: boolean) => {
+    setAllowCrossWeek(v)
+    saveAlgorithmMetadata(businessId, { ALLOW_CROSS_WEEK: v }).catch(() => {})
+  }
+  const changeMaxCrossWeekDays = (value: number) => {
+    const next = Math.min(31, Math.max(1, Math.round(value || 1)))
+    setMaxCrossWeekDays(next)
+    saveAlgorithmMetadata(businessId, {
+      MAX_CROSS_WEEK_DAYS: next,
+    }).catch(() => {})
+  }
 
   const [dateFrom, dateTo] = range === 'day' ? [date, date]
     : range === 'week' ? (() => { const s = startOfWeek(parseYmd(date)); return [ymd(s), ymd(addDays(s, 6))] })()
@@ -115,6 +133,7 @@ export function SchedulerClient() {
     { on: protectVips, set: changeVips, icon: Star, title: t('sched.tg.vips.title'), desc: t('sched.tg.vips.desc') },
     { on: respectPreferred, set: changePreferred, icon: CalendarClock, title: t('sched.tg.preferred.title'), desc: t('sched.tg.preferred.desc') },
     { on: prioritizeAdvance, set: changeAdvance, icon: ChevronsUp, title: t('sched.tg.advance.title'), desc: t('sched.tg.advance.desc') },
+    { on: allowCrossWeek, set: changeCrossWeek, icon: MoveHorizontal, title: t('sched.tg.crossWeek.title'), desc: t('sched.tg.crossWeek.desc') },
   ]
 
   return (
@@ -199,6 +218,28 @@ export function SchedulerClient() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">{t('sched.savedNote')}</p>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+              <div>
+                <Label htmlFor="max-cross-week-days">
+                  {t('sched.maxDisplacement')}
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {t('sched.maxDisplacementDesc')}
+                </p>
+              </div>
+              <Input
+                id="max-cross-week-days"
+                type="number"
+                min={1}
+                max={31}
+                value={maxCrossWeekDays}
+                disabled={!allowCrossWeek}
+                onChange={(event) => changeMaxCrossWeekDays(
+                  Number(event.target.value),
+                )}
+                className="w-24"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
