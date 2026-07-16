@@ -1,3 +1,5 @@
+/// <reference lib="deno.ns" />
+
 // Offline tests for solveCore against fixtures. Run: `deno test`.
 // No network, no DB. Asserts hard-constraint validity, idle non-increase,
 // move-budget enforcement, and waiting-list fill behavior.
@@ -10,9 +12,77 @@ import { findHardViolation, runSolver } from "../solver/core.ts";
 import { capacityWindows, dayDiff } from "../solver/time.ts";
 import type { SolverInput } from "../solver/types.ts";
 
+interface TestTravelLeg {
+  seconds: number;
+  meters: number;
+  mode: "studio" | "fallback" | "foot-walking" | "driving-car";
+  verifiable: boolean;
+}
+
+type RoutedTestInput = SolverInput & {
+  studio_location_key: string;
+  travel_matrix: Record<string, Record<string, TestTravelLeg>>;
+  strategy: "balanced" | "smart_route";
+  route_thresholds: {
+    walk_max_minutes: number;
+    unknown_studio_leg_minutes: number;
+    smart_route_min_saving_minutes: number;
+  };
+};
+
 async function load(name: string): Promise<SolverInput> {
   const url = new URL(`../fixtures/${name}`, import.meta.url);
   return JSON.parse(await Deno.readTextFile(url)) as SolverInput;
+}
+
+async function routedBase(): Promise<RoutedTestInput> {
+  const input = structuredClone(
+    await load("g_intrablock_exact.json"),
+  ) as RoutedTestInput;
+  input.studio_location_key = "studio";
+  input.travel_matrix = {};
+  input.strategy = "balanced";
+  input.route_thresholds = {
+    walk_max_minutes: 9,
+    unknown_studio_leg_minutes: 20,
+    smart_route_min_saving_minutes: 10,
+  };
+  input.context.settings.allow_waiting_list = false;
+  input.context.settings.max_solver_seconds = 0;
+  return input;
+}
+
+function setLocation(
+  input: RoutedTestInput,
+  appointmentId: string,
+  locationKey: string,
+): void {
+  const appointment = input.appointments.find((item) =>
+    item.id === appointmentId
+  );
+  assert(appointment, `missing appointment ${appointmentId}`);
+  (appointment as typeof appointment & { location_key: string }).location_key =
+    locationKey;
+}
+
+function setLeg(
+  input: RoutedTestInput,
+  from: string,
+  to: string,
+  minutes: number,
+  verifiable = true,
+): void {
+  input.travel_matrix[from] ??= {};
+  input.travel_matrix[from][to] = {
+    seconds: minutes * 60,
+    meters: minutes * 100,
+    mode: minutes === 0 ? "studio" : "driving-car",
+    verifiable,
+  };
+}
+
+function lockAll(input: RoutedTestInput): void {
+  for (const appointment of input.appointments) appointment.locked = true;
 }
 
 function toMin(t: string): number {
@@ -217,6 +287,120 @@ Deno.test("I: month moves stay in their week unless cross-week is enabled", asyn
   assertEquals(moved.date, "2026-07-10")
   assert(Math.abs(dayDiff("2026-07-13", moved.date)) <= 7)
 })
+
+Deno.test("routing rejects consecutive appointments without enough travel time", async () => {
+  const input = await routedBase();
+  input.appointments[1].start_time = "09:40";
+  input.appointments[1].end_time = "10:10";
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  setLeg(input, "studio", "patient-a", 0);
+  setLeg(input, "patient-a", "patient-b", 15);
+  setLeg(input, "patient-b", "studio", 0);
+  lockAll(input);
+
+  const violation = findHardViolation(input, runSolver(input).slots);
+  assert(
+    violation?.includes("travel"),
+    `expected a travel violation, got ${violation}`,
+  );
+});
+
+Deno.test("routing accepts a consecutive leg fully absorbed by lunch", async () => {
+  const input = await routedBase();
+  input.appointments[0].start_time = "12:30";
+  input.appointments[0].end_time = "13:00";
+  input.appointments[1].start_time = "14:00";
+  input.appointments[1].end_time = "14:30";
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  setLeg(input, "studio", "patient-a", 0);
+  setLeg(input, "patient-a", "patient-b", 60);
+  setLeg(input, "patient-b", "studio", 0);
+  lockAll(input);
+
+  assertEquals(findHardViolation(input, runSolver(input).slots), null);
+});
+
+Deno.test("routing enforces both first-studio and last-studio legs", async () => {
+  const first = await routedBase();
+  first.appointments = [first.appointments[0]];
+  first.appointments[0].start_time = "09:05";
+  first.appointments[0].end_time = "09:35";
+  setLocation(first, "appt-1", "patient-a");
+  setLeg(first, "studio", "patient-a", 10);
+  setLeg(first, "patient-a", "studio", 0);
+  lockAll(first);
+  const firstViolation = findHardViolation(first, runSolver(first).slots);
+  assert(
+    firstViolation?.includes("first travel"),
+    `expected first travel violation, got ${firstViolation}`,
+  );
+
+  const last = await routedBase();
+  last.appointments = [last.appointments[0]];
+  last.appointments[0].start_time = "17:20";
+  last.appointments[0].end_time = "17:50";
+  setLocation(last, "appt-1", "patient-a");
+  setLeg(last, "studio", "patient-a", 0);
+  setLeg(last, "patient-a", "studio", 15);
+  lockAll(last);
+  const lastViolation = findHardViolation(last, runSolver(last).slots);
+  assert(
+    lastViolation?.includes("last travel"),
+    `expected last travel violation, got ${lastViolation}`,
+  );
+});
+
+Deno.test("routing blocks an unverifiable required external leg", async () => {
+  const input = await routedBase();
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  setLeg(input, "studio", "patient-a", 0);
+  setLeg(input, "patient-a", "patient-b", 0, false);
+  setLeg(input, "patient-b", "studio", 0);
+  lockAll(input);
+
+  const violation = findHardViolation(input, runSolver(input).slots);
+  assert(
+    violation?.includes("unavailable"),
+    `expected route unavailable, got ${violation}`,
+  );
+});
+
+Deno.test("routing idle subtracts required travel from an open gap", async () => {
+  const input = await routedBase();
+  input.appointments[1].start_time = "10:30";
+  input.appointments[1].end_time = "11:00";
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  setLeg(input, "studio", "patient-a", 0);
+  setLeg(input, "patient-a", "patient-b", 20);
+  setLeg(input, "patient-b", "studio", 0);
+  lockAll(input);
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  assertEquals(result.idleBefore, 40);
+  assertEquals(result.idleAfter, 40);
+});
+
+Deno.test("routing candidates compact to predecessor end plus travel", async () => {
+  const input = await routedBase();
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  setLeg(input, "studio", "patient-a", 0);
+  setLeg(input, "patient-a", "patient-b", 20);
+  setLeg(input, "patient-b", "studio", 0);
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const move = result.output.changes.find((change) =>
+    change.appointment_id === "appt-2"
+  );
+  assert(move, "expected the second appointment to be compacted");
+  assertEquals(move.new_start_time, "09:50:00");
+});
 
 Deno.test("determinism: same input yields identical output", async () => {
   const input = await load("a_interstitial_gap.json");

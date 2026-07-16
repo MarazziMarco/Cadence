@@ -3,7 +3,10 @@
 // All times are wall-clock "HH:MM" or "HH:MM:SS" strings on input; the core
 // normalizes them to minutes-from-midnight internally.
 
+import type { TravelMatrix } from "../routing/matrix.ts";
+
 export type Mode = "conservative" | "balanced" | "aggressive";
+export type OptimizationStrategy = "balanced" | "smart_route";
 export type Priority = "low" | "normal" | "high";
 export type Weekday =
   | "monday"
@@ -21,6 +24,10 @@ export interface Tuning {
   MIN_IDLE_GAP?: number; // default 5 — minimum gap (min) counted as idle
   PRIORITIZE_ADVANCE?: boolean; // default true — pull "move me up" clients into freed slots first
   ADVANCE_MIN_DAYS?: number; // default 3 — only advance if the new slot is >= this many days earlier
+  OPTIMIZATION_STRATEGY?: OptimizationStrategy;
+  WALK_MAX_MINUTES?: number;
+  UNKNOWN_STUDIO_LEG_MINUTES?: number;
+  SMART_ROUTE_MIN_SAVING_MINUTES?: number;
 }
 
 /** One active algorithm_settings row (§2 context.settings). */
@@ -126,6 +133,7 @@ export interface Appointment {
   locked: boolean;
   manual_override: boolean;
   source: string;
+  location_key: string;
 }
 
 export interface WaitingListEntry {
@@ -155,6 +163,16 @@ export interface SolverInput {
   patient_exceptions: PatientException[];
   appointments: Appointment[];
   waiting_list: WaitingListEntry[];
+  studio_location_key: string;
+  travel_matrix: TravelMatrix;
+  strategy: OptimizationStrategy;
+  route_thresholds: RouteThresholds;
+}
+
+export interface RouteThresholds {
+  walk_max_minutes: number;
+  unknown_studio_leg_minutes: number;
+  smart_route_min_saving_minutes: number;
 }
 
 // ---- Output (§7) ---------------------------------------------------------

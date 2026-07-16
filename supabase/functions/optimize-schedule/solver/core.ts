@@ -56,6 +56,7 @@ interface Slot {
   movable: boolean; // false => anchor (locked / no-AI / dirty)
   created: boolean; // true => came from waiting list
   manual_override: boolean;
+  location_key: string;
   // waiting-list bookkeeping (created only)
   wlPriority?: string;
 }
@@ -67,6 +68,72 @@ interface Origin {
 
 const occStart = (s: Slot) => s.start - s.bufBefore;
 const occEnd = (s: Slot) => s.start + s.dur + s.bufAfter;
+
+function studioLocationKey(input: SolverInput): string {
+  return input.studio_location_key ?? "studio:unknown";
+}
+
+function travelMinutes(
+  input: SolverInput,
+  from: string,
+  to: string,
+): number | null {
+  if (from === to) return 0;
+  const leg = input.travel_matrix?.[from]?.[to];
+  if (!leg?.verifiable || !Number.isFinite(leg.seconds) || leg.seconds < 0) {
+    return null;
+  }
+  return Math.ceil(leg.seconds / 60);
+}
+
+function routeViolationForDay(
+  input: SolverInput,
+  slots: Slot[],
+  date: string,
+): string | null {
+  const wins = capacityWindows(date, input.working_hours, input.holidays);
+  if (wins.length === 0) return null;
+  const ordered = slots
+    .filter((slot) => slot.date === date)
+    .sort((a, b) => occStart(a) - occStart(b) || a.id.localeCompare(b.id));
+  if (ordered.length === 0) return null;
+
+  const studio = studioLocationKey(input);
+  const first = ordered[0];
+  const firstTravel = travelMinutes(input, studio, first.location_key);
+  if (firstTravel === null) {
+    return `first travel unavailable ${studio}/${first.location_key} on ${date}`;
+  }
+  if (wins[0].start + firstTravel > occStart(first)) {
+    return `insufficient first travel before ${first.id} on ${date}`;
+  }
+
+  for (let i = 1; i < ordered.length; i++) {
+    const previous = ordered[i - 1];
+    const next = ordered[i];
+    const travel = travelMinutes(
+      input,
+      previous.location_key,
+      next.location_key,
+    );
+    if (travel === null) {
+      return `travel unavailable ${previous.id}/${next.id} on ${date}`;
+    }
+    if (occEnd(previous) + travel > occStart(next)) {
+      return `insufficient travel ${previous.id}/${next.id} on ${date}`;
+    }
+  }
+
+  const last = ordered[ordered.length - 1];
+  const lastTravel = travelMinutes(input, last.location_key, studio);
+  if (lastTravel === null) {
+    return `last travel unavailable ${last.location_key}/${studio} on ${date}`;
+  }
+  if (occEnd(last) + lastTravel > wins[wins.length - 1].end) {
+    return `insufficient last travel after ${last.id} on ${date}`;
+  }
+  return null;
+}
 
 // ---- seeded RNG (mulberry32) --------------------------------------------
 function makeRng(seed: number): () => number {
@@ -172,7 +239,9 @@ function feasibleAt(
   const prevDate = slot.date, prevStart = slot.start;
   slot.date = date;
   slot.start = start;
-  const ok = !conflicts(slot, slots) && splitDayOk(input, slots, slot, wins, wi);
+  const ok = !conflicts(slot, slots) &&
+    splitDayOk(input, slots, slot, wins, wi) &&
+    routeViolationForDay(input, slots, date) === null;
   slot.date = prevDate;
   slot.start = prevStart;
   return ok;
@@ -206,12 +275,36 @@ function candidateStarts(
 ): number[] {
   const wins = capacityWindows(date, input.working_hours, input.holidays);
   const set = new Set<number>();
+  const studio = studioLocationKey(input);
   for (const w of wins) {
-    set.add(w.start + slot.bufBefore); // left-packed against window start
+    const firstTravel = travelMinutes(input, studio, slot.location_key);
+    if (firstTravel !== null) {
+      set.add(w.start + firstTravel + slot.bufBefore);
+    }
+    const lastTravel = travelMinutes(input, slot.location_key, studio);
+    if (lastTravel !== null) {
+      set.add(w.end - lastTravel - slot.dur - slot.bufAfter);
+    }
     for (const o of slots) {
       if (o === slot || o.date !== date) continue;
-      const after = occEnd(o) + slot.bufBefore; // right after another footprint
-      if (after >= w.start && after + slot.dur <= w.end) set.add(after);
+      const afterTravel = travelMinutes(
+        input,
+        o.location_key,
+        slot.location_key,
+      );
+      if (afterTravel !== null) {
+        const after = occEnd(o) + afterTravel + slot.bufBefore;
+        if (after >= w.start && after + slot.dur <= w.end) set.add(after);
+      }
+      const beforeTravel = travelMinutes(
+        input,
+        slot.location_key,
+        o.location_key,
+      );
+      if (beforeTravel !== null) {
+        const before = occStart(o) - beforeTravel - slot.dur - slot.bufAfter;
+        if (before >= w.start && before + slot.dur <= w.end) set.add(before);
+      }
     }
   }
   const av = availFor(input, slot.patient_id, date);
@@ -269,7 +362,16 @@ function dayIdleAndGaps(
     const from = occEnd(inDay[i - 1]);
     const to = occStart(inDay[i]);
     if (to <= from) continue; // touching or (guarded elsewhere) overlapping
-    const net = openOverlap(from, to, wins); // subtract lunch / closures
+    const open = openOverlap(from, to, wins);
+    const travel = travelMinutes(
+      input,
+      inDay[i - 1].location_key,
+      inDay[i].location_key,
+    );
+    if (travel === null) continue;
+    const closed = Math.max(0, to - from - open);
+    const travelDuringOpen = Math.max(0, travel - closed);
+    const net = Math.max(0, open - travelDuringOpen);
     if (net >= minGap) {
       idle += net;
       gapCount++;
@@ -444,6 +546,7 @@ function buildSlots(input: SolverInput): { slots: Slot[]; dirty: Slot[] } {
       movable: !a.locked && !noAi,
       created: false,
       manual_override: a.manual_override,
+      location_key: a.location_key ?? studioLocationKey(input),
     };
     // dirty data: existing appt outside working hours -> anchor, flag it
     const wins = capacityWindows(
@@ -692,6 +795,8 @@ export function findHardViolation(
         }
       }
     }
+    const routeViolation = routeViolationForDay(input, dayslots, date);
+    if (routeViolation) return routeViolation;
   }
   return null;
 }
@@ -858,6 +963,7 @@ export function runSolver(input: SolverInput): SolverResult {
           movable: false,
           created: true,
           manual_override: false,
+          location_key: studioLocationKey(input),
           wlPriority: entry.priority,
         };
         for (const cand of candidateStarts(input, slots, probe, date)) {
