@@ -216,7 +216,6 @@ export interface RouteCache {
   fetched_at: string
   expires_at: string
   created_at: string
-  updated_at: string
 }
 
 export interface PatientAvailability {

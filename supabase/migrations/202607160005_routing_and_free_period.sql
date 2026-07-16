@@ -6,25 +6,36 @@ create table if not exists public.route_cache (
   destination_hash text not null
     check (destination_hash ~ '^[0-9a-f]{16,64}$'),
   origin_latitude double precision not null
-    check (origin_latitude between -90 and 90),
+    check (
+      origin_latitude between -90 and 90
+      and origin_latitude = round(origin_latitude::numeric, 5)::double precision
+    ),
   origin_longitude double precision not null
-    check (origin_longitude between -180 and 180),
+    check (
+      origin_longitude between -180 and 180
+      and origin_longitude = round(origin_longitude::numeric, 5)::double precision
+    ),
   destination_latitude double precision not null
-    check (destination_latitude between -90 and 90),
+    check (
+      destination_latitude between -90 and 90
+      and destination_latitude = round(destination_latitude::numeric, 5)::double precision
+    ),
   destination_longitude double precision not null
-    check (destination_longitude between -180 and 180),
+    check (
+      destination_longitude between -180 and 180
+      and destination_longitude = round(destination_longitude::numeric, 5)::double precision
+    ),
   profile text not null
     check (profile in ('foot-walking', 'driving-car')),
-  duration_seconds integer not null
+  duration_seconds numeric(12, 3) not null
     check (duration_seconds >= 0),
-  distance_meters integer not null
+  distance_meters numeric(14, 3) not null
     check (distance_meters >= 0),
   provider text not null,
   fetched_at timestamptz not null,
   expires_at timestamptz not null
     check (expires_at > fetched_at),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
   unique (business_id, origin_hash, destination_hash, profile)
 );
 

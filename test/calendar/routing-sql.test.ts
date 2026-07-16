@@ -18,8 +18,8 @@ describe('routing and free-period schema contract', () => {
     expect(migration).toMatch(/origin_hash text not null/i)
     expect(migration).toMatch(/destination_hash text not null/i)
     expect(migration).toMatch(/profile text not null[\s\S]+foot-walking[\s\S]+driving-car/i)
-    expect(migration).toMatch(/duration_seconds integer not null[\s\S]+duration_seconds >= 0/i)
-    expect(migration).toMatch(/distance_meters integer not null[\s\S]+distance_meters >= 0/i)
+    expect(migration).toMatch(/duration_seconds numeric\(12,\s*3\) not null[\s\S]+duration_seconds >= 0/i)
+    expect(migration).toMatch(/distance_meters numeric\(14,\s*3\) not null[\s\S]+distance_meters >= 0/i)
     expect(migration).toMatch(/provider text not null/i)
     expect(migration).toMatch(/fetched_at timestamptz not null/i)
     expect(migration).toMatch(/expires_at timestamptz not null/i)
@@ -33,7 +33,21 @@ describe('routing and free-period schema contract', () => {
     expect(migration).toMatch(/origin_longitude double precision/)
     expect(migration).toMatch(/destination_latitude double precision/)
     expect(migration).toMatch(/destination_longitude double precision/)
+    for (const field of [
+      'origin_latitude',
+      'origin_longitude',
+      'destination_latitude',
+      'destination_longitude',
+    ]) {
+      expect(migration).toMatch(
+        new RegExp(
+          `${field} = round\\(${field}::numeric, 5\\)::double precision`,
+          'i',
+        ),
+      )
+    }
     expect(migration).not.toMatch(/origin_address|destination_address/i)
+    expect(migration).not.toMatch(/updated_at timestamptz/i)
   })
 
   it('adds route strategy, goal, KPIs, excluded period, blockers, and exact-plan state', () => {
