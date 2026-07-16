@@ -369,6 +369,17 @@ describe('AppointmentForm', () => {
     )
   })
 
+  it('uses the workspace business day when no date is provided', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-07-16T22:30:00.000Z'))
+      renderForm({ useBusinessToday: true })
+      expect(screen.getByLabelText(/^date$/i)).toHaveValue('2026-07-17')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('blocks an appointment that would end after midnight before the API', async () => {
     renderForm()
     await userEvent.type(
