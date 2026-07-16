@@ -13,7 +13,6 @@ import {
   useMemo,
   useReducer,
   useState,
-  type ComponentType,
 } from 'react'
 import { toast } from 'sonner'
 
@@ -69,8 +68,8 @@ import { AppointmentDialog } from './appointment-dialog'
 import {
   DesktopWeekCalendar,
   type CalendarRendererProps,
-  type DesktopWeekCalendarProps,
 } from './desktop-week-calendar'
+import { MobileDayCalendar } from './mobile-day-calendar'
 import { OptimizeDialog } from './optimize-dialog'
 
 type CalendarSection = 'calendar' | 'waiting'
@@ -156,20 +155,6 @@ export function useDesktopMediaQuery() {
   return isDesktop
 }
 
-// Task 8 replaces this compatibility renderer. Keeping it as a module-level
-// component preserves current phone behavior without defining components inline.
-function LegacyMobileCalendar(props: DesktopWeekCalendarProps) {
-  return <DesktopWeekCalendar {...props} />
-}
-
-const RENDERERS: Record<
-  'desktop' | 'mobile',
-  ComponentType<DesktopWeekCalendarProps>
-> = {
-  desktop: DesktopWeekCalendar,
-  mobile: LegacyMobileCalendar,
-}
-
 export function CalendarController() {
   const { business } = useWorkspace()
   const { t, locale } = useT()
@@ -244,7 +229,6 @@ export function CalendarController() {
     ? appointmentById.get(state.selectedAppointmentId) ?? null
     : null
   const rendererView = supportedView
-  const Renderer = RENDERERS[isDesktop ? 'desktop' : 'mobile']
 
   useEffect(() => {
     const storedView = parseStoredCalendarView(
@@ -253,8 +237,11 @@ export function CalendarController() {
     const storedDensity = parseStoredCalendarDensity(
       localStorage.getItem(CALENDAR_DENSITY_STORAGE_KEY),
     )
-    if (isSupportedCalendarView(storedView)) {
+    const desktop = window.matchMedia('(min-width: 1024px)').matches
+    if (desktop && isSupportedCalendarView(storedView)) {
       dispatch({ type: 'set-view', view: storedView })
+    } else if (!desktop) {
+      dispatch({ type: 'set-view', view: 'day' })
     }
     if (storedDensity !== null) {
       dispatch({ type: 'set-density', density: storedDensity })
@@ -396,6 +383,10 @@ export function CalendarController() {
   const handleResize = useCallback((request: ResizeIntent) => {
     mutateCalendarChange({ kind: 'resize', request })
   }, [mutateCalendarChange])
+
+  const handleOpenOptimizer = useCallback(() => {
+    setOptimizeOpen(true)
+  }, [])
 
   const rendererProps = useMemo<CalendarRendererProps>(() => ({
     appointments,
@@ -558,70 +549,93 @@ export function CalendarController() {
         <WaitingListClient hideHeader />
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
-            <Button size="lg" onClick={openNew}>
-              <Plus className="mr-2 h-4 w-4" /> {t('cal.new')}
-            </Button>
-            {businessId ? (
-              <OptimizeDialog
-                businessId={businessId}
-                dateFrom={range.from}
-                dateTo={range.to}
-                open={optimizeOpen}
-                onOpenChange={setOptimizeOpen}
+          {isDesktop ? (
+            <>
+              <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
+                <Button size="lg" onClick={openNew}>
+                  <Plus className="mr-2 h-4 w-4" /> {t('cal.new')}
+                </Button>
+                {businessId ? (
+                  <OptimizeDialog
+                    businessId={businessId}
+                    dateFrom={range.from}
+                    dateTo={range.to}
+                    open={optimizeOpen}
+                    onOpenChange={setOptimizeOpen}
+                  />
+                ) : null}
+              </div>
+
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => navigate(-1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => dispatch({
+                      type: 'select-date',
+                      date: businessToday(timezone),
+                    })}
+                  >
+                    {t('cal.today')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => navigate(1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <span className="ml-1 text-sm font-semibold">{label}</span>
+                </div>
+                <div className="inline-flex rounded-lg border border-border p-0.5">
+                  {(['day', 'week'] as const).map((view) => (
+                    <button
+                      key={view}
+                      onClick={() => dispatch({ type: 'set-view', view })}
+                      className={cn(
+                        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                        rendererView === view
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {t(`cal.view.${view}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <DesktopWeekCalendar {...rendererProps} view={rendererView} />
+            </>
+          ) : (
+            <>
+              <MobileDayCalendar
+                {...rendererProps}
+                isLoading={appointmentsQuery.isPending || configQuery.isPending}
+                onOptimize={businessId ? handleOpenOptimizer : undefined}
               />
-            ) : null}
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                onClick={() => navigate(-1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => dispatch({
-                  type: 'select-date',
-                  date: businessToday(timezone),
-                })}
-              >
-                {t('cal.today')}
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                onClick={() => navigate(1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <span className="ml-1 text-sm font-semibold">{label}</span>
-            </div>
-            <div className="inline-flex rounded-lg border border-border p-0.5">
-              {(['day', 'week'] as const).map((view) => (
-                <button
-                  key={view}
-                  onClick={() => dispatch({ type: 'set-view', view })}
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                    rendererView === view
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {t(`cal.view.${view}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <Renderer {...rendererProps} view={rendererView} />
+              {businessId ? (
+                <div className="hidden">
+                  <OptimizeDialog
+                    businessId={businessId}
+                    dateFrom={state.selectedDate}
+                    dateTo={state.selectedDate}
+                    open={optimizeOpen}
+                    onOpenChange={setOptimizeOpen}
+                  />
+                </div>
+              ) : null}
+            </>
+          )}
 
           {businessId ? (
             <AppointmentDialog

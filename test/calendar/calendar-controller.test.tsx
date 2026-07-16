@@ -51,6 +51,31 @@ vi.mock('@/components/calendar/desktop-week-calendar', () => ({
   ),
 }))
 
+vi.mock('@/components/calendar/mobile-day-calendar', () => ({
+  MobileDayCalendar: (props: {
+    appointments: CalendarAppointment[]
+    selectedDate: string
+    density: number
+    onSelectAppointment(id: string): void
+    onCreateAt(date: string, startMinute: number): void
+  }) => (
+    <div
+      data-testid="calendar-renderer"
+      data-date={props.selectedDate}
+      data-density={props.density}
+      data-view="day"
+    >
+      <span>{props.appointments.length} appointments</span>
+      <button onClick={() => props.onSelectAppointment('appointment-1')}>
+        Select appointment
+      </button>
+      <button onClick={() => props.onCreateAt(props.selectedDate, 600)}>
+        Create at 10
+      </button>
+    </div>
+  ),
+}))
+
 vi.mock('@/components/calendar/appointment-dialog', () => ({
   AppointmentDialog: (props: {
     open: boolean
@@ -194,21 +219,21 @@ describe('CalendarController', () => {
     )).toEqual([appointment])
   })
 
-  it.each(['month', 'agenda'])(
-    'ignores stored unsupported view %s until its renderer exists',
+  it.each(['week', 'month', 'agenda'])(
+    'uses the available day renderer on mobile instead of stored %s view',
     async (storedView) => {
       localStorage.setItem('cadence.calendar.view', storedView)
       renderController()
 
       const renderer = await screen.findByTestId('calendar-renderer')
-      expect(renderer).toHaveAttribute('data-view', 'week')
+      expect(renderer).toHaveAttribute('data-view', 'day')
       expect(listAppointments).toHaveBeenCalledWith(
         business.id,
-        '2026-07-13',
-        '2026-07-19',
+        '2026-07-17',
+        '2026-07-17',
       )
       await waitFor(() => {
-        expect(localStorage.getItem('cadence.calendar.view')).toBe('week')
+        expect(localStorage.getItem('cadence.calendar.view')).toBe('day')
       })
     },
   )

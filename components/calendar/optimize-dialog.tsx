@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Wand2, Loader2, Sparkles } from 'lucide-react'
 import { runOptimization, fetchRun, ensureAlgorithmSettings } from '@/lib/api/scheduler'
@@ -30,9 +30,10 @@ export function OptimizeDialog({
   const [loading, setLoading] = useState(false)
   const [run, setRun] = useState<any>(null)
   const [changes, setChanges] = useState<any[]>([])
+  const wasOpenRef = useRef(false)
   const open = controlledOpen ?? uncontrolledOpen
 
-  async function optimize() {
+  const optimize = useCallback(async () => {
     setLoading(true); setRun(null); setChanges([])
     try {
       await ensureAlgorithmSettings(businessId)
@@ -42,12 +43,16 @@ export function OptimizeDialog({
     } catch (e: any) {
       toast.error(e.message || t('opt.failed'))
     } finally { setLoading(false) }
-  }
+  }, [businessId, dateFrom, dateTo, t])
+
+  useEffect(() => {
+    if (open && !wasOpenRef.current) void optimize()
+    wasOpenRef.current = open
+  }, [open, optimize])
 
   function handleOpenChange(v: boolean) {
     if (controlledOpen === undefined) setUncontrolledOpen(v)
     onOpenChange?.(v)
-    if (v) { setRun(null); setChanges([]); optimize() }
   }
 
   return (
