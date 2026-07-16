@@ -20,9 +20,9 @@ import {
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
 import { useWeekHeaderPinch } from '@/hooks/use-week-header-pinch'
-import { AppointmentCard } from './appointment-card'
 import { CalendarToolbar } from './calendar-toolbar'
 import { CalendarZoomControls } from './calendar-zoom-controls'
+import { MobileWeekAppointmentWithGesture } from './mobile-week-appointment-card'
 
 interface MobileWeekTimeGridProps {
   appointments: CalendarAppointment[]
@@ -43,6 +43,8 @@ interface MobileWeekTimeGridProps {
 const RAIL = 46
 const START = 7 * 60
 const END = 21 * 60
+const SERVICE_MIN_WIDTH = 72
+const SERVICE_MIN_HEIGHT = 52
 
 export function MobileWeekTimeGrid({
   appointments,
@@ -223,26 +225,36 @@ export function MobileWeekTimeGrid({
                       style={{ top: minutesToY(minute, START, density) }}
                     />
                   ))}
-                  {layouts.map((layout) => (
-                    <AppointmentCard
-                      key={layout.id}
-                      appointment={layout.appointment}
-                      top={layout.top}
-                      height={layout.height}
-                      leftPercent={layout.leftPercent}
-                      widthPercent={layout.widthPercent}
-                      rangeStart={START}
-                      rangeEnd={END}
-                      density={density}
-                      snapIntervalMinutes={config.slotIntervalMinutes}
-                      scrollRef={scrollRef}
-                      gestureDisabled={false}
-                      onGestureActiveChange={() => {}}
-                      onSelect={onSelectAppointment}
-                      onMove={onMove}
-                      onResize={onResize}
-                    />
-                  ))}
+                  {layouts.map((layout) => {
+                    const renderedWidth = (
+                      columnWidth * layout.widthPercent / 100
+                    )
+                    const showService = (
+                      renderedWidth >= SERVICE_MIN_WIDTH
+                      && layout.height >= SERVICE_MIN_HEIGHT
+                    )
+                    return (
+                      <MobileWeekAppointmentWithGesture
+                        key={layout.id}
+                        appointment={layout.appointment}
+                        top={layout.top}
+                        height={layout.height}
+                        leftPercent={layout.leftPercent}
+                        widthPercent={layout.widthPercent}
+                        showService={showService}
+                        rangeStart={START}
+                        rangeEnd={END}
+                        density={density}
+                        snapIntervalMinutes={config.slotIntervalMinutes}
+                        scrollRef={scrollRef}
+                        gestureDisabled={false}
+                        onGestureActiveChange={() => {}}
+                        onSelect={onSelectAppointment}
+                        onMove={onMove}
+                        onResize={onResize}
+                      />
+                    )
+                  })}
                 </div>
               )
             })}
