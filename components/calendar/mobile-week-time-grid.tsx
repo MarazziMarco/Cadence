@@ -11,7 +11,7 @@ import {
   weekRange,
 } from '@/lib/calendar/date'
 import { minutesToY, yToMinutes } from '@/lib/calendar/geometry'
-import { allocateOverlapLanes } from '@/lib/calendar/overlap-lanes'
+import { allocateTemporalOverlapLanes } from '@/lib/calendar/overlap-lanes'
 import type { CalendarView, MoveIntent, ResizeIntent } from '@/lib/calendar/types'
 import {
   selectedDayScrollLeft,
@@ -176,22 +176,28 @@ export function MobileWeekTimeGrid({
               ))}
             </div>
             {days.map((date) => {
-              const layouts = allocateOverlapLanes(
+              const layouts = allocateTemporalOverlapLanes(
                 appointments
                   .filter((appointment) => appointment.appointment_date === date)
-                  .map((appointment) => ({
-                    appointment,
-                    id: appointment.id,
-                    top: minutesToY(
+                  .map((appointment) => {
+                    const top = minutesToY(
                       timeToMin(appointment.start_time),
                       START,
                       density,
-                    ),
-                    height: Math.max(
-                      44,
-                      minutesToY(appointment.duration_minutes, 0, density),
-                    ),
-                  })),
+                    )
+                    const temporalHeight = minutesToY(
+                      appointment.duration_minutes,
+                      0,
+                      density,
+                    )
+                    return {
+                      appointment,
+                      id: appointment.id,
+                      top,
+                      height: Math.max(44, temporalHeight),
+                      temporalEnd: top + temporalHeight,
+                    }
+                  }),
               )
               return (
                 <div

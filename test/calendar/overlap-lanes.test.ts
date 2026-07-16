@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
-import { allocateOverlapLanes } from '@/lib/calendar/overlap-lanes'
+import {
+  allocateOverlapLanes,
+  allocateTemporalOverlapLanes,
+} from '@/lib/calendar/overlap-lanes'
 
 describe('allocateOverlapLanes', () => {
+  it('does not create an overlap lane from visual minimum height alone', () => {
+    const layouts = allocateTemporalOverlapLanes([
+      { id: 'a', top: 0, height: 44, temporalEnd: 30 },
+      { id: 'b', top: 30, height: 44, temporalEnd: 60 },
+    ])
+
+    expect(layouts.map((item) => item.laneCount)).toEqual([1, 1])
+  })
+
   it('keeps boxes that only touch at a boundary at full width', () => {
     expect(
       allocateOverlapLanes([

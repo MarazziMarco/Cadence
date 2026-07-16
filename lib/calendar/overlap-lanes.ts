@@ -4,12 +4,18 @@ export interface OverlapLaneInput {
   height: number
 }
 
+export interface TimedLayout extends OverlapLaneInput {
+  temporalEnd: number
+}
+
 export interface OverlapLaneLayout {
   lane: number
   laneCount: number
   leftPercent: number
   widthPercent: number
 }
+
+export type LaneLayout<T extends OverlapLaneInput> = T & OverlapLaneLayout
 
 type IndexedItem<T extends OverlapLaneInput> = {
   item: T
@@ -19,16 +25,29 @@ type IndexedItem<T extends OverlapLaneInput> = {
 
 export function allocateOverlapLanes<T extends OverlapLaneInput>(
   items: readonly T[],
-): Array<T & OverlapLaneLayout> {
+): Array<LaneLayout<T>> {
+  return allocateLanes(items, (item) => item.top + item.height)
+}
+
+export function allocateTemporalOverlapLanes<T extends TimedLayout>(
+  items: T[],
+): Array<LaneLayout<T>> {
+  return allocateLanes(items, (item) => item.temporalEnd)
+}
+
+function allocateLanes<T extends OverlapLaneInput>(
+  items: readonly T[],
+  endFor: (item: T) => number,
+): Array<LaneLayout<T>> {
   const sorted = items
     .map((item, index): IndexedItem<T> => ({
       item,
       index,
-      end: item.top + item.height,
+      end: endFor(item),
     }))
     .sort((left, right) => left.item.top - right.item.top || left.index - right.index)
 
-  const allocated = new Array<T & OverlapLaneLayout>(items.length)
+  const allocated = new Array<LaneLayout<T>>(items.length)
 
   for (let start = 0; start < sorted.length; ) {
     let end = start + 1
@@ -48,7 +67,7 @@ export function allocateOverlapLanes<T extends OverlapLaneInput>(
 
 function allocateCluster<T extends OverlapLaneInput>(
   cluster: Array<IndexedItem<T>>,
-  allocated: Array<T & OverlapLaneLayout>,
+  allocated: Array<LaneLayout<T>>,
 ): void {
   const laneEnds: number[] = []
   const placements = cluster.map((entry) => {
