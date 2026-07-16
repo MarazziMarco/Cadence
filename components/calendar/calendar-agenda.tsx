@@ -33,6 +33,7 @@ interface CalendarAgendaProps {
   onViewChange(view: CalendarView): void
   onOptimize?(): void
   optimizeButtonRef?: Ref<HTMLButtonElement>
+  showToolbar?: boolean
 }
 
 function patientName(appointment: CalendarAppointment, fallback: string) {
@@ -54,6 +55,7 @@ export function CalendarAgenda({
   onViewChange,
   onOptimize,
   optimizeButtonRef,
+  showToolbar = true,
 }: CalendarAgendaProps) {
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
@@ -103,16 +105,21 @@ export function CalendarAgenda({
   }, [agendaQuery.fetchNextPage, agendaQuery.hasNextPage])
 
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card">
-      <CalendarToolbar
-        selectedDate={selectedDate}
-        view="agenda"
-        enabledViews={['day', 'week', 'month', 'agenda']}
-        onToday={() => onSelectDate(businessToday(config.timezone))}
-        onViewChange={onViewChange}
-        onOptimize={onOptimize}
-        optimizeButtonRef={optimizeButtonRef}
-      />
+    <section
+      data-testid="calendar-agenda"
+      className="overflow-hidden rounded-xl border border-border bg-card"
+    >
+      {showToolbar ? (
+        <CalendarToolbar
+          selectedDate={selectedDate}
+          view="agenda"
+          enabledViews={['day', 'week', 'month', 'agenda']}
+          onToday={() => onSelectDate(businessToday(config.timezone))}
+          onViewChange={onViewChange}
+          onOptimize={onOptimize}
+          optimizeButtonRef={optimizeButtonRef}
+        />
+      ) : null}
       <div className="grid grid-cols-1 gap-2 border-y border-border bg-muted/25 p-2 sm:grid-cols-3">
         <select
           aria-label={t('appt.patient')}

@@ -28,6 +28,9 @@ test('phone calendar switches views without document overflow', async ({ page })
   )).toBe(true)
 
   const dayOptimizerTitle = await page.locator('button[title]').last().getAttribute('title')
+  await view.selectOption('week')
+  await expect(page.getByTestId('mobile-week-time-grid')).toBeVisible()
+
   await view.selectOption('month')
   await expect(page.getByTestId('mobile-month-calendar')).toBeVisible()
   const monthOptimizerTitle = await page.locator('button[title]').last().getAttribute('title')

@@ -69,6 +69,11 @@ const en: Dict = {
   'prefs.currency': 'Business currency',
   'prefs.preview': 'Preview',
   'prefs.saved': 'Preferences saved',
+  'prefs.calendarTitle': 'Calendar',
+  'prefs.phoneWeekLayout': 'Phone week layout',
+  'prefs.phoneWeekLayoutHint': 'This choice stays only on this phone.',
+  'prefs.phoneWeekGrid': 'Week grid',
+  'prefs.phoneWeekTimeline': 'Daily timelines',
 
   // Auth
   'auth.login.title': 'Welcome back',
@@ -545,6 +550,11 @@ const it: Dict = {
   'prefs.currency': 'Valuta dell’attività',
   'prefs.preview': 'Anteprima',
   'prefs.saved': 'Preferenze salvate',
+  'prefs.calendarTitle': 'Calendario',
+  'prefs.phoneWeekLayout': 'Vista settimanale sul telefono',
+  'prefs.phoneWeekLayoutHint': 'Questa scelta resta solo su questo telefono.',
+  'prefs.phoneWeekGrid': 'Griglia settimanale',
+  'prefs.phoneWeekTimeline': 'Timeline giornaliere',
 
   'auth.login.title': 'Bentornato',
   'auth.login.subtitle': 'Accedi al tuo spazio di lavoro.',
@@ -1005,6 +1015,11 @@ const es: Dict = {
   'prefs.currency': 'Moneda del negocio',
   'prefs.preview': 'Vista previa',
   'prefs.saved': 'Preferencias guardadas',
+  'prefs.calendarTitle': 'Calendario',
+  'prefs.phoneWeekLayout': 'Vista semanal en el teléfono',
+  'prefs.phoneWeekLayoutHint': 'Esta opción se guarda solo en este teléfono.',
+  'prefs.phoneWeekGrid': 'Cuadrícula semanal',
+  'prefs.phoneWeekTimeline': 'Cronologías diarias',
 
   'auth.login.title': 'Bienvenido de nuevo',
   'auth.login.subtitle': 'Inicia sesión en tu espacio de trabajo.',

@@ -7,6 +7,7 @@ export interface MonthCell {
   isToday: boolean
   isSelected: boolean
   visibleIndicators: CalendarAppointment[]
+  appointments: CalendarAppointment[]
   hiddenCount: number
 }
 
@@ -48,6 +49,7 @@ export function buildMonthCells({
       isToday: date === today,
       isSelected: date === selectedDate,
       visibleIndicators: dayAppointments.slice(0, 2),
+      appointments: dayAppointments,
       hiddenCount: Math.max(0, dayAppointments.length - 2),
     }
   })

@@ -47,6 +47,11 @@ import {
   type CalendarState,
 } from '@/lib/calendar/controller'
 import {
+  PHONE_WEEK_LAYOUT_STORAGE_KEY,
+  parsePhoneWeekLayout,
+  type PhoneWeekLayout,
+} from '@/lib/calendar/week-layout'
+import {
   addBusinessDays,
   businessToday,
   formatBusinessDate,
@@ -84,9 +89,11 @@ import {
   DesktopWeekCalendar,
   type CalendarRendererProps,
 } from './desktop-week-calendar'
+import { DesktopMonthCalendar } from './desktop-month-calendar'
 import { MobileDayCalendar } from './mobile-day-calendar'
 import { MobileMonthCalendar } from './mobile-month-calendar'
-import { MobileWeekOverview } from './mobile-week-overview'
+import { MobileWeekTimeGrid } from './mobile-week-time-grid'
+import { MobileWeekTimeline } from './mobile-week-timeline'
 import { MoveAppointmentSheet } from './move-appointment-sheet'
 import { TabletMultiDayCalendar } from './tablet-multi-day-calendar'
 
@@ -258,6 +265,8 @@ export function CalendarController() {
   const [moveSheetOpen, setMoveSheetOpen] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [preferencesRestored, setPreferencesRestored] = useState(false)
+  const [phoneWeekLayout, setPhoneWeekLayout] =
+    useState<PhoneWeekLayout>('grid')
   const desktopOptimizeButtonRef = useRef<HTMLButtonElement>(null)
   const mobileOptimizeButtonRef = useRef<HTMLButtonElement>(null)
   const lastOptimizeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -272,6 +281,11 @@ export function CalendarController() {
   const timelineView: TimelineCalendarView = (
     rendererView === 'week' ? 'week' : 'day'
   )
+  const rangeView = (
+    responsiveLayout === 'phone' || responsiveLayout === 'desktop'
+      ? rendererView
+      : timelineView
+  )
   const range = useMemo(
     () => {
       if (responsiveLayout === 'three-day') {
@@ -285,10 +299,10 @@ export function CalendarController() {
       }
       return visibleSupportedRange(
         state.selectedDate,
-        responsiveLayout === 'phone' ? rendererView : timelineView,
+        rangeView,
       )
     },
-    [rendererView, responsiveLayout, state.selectedDate, timelineView],
+    [rangeView, responsiveLayout, state.selectedDate],
   )
   const previousRange = useMemo(
     () => {
@@ -303,12 +317,12 @@ export function CalendarController() {
       }
       return adjacentRange(
         state.selectedDate,
-        responsiveLayout === 'phone' ? rendererView : timelineView,
+        rangeView,
         range,
         -1,
       )
     },
-    [range, rendererView, responsiveLayout, state.selectedDate, timelineView],
+    [range, rangeView, responsiveLayout, state.selectedDate],
   )
   const nextRange = useMemo(
     () => {
@@ -323,18 +337,18 @@ export function CalendarController() {
       }
       return adjacentRange(
         state.selectedDate,
-        responsiveLayout === 'phone' ? rendererView : timelineView,
+        rangeView,
         range,
         1,
       )
     },
-    [range, rendererView, responsiveLayout, state.selectedDate, timelineView],
+    [range, rangeView, responsiveLayout, state.selectedDate],
   )
   const optimizationScope: 'day' | 'week' | 'month' | 'custom' = (
     responsiveLayout === 'phone'
       ? rendererView === 'agenda' ? 'custom' : rendererView
       : responsiveLayout === 'desktop'
-        ? timelineView
+        ? rendererView === 'agenda' ? 'custom' : rendererView
         : responsiveLayout === 'seven-day'
           ? 'week'
           : 'custom'
@@ -391,6 +405,9 @@ export function CalendarController() {
     const storedDensity = parseStoredCalendarDensity(
       localStorage.getItem(CALENDAR_DENSITY_STORAGE_KEY),
     )
+    setPhoneWeekLayout(parsePhoneWeekLayout(
+      localStorage.getItem(PHONE_WEEK_LAYOUT_STORAGE_KEY),
+    ))
     if (isSupportedCalendarView(storedView)) {
       dispatch({ type: 'set-view', view: storedView })
     } else {
@@ -728,11 +745,6 @@ export function CalendarController() {
     dispatch({ type: 'set-view', view })
   }, [])
 
-  const handleOverviewDay = useCallback((date: string) => {
-    dispatch({ type: 'select-date', date })
-    dispatch({ type: 'set-view', view: 'day' })
-  }, [])
-
   const handleOpenOptimizer = useCallback(() => {
     const activeElement = document.activeElement
     lastOptimizeButtonRef.current = activeElement instanceof HTMLButtonElement
@@ -795,9 +807,7 @@ export function CalendarController() {
     || moveSheetOpen
   )
   const navigate = useCallback((direction: -1 | 1) => {
-    const navigationView = responsiveLayout === 'phone'
-      ? rendererView
-      : timelineView
+    const navigationView = rangeView
     if (navigationView === 'month') {
       dispatch({
         type: 'select-date',
@@ -816,7 +826,7 @@ export function CalendarController() {
       type: 'select-date',
       date: addBusinessDays(state.selectedDate, direction * amount),
     })
-  }, [range, rendererView, responsiveLayout, state.selectedDate, timelineView])
+  }, [range, rangeView, responsiveLayout, state.selectedDate])
 
   const openNew = useCallback(() => {
     handleCreateAt(state.selectedDate, 9 * 60)
@@ -1035,13 +1045,13 @@ export function CalendarController() {
                   <span className="ml-1 text-sm font-semibold">{label}</span>
                 </div>
                 <div className="inline-flex rounded-lg border border-border p-0.5">
-                  {(['day', 'week'] as const).map((view) => (
+                  {(['day', 'week', 'month', 'agenda'] as const).map((view) => (
                     <button
                       key={view}
                       onClick={() => dispatch({ type: 'set-view', view })}
                       className={cn(
                         'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                        timelineView === view
+                        rendererView === view
                           ? 'bg-primary text-primary-foreground'
                           : 'text-muted-foreground hover:text-foreground',
                       )}
@@ -1052,7 +1062,30 @@ export function CalendarController() {
                 </div>
               </div>
 
-              <DesktopWeekCalendar {...rendererProps} view={timelineView} />
+              {rendererView === 'month' ? (
+                <DesktopMonthCalendar
+                  appointments={appointments}
+                  config={config}
+                  selectedDate={state.selectedDate}
+                  onSelectDate={handleSelectDate}
+                  onSelectAppointment={handleSelectAppointment}
+                  onViewChange={handleViewChange}
+                />
+              ) : rendererView === 'agenda' ? (
+                <CalendarAgenda
+                  businessId={businessId}
+                  config={config}
+                  selectedDate={state.selectedDate}
+                  onSelectDate={handleSelectDate}
+                  onSelectAppointment={handleSelectAgendaAppointment}
+                  onViewChange={handleViewChange}
+                  onOptimize={businessId ? handleOpenOptimizer : undefined}
+                  optimizeButtonRef={desktopOptimizeButtonRef}
+                  showToolbar={false}
+                />
+              ) : (
+                <DesktopWeekCalendar {...rendererProps} view={timelineView} />
+              )}
             </>
           ) : responsiveLayout === 'phone' && rendererView === 'agenda' ? (
             <CalendarAgenda
@@ -1078,15 +1111,26 @@ export function CalendarController() {
               optimizeButtonRef={mobileOptimizeButtonRef}
             />
           ) : responsiveLayout === 'phone' && rendererView === 'week' ? (
-            <MobileWeekOverview
-              appointments={appointments}
-              config={config}
-              selectedDate={state.selectedDate}
-              onSelectDay={handleOverviewDay}
-              onViewChange={handleViewChange}
-              onOptimize={businessId ? handleOpenOptimizer : undefined}
-              optimizeButtonRef={mobileOptimizeButtonRef}
-            />
+            phoneWeekLayout === 'timeline' ? (
+              <MobileWeekTimeline
+                appointments={appointments}
+                config={config}
+                selectedDate={state.selectedDate}
+                onSelectDate={handleSelectDate}
+                onSelectAppointment={handleSelectAppointment}
+                onViewChange={handleViewChange}
+                onOptimize={businessId ? handleOpenOptimizer : undefined}
+                optimizeButtonRef={mobileOptimizeButtonRef}
+              />
+            ) : (
+              <MobileWeekTimeGrid
+                {...rendererProps}
+                onDensityChange={handleDensityChange}
+                onViewChange={handleViewChange}
+                onOptimize={businessId ? handleOpenOptimizer : undefined}
+                optimizeButtonRef={mobileOptimizeButtonRef}
+              />
+            )
           ) : responsiveLayout === 'phone' ? (
             <>
               <MobileDayCalendar

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -14,6 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  PHONE_WEEK_LAYOUT_STORAGE_KEY,
+  parsePhoneWeekLayout,
+  type PhoneWeekLayout,
+} from '@/lib/calendar/week-layout'
 
 // Business preferences that aren't tied to the daily flow. Currency lives on the
 // existing business.currency column (no schema change); saving refreshes the
@@ -26,6 +31,14 @@ export function PreferencesClient() {
   const [currency, setCurrency] = useState(business?.currency || 'EUR')
   const [language, setLanguage] = useState(business?.language || 'en')
   const [saving, setSaving] = useState(false)
+  const [phoneWeekLayout, setPhoneWeekLayout] =
+    useState<PhoneWeekLayout>('grid')
+
+  useEffect(() => {
+    setPhoneWeekLayout(parsePhoneWeekLayout(
+      localStorage.getItem(PHONE_WEEK_LAYOUT_STORAGE_KEY),
+    ))
+  }, [])
 
   const dirty = currency !== business?.currency || language !== business?.language
 
@@ -68,6 +81,32 @@ export function PreferencesClient() {
           <Button onClick={save} disabled={saving || !dirty}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {t('common.save')}
           </Button>
+        </CardContent>
+      </Card>
+      <Card className="mt-6 max-w-lg shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">{t('prefs.calendarTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="phone-week-layout">
+            {t('prefs.phoneWeekLayout')}
+          </Label>
+          <select
+            id="phone-week-layout"
+            className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={phoneWeekLayout}
+            onChange={(event) => {
+              const value = parsePhoneWeekLayout(event.target.value)
+              setPhoneWeekLayout(value)
+              localStorage.setItem(PHONE_WEEK_LAYOUT_STORAGE_KEY, value)
+            }}
+          >
+            <option value="grid">{t('prefs.phoneWeekGrid')}</option>
+            <option value="timeline">{t('prefs.phoneWeekTimeline')}</option>
+          </select>
+          <p className="text-xs text-muted-foreground">
+            {t('prefs.phoneWeekLayoutHint')}
+          </p>
         </CardContent>
       </Card>
     </div>

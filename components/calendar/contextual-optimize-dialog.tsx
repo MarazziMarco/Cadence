@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { MovedMessages } from './moved-messages'
 
 interface ContextualOptimizeDialogProps {
   businessId: string
@@ -61,13 +62,13 @@ export function ContextualOptimizeDialog({
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [allowCrossWeek, setAllowCrossWeek] = useState(false)
   const [maxCrossWeekDays, setMaxCrossWeekDays] = useState(7)
-  const [applied, setApplied] = useState(false)
+  const [appliedChanges, setAppliedChanges] = useState<any[] | null>(null)
 
   const optimize = useCallback(async () => {
     setLoading(true)
     setGroups([])
     setExcluded(new Set())
-    setApplied(false)
+    setAppliedChanges(null)
     try {
       await ensureAlgorithmSettings(businessId)
       const settings = await getAlgorithmSettings(businessId)
@@ -125,7 +126,10 @@ export function ContextualOptimizeDialog({
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       void queryClient.invalidateQueries({ queryKey: ['waiting'] })
       void queryClient.invalidateQueries({ queryKey: ['optimizations'] })
-      setApplied(true)
+      setAppliedChanges(selected.map((change) => ({
+        ...change,
+        accepted: true,
+      })))
       toast.success(t('opt.applied', { n: selected.length }))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('opt.failed'))
@@ -163,9 +167,15 @@ export function ContextualOptimizeDialog({
               <Loader2 className="h-5 w-5 animate-spin" />
               {t('opt.building')}
             </div>
-          ) : applied ? (
-            <div className="rounded-xl border border-success/30 bg-success/10 p-4 text-sm font-medium">
-              {t('opt.applied', { n: selected.length })}
+          ) : appliedChanges ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-success/30 bg-success/10 p-4 text-sm font-medium">
+                {t('opt.applied', { n: appliedChanges.length })}
+              </div>
+              <MovedMessages
+                businessId={businessId}
+                changes={appliedChanges}
+              />
             </div>
           ) : (
             <div className="space-y-4">

@@ -98,9 +98,15 @@ vi.mock('@/components/calendar/mobile-day-calendar', () => ({
   ),
 }))
 
-vi.mock('@/components/calendar/mobile-week-overview', () => ({
-  MobileWeekOverview: () => (
+vi.mock('@/components/calendar/mobile-week-time-grid', () => ({
+  MobileWeekTimeGrid: () => (
     <div data-testid="calendar-renderer" data-view="week" />
+  ),
+}))
+
+vi.mock('@/components/calendar/mobile-week-timeline', () => ({
+  MobileWeekTimeline: () => (
+    <div data-testid="calendar-renderer" data-view="week-timeline" />
   ),
 }))
 
