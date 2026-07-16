@@ -368,6 +368,24 @@ Deno.test("routing blocks an unverifiable required external leg", async () => {
   );
 });
 
+Deno.test("routing blocks two appointments sharing a generic unresolved external key", async () => {
+  const input = await routedBase();
+  input.appointments[0].start_time = "09:20";
+  input.appointments[0].end_time = "09:50";
+  setLocation(input, "appt-1", "unresolved:patient");
+  setLocation(input, "appt-2", "unresolved:patient");
+  setLeg(input, "studio", "unresolved:patient", 20);
+  setLeg(input, "unresolved:patient", "unresolved:patient", 0);
+  setLeg(input, "unresolved:patient", "studio", 20);
+  lockAll(input);
+
+  const violation = findHardViolation(input, runSolver(input).slots);
+  assert(
+    violation?.includes("unavailable"),
+    `generic unresolved co-location must remain unverifiable, got ${violation}`,
+  );
+});
+
 Deno.test("routing idle subtracts required travel from an open gap", async () => {
   const input = await routedBase();
   input.appointments[1].start_time = "10:30";
@@ -400,6 +418,80 @@ Deno.test("routing candidates compact to predecessor end plus travel", async () 
   );
   assert(move, "expected the second appointment to be compacted");
   assertEquals(move.new_start_time, "09:50:00");
+});
+
+Deno.test("routing preserves an afternoon window boundary when lunch absorbs predecessor travel", async () => {
+  const input = await routedBase();
+  input.appointments[0].start_time = "12:30";
+  input.appointments[0].end_time = "13:00";
+  input.appointments[0].locked = true;
+  input.appointments[1].start_time = "15:00";
+  input.appointments[1].end_time = "15:30";
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  setLeg(input, "studio", "patient-a", 0);
+  setLeg(input, "studio", "patient-b", 20);
+  setLeg(input, "patient-a", "patient-b", 30);
+  setLeg(input, "patient-b", "studio", 0);
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const move = result.output.changes.find((change) =>
+    change.appointment_id === "appt-2"
+  );
+  assert(move, "expected the afternoon appointment to compact to reopening");
+  assertEquals(move.new_start_time, "14:00:00");
+});
+
+Deno.test("routing keeps the successor boundary available for waiting-list insertion", async () => {
+  const input = await routedBase();
+  input.appointments = [input.appointments[1]];
+  input.appointments[0].start_time = "11:00";
+  input.appointments[0].end_time = "11:30";
+  input.appointments[0].locked = true;
+  setLocation(input, "appt-2", "patient-b");
+  input.context.settings.allow_waiting_list = true;
+  input.waiting_list = [{
+    id: "wl-successor",
+    patient_id: "pat-a",
+    preferred_service_id: "svc-1",
+    priority: "high",
+    earliest_date: "2026-07-13",
+    latest_date: "2026-07-13",
+    preferred_weekdays: ["monday"],
+    earliest_time: "10:10",
+    latest_time: "11:00",
+    preferred_duration_minutes: 30,
+    flexible: false,
+  }];
+  setLeg(input, "studio", "studio", 0);
+  setLeg(input, "studio", "patient-b", 20);
+  setLeg(input, "patient-b", "studio", 0);
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const create = result.output.changes.find((change) =>
+    change.kind === "create" && change.patient_id === "pat-a"
+  );
+  assert(create, "expected a waiting-list insertion before the successor");
+  assertEquals(create.new_start_time, "10:10:00");
+});
+
+Deno.test("routing results stay deterministic for a fixed candidate budget", async () => {
+  const first = await routedBase();
+  first.context.settings.max_solver_seconds = 30;
+  setLocation(first, "appt-1", "patient-a");
+  setLocation(first, "appt-2", "patient-b");
+  setLeg(first, "studio", "patient-a", 0);
+  setLeg(first, "patient-a", "patient-b", 20);
+  setLeg(first, "patient-b", "studio", 0);
+  const second = structuredClone(first);
+
+  const firstResult = runSolver(first);
+  const secondResult = runSolver(second);
+  assertEquals(firstResult.output.changes, secondResult.output.changes);
+  assertEquals(firstResult.idleBefore, secondResult.idleBefore);
+  assertEquals(firstResult.idleAfter, secondResult.idleAfter);
 });
 
 Deno.test("determinism: same input yields identical output", async () => {

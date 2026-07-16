@@ -19,6 +19,7 @@ import {
 } from "../routing/matrix.ts";
 import {
   createOpenRouteServiceProvider,
+  type ProviderLocation,
   type RoutingProvider,
   RoutingProviderError,
 } from "../routing/provider.ts";
@@ -629,6 +630,88 @@ Deno.test("routing input resolves tenant business, appointment, and patient loca
   );
 });
 
+Deno.test("routing input uses approximate studio coordinates without a postal address", async () => {
+  const queries: Array<{ table: string; filters: Record<string, unknown> }> =
+    [];
+  const selectedColumns: Record<string, string> = {};
+  const matrixLocations: ProviderLocation[][] = [];
+  let geocodeCalls = 0;
+  const supabase = locationSupabase({
+    business: {
+      id: "business-1",
+      address: null,
+      city: null,
+      postal_code: null,
+      location_latitude: 41.90278,
+      location_longitude: 12.49637,
+    },
+    appointments: [{
+      id: "appointment-1",
+      patient_id: "patient-1",
+      location_mode: "custom",
+      location_address: null,
+      location_city: null,
+      location_postal_code: null,
+      location_latitude: 41.91,
+      location_longitude: 12.5,
+      location_address_hash: "dddddddddddddddd",
+    }],
+    patients: [{
+      id: "patient-1",
+      address: null,
+      city: null,
+      postal_code: null,
+    }],
+  }, queries, selectedColumns);
+
+  const routed = await prepareRoutingInput(
+    supabase,
+    {
+      context: { business_id: "business-1" },
+      appointments: [{ id: "appointment-1" }],
+    },
+    defaults(),
+    {
+      cache: memoryCache(),
+      provider: {
+        geocode() {
+          geocodeCalls++;
+          return Promise.resolve(null);
+        },
+        matrix(_profile, locations) {
+          matrixLocations.push(locations);
+          return Promise.resolve(Object.fromEntries(locations.map((origin) => [
+            origin.key,
+            Object.fromEntries(locations.map((destination) => [
+              destination.key,
+              {
+                seconds: origin.key === destination.key ? 0 : 300,
+                meters: origin.key === destination.key ? 0 : 900,
+              },
+            ])),
+          ])));
+        },
+      },
+    },
+  );
+
+  assert(selectedColumns.business.includes("location_latitude"));
+  assert(selectedColumns.business.includes("location_longitude"));
+  assertEquals(geocodeCalls, 0);
+  assert(matrixLocations.length > 0, "expected provider matrix routing");
+  const studio = matrixLocations.flat().find((location) =>
+    location.key === routed.studio_location_key
+  );
+  assertEquals(studio?.latitude, 41.90278);
+  assertEquals(studio?.longitude, 12.49637);
+  assertEquals(
+    routed.travel_matrix[routed.studio_location_key][
+      routed.appointments[0].location_key
+    ].verifiable,
+    true,
+  );
+});
+
 Deno.test("routing input avoids an empty PostgREST in-filter", async () => {
   const queries: Array<{ table: string; filters: Record<string, unknown> }> =
     [];
@@ -769,12 +852,14 @@ function locationSupabase(
     patients: Array<Record<string, unknown>>;
   },
   queries: Array<{ table: string; filters: Record<string, unknown> }>,
+  selectedColumns: Record<string, string> = {},
 ) {
   return {
     from(table: string) {
       const filters: Record<string, unknown> = {};
       const builder = {
-        select() {
+        select(columns?: string) {
+          if (columns) selectedColumns[table] = columns;
           return builder;
         },
         eq(key: string, value: unknown) {

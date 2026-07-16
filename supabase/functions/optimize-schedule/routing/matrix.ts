@@ -500,6 +500,8 @@ interface BusinessLocationRow {
   address: string | null;
   city: string | null;
   postal_code: string | null;
+  location_latitude: number | null;
+  location_longitude: number | null;
 }
 
 interface AppointmentLocationRow {
@@ -588,7 +590,9 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
 > {
   const businessQuery = supabase
     .from("business")
-    .select("id, address, city, postal_code") as LocationQueryBuilder<
+    .select(
+      "id, address, city, postal_code, location_latitude, location_longitude",
+    ) as LocationQueryBuilder<
       BusinessLocationRow
     >;
   const { data: business, error: businessError } = await businessQuery
@@ -606,8 +610,8 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
   );
   const studioCandidate: LocationCandidate = {
     address: studioAddress,
-    latitude: null,
-    longitude: null,
+    latitude: business.location_latitude,
+    longitude: business.location_longitude,
   };
   const studio = withAddress(
     resolveAppointmentLocation({

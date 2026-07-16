@@ -78,12 +78,14 @@ function travelMinutes(
   from: string,
   to: string,
 ): number | null {
-  if (from === to) return 0;
-  const leg = input.travel_matrix?.[from]?.[to];
-  if (!leg?.verifiable || !Number.isFinite(leg.seconds) || leg.seconds < 0) {
+  if (from.startsWith("unresolved:") || to.startsWith("unresolved:")) {
     return null;
   }
-  return Math.ceil(leg.seconds / 60);
+  const leg = input.travel_matrix?.[from]?.[to];
+  if (leg?.verifiable && Number.isFinite(leg.seconds) && leg.seconds >= 0) {
+    return Math.ceil(leg.seconds / 60);
+  }
+  return from === to && from.startsWith("studio:") ? 0 : null;
 }
 
 function routeViolationForDay(
@@ -277,6 +279,8 @@ function candidateStarts(
   const set = new Set<number>();
   const studio = studioLocationKey(input);
   for (const w of wins) {
+    set.add(w.start + slot.bufBefore);
+    set.add(w.end - slot.dur - slot.bufAfter);
     const firstTravel = travelMinutes(input, studio, slot.location_key);
     if (firstTravel !== null) {
       set.add(w.start + firstTravel + slot.bufBefore);
