@@ -83,6 +83,7 @@ import {
   type CalendarRendererProps,
 } from './desktop-week-calendar'
 import { MobileDayCalendar } from './mobile-day-calendar'
+import { MobileMonthCalendar } from './mobile-month-calendar'
 import { MobileWeekOverview } from './mobile-week-overview'
 import { MoveAppointmentSheet } from './move-appointment-sheet'
 import { OptimizeDialog } from './optimize-dialog'
@@ -97,12 +98,13 @@ type CalendarRangeSnapshot = [
   data: CalendarAppointment[] | undefined,
 ]
 
-type SupportedCalendarView = Extract<CalendarView, 'day' | 'week'>
+type SupportedCalendarView = Extract<CalendarView, 'day' | 'week' | 'month'>
+type TimelineCalendarView = Extract<CalendarView, 'day' | 'week'>
 
 function isSupportedCalendarView(
   view: CalendarView | null,
 ): view is SupportedCalendarView {
-  return view === 'day' || view === 'week'
+  return view === 'day' || view === 'week' || view === 'month'
 }
 
 export function createInitialCalendarState(timezone: string): CalendarState {
@@ -258,8 +260,11 @@ export function CalendarController() {
   const isDesktop = responsiveLayout === 'desktop'
   const supportedView: SupportedCalendarView = isSupportedCalendarView(state.view)
     ? state.view
-    : 'week'
+    : 'day'
   const rendererView: SupportedCalendarView = supportedView
+  const timelineView: TimelineCalendarView = (
+    rendererView === 'week' ? 'week' : 'day'
+  )
   const range = useMemo(
     () => {
       if (responsiveLayout === 'three-day') {
@@ -271,9 +276,12 @@ export function CalendarController() {
       if (responsiveLayout === 'seven-day') {
         return visibleSupportedRange(state.selectedDate, 'week')
       }
-      return visibleSupportedRange(state.selectedDate, rendererView)
+      return visibleSupportedRange(
+        state.selectedDate,
+        responsiveLayout === 'phone' ? rendererView : timelineView,
+      )
     },
-    [rendererView, responsiveLayout, state.selectedDate],
+    [rendererView, responsiveLayout, state.selectedDate, timelineView],
   )
   const previousRange = useMemo(
     () => {
@@ -286,9 +294,14 @@ export function CalendarController() {
       if (responsiveLayout === 'seven-day') {
         return adjacentRange(state.selectedDate, 'week', range, -1)
       }
-      return adjacentRange(state.selectedDate, rendererView, range, -1)
+      return adjacentRange(
+        state.selectedDate,
+        responsiveLayout === 'phone' ? rendererView : timelineView,
+        range,
+        -1,
+      )
     },
-    [range, rendererView, responsiveLayout, state.selectedDate],
+    [range, rendererView, responsiveLayout, state.selectedDate, timelineView],
   )
   const nextRange = useMemo(
     () => {
@@ -301,9 +314,14 @@ export function CalendarController() {
       if (responsiveLayout === 'seven-day') {
         return adjacentRange(state.selectedDate, 'week', range, 1)
       }
-      return adjacentRange(state.selectedDate, rendererView, range, 1)
+      return adjacentRange(
+        state.selectedDate,
+        responsiveLayout === 'phone' ? rendererView : timelineView,
+        range,
+        1,
+      )
     },
-    [range, rendererView, responsiveLayout, state.selectedDate],
+    [range, rendererView, responsiveLayout, state.selectedDate, timelineView],
   )
 
   const [appointmentsQuery, configQuery] = useQueries({
@@ -676,7 +694,7 @@ export function CalendarController() {
     dispatch({ type: 'set-density', density })
   }, [])
 
-  const handleViewChange = useCallback((view: 'day' | 'week') => {
+  const handleViewChange = useCallback((view: CalendarView) => {
     dispatch({ type: 'set-view', view })
   }, [])
 
@@ -747,18 +765,28 @@ export function CalendarController() {
     || moveSheetOpen
   )
   const navigate = useCallback((direction: -1 | 1) => {
+    const navigationView = responsiveLayout === 'phone'
+      ? rendererView
+      : timelineView
+    if (navigationView === 'month') {
+      dispatch({
+        type: 'select-date',
+        date: shiftedSelectedDate('month', range, direction),
+      })
+      return
+    }
     const amount = responsiveLayout === 'three-day'
       ? 3
       : responsiveLayout === 'seven-day'
         ? 7
-        : rendererView === 'day'
+        : navigationView === 'day'
           ? 1
           : 7
     dispatch({
       type: 'select-date',
       date: addBusinessDays(state.selectedDate, direction * amount),
     })
-  }, [rendererView, responsiveLayout, state.selectedDate])
+  }, [range, rendererView, responsiveLayout, state.selectedDate, timelineView])
 
   const openNew = useCallback(() => {
     handleCreateAt(state.selectedDate, 9 * 60)
@@ -824,7 +852,7 @@ export function CalendarController() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [dialogOpen, isDesktop, navigate, openNew, section, timezone])
 
-  const label = rendererView === 'day'
+  const label = timelineView === 'day'
     ? formatBusinessDate(state.selectedDate, dateLocale, {
         weekday: 'long',
         month: 'long',
@@ -964,7 +992,7 @@ export function CalendarController() {
                       onClick={() => dispatch({ type: 'set-view', view })}
                       className={cn(
                         'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                        rendererView === view
+                        timelineView === view
                           ? 'bg-primary text-primary-foreground'
                           : 'text-muted-foreground hover:text-foreground',
                       )}
@@ -975,8 +1003,20 @@ export function CalendarController() {
                 </div>
               </div>
 
-              <DesktopWeekCalendar {...rendererProps} view={rendererView} />
+              <DesktopWeekCalendar {...rendererProps} view={timelineView} />
             </>
+          ) : responsiveLayout === 'phone' && rendererView === 'month' ? (
+            <MobileMonthCalendar
+              appointments={appointments}
+              config={config}
+              selectedDate={state.selectedDate}
+              onSelectDate={handleSelectDate}
+              onSelectAppointment={handleSelectAppointment}
+              onNavigateMonth={navigate}
+              onViewChange={handleViewChange}
+              onOptimize={businessId ? handleOpenOptimizer : undefined}
+              optimizeButtonRef={mobileOptimizeButtonRef}
+            />
           ) : responsiveLayout === 'phone' && rendererView === 'week' ? (
             <MobileWeekOverview
               appointments={appointments}
@@ -1000,7 +1040,7 @@ export function CalendarController() {
                 onOptimize={businessId ? handleOpenOptimizer : undefined}
                 optimizeButtonRef={mobileOptimizeButtonRef}
                 onDensityChange={handleDensityChange}
-                view={rendererView}
+                view={timelineView}
                 onViewChange={handleViewChange}
               />
             </>
@@ -1008,7 +1048,7 @@ export function CalendarController() {
             <TabletMultiDayCalendar
               {...rendererProps}
               dayCount={responsiveLayout === 'seven-day' ? 7 : 3}
-              view={rendererView}
+              view={timelineView}
               onDensityChange={handleDensityChange}
               onViewChange={handleViewChange}
               onOptimize={businessId ? handleOpenOptimizer : undefined}

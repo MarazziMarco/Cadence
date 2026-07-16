@@ -13,6 +13,7 @@ import {
   formatBusinessDate,
   weekRange,
 } from '@/lib/calendar/date'
+import type { CalendarView } from '@/lib/calendar/types'
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
 import { CalendarToolbar } from './calendar-toolbar'
@@ -22,7 +23,7 @@ interface MobileWeekOverviewProps {
   config: CalendarConfig
   selectedDate: string
   onSelectDay(date: string): void
-  onViewChange(view: 'day' | 'week'): void
+  onViewChange(view: CalendarView): void
   onOptimize?(): void
   optimizeButtonRef?: Ref<HTMLButtonElement>
 }
@@ -53,9 +54,9 @@ export function MobileWeekOverview({
       <CalendarToolbar
         selectedDate={selectedDate}
         view="week"
-        enabledViews={['day', 'week']}
+        enabledViews={['day', 'week', 'month']}
         onToday={() => onSelectDay(today)}
-        onViewChange={(view) => onViewChange(view as 'day' | 'week')}
+        onViewChange={onViewChange}
         onOptimize={onOptimize}
         optimizeButtonRef={optimizeButtonRef}
       />

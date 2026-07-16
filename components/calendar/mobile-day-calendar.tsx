@@ -25,6 +25,7 @@ import {
 } from '@/lib/calendar/geometry'
 import { allocateOverlapLanes } from '@/lib/calendar/overlap-lanes'
 import type { CalendarRendererProps } from '@/components/calendar/desktop-week-calendar'
+import type { CalendarView } from '@/lib/calendar/types'
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
 import { WEEKDAYS } from '@/lib/types/db'
@@ -43,8 +44,8 @@ interface MobileDayCalendarProps extends CalendarRendererProps {
   onOptimize?(): void
   optimizeButtonRef?: Ref<HTMLButtonElement>
   onDensityChange(density: number): void
-  view?: 'day' | 'week'
-  onViewChange?(view: 'day' | 'week'): void
+  view?: CalendarView
+  onViewChange?(view: CalendarView): void
 }
 
 interface OpenWindow {
@@ -329,11 +330,9 @@ export function MobileDayCalendar({
         <CalendarToolbar
           selectedDate={selectedDate}
           view={view}
-          enabledViews={['day', 'week']}
+          enabledViews={['day', 'week', 'month']}
           onToday={handleToday}
-          onViewChange={(nextView) => onViewChange(
-            nextView as 'day' | 'week',
-          )}
+          onViewChange={onViewChange}
           onOptimize={onOptimize}
           optimizeButtonRef={optimizeButtonRef}
         />
