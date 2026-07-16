@@ -115,7 +115,7 @@ export function MobileMonthCalendar({
       <CalendarToolbar
         selectedDate={selectedDate}
         view="month"
-        enabledViews={['day', 'week', 'month']}
+        enabledViews={['day', 'week', 'month', 'agenda']}
         onToday={() => onSelectDate(today)}
         onViewChange={onViewChange}
         onOptimize={onOptimize}

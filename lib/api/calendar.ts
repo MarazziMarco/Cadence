@@ -1,10 +1,18 @@
 import type { CalendarAppointment } from '@/lib/api/appointments'
 import { isCalendarConstraint } from '@/lib/calendar/constraints'
 import type {
+  AgendaFilters,
   CalendarConstraint,
   MoveIntent,
   ResizeIntent,
 } from '@/lib/calendar/types'
+import {
+  AGENDA_PAGE_SIZE,
+  agendaNextCursor,
+  sortAgendaAppointments,
+  type AgendaCursor,
+  type AgendaPage,
+} from '@/lib/calendar/agenda'
 import { createClient } from '@/lib/supabase/client'
 import { WEEKDAYS, type WorkingHour } from '@/lib/types/db'
 
@@ -15,6 +23,47 @@ export interface CalendarConfig {
   maxDailyAppointments: number | null
   workingHours: WorkingHour[]
   holidays: Array<{ start_date: string; end_date: string; is_closed: boolean }>
+}
+
+const AGENDA_SELECT = 'id, appointment_date, start_time, end_time, duration_minutes, status, color, title, price, patient_id, service_id, locked, manual_override, version, patients:patient_id ( first_name, last_name, full_name, color, phone, email ), services:service_id ( name, color, buffer_before_minutes, buffer_after_minutes, max_daily_bookings )'
+
+export async function listAgendaPage(
+  businessId: string,
+  startDate: string,
+  filters: AgendaFilters,
+  cursor: AgendaCursor | null,
+): Promise<AgendaPage> {
+  const supabase = createClient()
+  let query = supabase
+    .from('appointments')
+    .select(AGENDA_SELECT)
+    .eq('business_id', businessId)
+    .is('deleted_at', null)
+    .gte('appointment_date', startDate)
+
+  if (filters.patientId) query = query.eq('patient_id', filters.patientId)
+  if (filters.serviceId) query = query.eq('service_id', filters.serviceId)
+  if (filters.status) query = query.eq('status', filters.status)
+  if (cursor) {
+    query = query.or(
+      `appointment_date.gt.${cursor.date},and(appointment_date.eq.${cursor.date},start_time.gt.${cursor.startTime}),and(appointment_date.eq.${cursor.date},start_time.eq.${cursor.startTime},id.gt.${cursor.id})`,
+    )
+  }
+
+  const { data, error } = await query
+    .order('appointment_date', { ascending: true })
+    .order('start_time', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(AGENDA_PAGE_SIZE)
+  if (error) throw error
+
+  const appointments = sortAgendaAppointments(
+    (data ?? []) as unknown as CalendarAppointment[],
+  )
+  return {
+    appointments,
+    nextCursor: agendaNextCursor(appointments),
+  }
 }
 
 /**

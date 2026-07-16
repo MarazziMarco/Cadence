@@ -330,7 +330,7 @@ export function MobileDayCalendar({
         <CalendarToolbar
           selectedDate={selectedDate}
           view={view}
-          enabledViews={['day', 'week', 'month']}
+          enabledViews={['day', 'week', 'month', 'agenda']}
           onToday={handleToday}
           onViewChange={onViewChange}
           onOptimize={onOptimize}

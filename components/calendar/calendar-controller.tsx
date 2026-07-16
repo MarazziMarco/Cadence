@@ -78,6 +78,7 @@ import {
   type AppointmentEditorPresentation,
 } from './appointment-dialog'
 import { AppointmentQuickSheet } from './appointment-quick-sheet'
+import { CalendarAgenda } from './calendar-agenda'
 import {
   DesktopWeekCalendar,
   type CalendarRendererProps,
@@ -98,13 +99,18 @@ type CalendarRangeSnapshot = [
   data: CalendarAppointment[] | undefined,
 ]
 
-type SupportedCalendarView = Extract<CalendarView, 'day' | 'week' | 'month'>
+type SupportedCalendarView = CalendarView
 type TimelineCalendarView = Extract<CalendarView, 'day' | 'week'>
 
 function isSupportedCalendarView(
   view: CalendarView | null,
 ): view is SupportedCalendarView {
-  return view === 'day' || view === 'week' || view === 'month'
+  return (
+    view === 'day'
+    || view === 'week'
+    || view === 'month'
+    || view === 'agenda'
+  )
 }
 
 export function createInitialCalendarState(timezone: string): CalendarState {
@@ -329,7 +335,7 @@ export function CalendarController() {
       {
         queryKey: calendarKeys.range(businessId, range.from, range.to),
         queryFn: () => listAppointments(businessId, range.from, range.to),
-        enabled: Boolean(businessId),
+        enabled: Boolean(businessId) && rendererView !== 'agenda',
         placeholderData: keepPreviousData,
       },
       {
@@ -400,7 +406,7 @@ export function CalendarController() {
   }, [preferencesRestored, state.density])
 
   useEffect(() => {
-    if (!businessId) return
+    if (!businessId || rendererView === 'agenda') return
     void Promise.all([
       queryClient.prefetchQuery({
         queryKey: calendarKeys.range(
@@ -434,6 +440,7 @@ export function CalendarController() {
     previousRange.from,
     previousRange.to,
     queryClient,
+    rendererView,
   ])
 
   const calendarRangeFilter = useMemo(() => ({
@@ -675,6 +682,17 @@ export function CalendarController() {
     dispatch({ type: 'create-at', value: null })
     dispatch({ type: 'select-appointment', id })
   }, [appointmentById, isDesktop])
+
+  const handleSelectAgendaAppointment = useCallback((
+    appointment: CalendarAppointment,
+  ) => {
+    setSelectedAppointmentSnapshot(appointment)
+    setEditorPresentation(null)
+    setMoveSheetOpen(false)
+    setDuplicating(false)
+    dispatch({ type: 'create-at', value: null })
+    dispatch({ type: 'select-appointment', id: appointment.id })
+  }, [])
 
   const handleCreateAt = useCallback((date: string, startMinute: number) => {
     setEditorPresentation(isDesktop ? 'dialog' : 'drawer')
@@ -1005,6 +1023,17 @@ export function CalendarController() {
 
               <DesktopWeekCalendar {...rendererProps} view={timelineView} />
             </>
+          ) : responsiveLayout === 'phone' && rendererView === 'agenda' ? (
+            <CalendarAgenda
+              businessId={businessId}
+              config={config}
+              selectedDate={state.selectedDate}
+              onSelectDate={handleSelectDate}
+              onSelectAppointment={handleSelectAgendaAppointment}
+              onViewChange={handleViewChange}
+              onOptimize={businessId ? handleOpenOptimizer : undefined}
+              optimizeButtonRef={mobileOptimizeButtonRef}
+            />
           ) : responsiveLayout === 'phone' && rendererView === 'month' ? (
             <MobileMonthCalendar
               appointments={appointments}

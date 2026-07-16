@@ -54,7 +54,7 @@ export function MobileWeekOverview({
       <CalendarToolbar
         selectedDate={selectedDate}
         view="week"
-        enabledViews={['day', 'week', 'month']}
+        enabledViews={['day', 'week', 'month', 'agenda']}
         onToday={() => onSelectDay(today)}
         onViewChange={onViewChange}
         onOptimize={onOptimize}
