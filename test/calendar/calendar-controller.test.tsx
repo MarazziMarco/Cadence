@@ -1,9 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { CalendarController } from '@/components/calendar/calendar-controller'
+import {
+  CalendarController,
+  createInitialCalendarState,
+} from '@/components/calendar/calendar-controller'
 import { listAppointments, type CalendarAppointment } from '@/lib/api/appointments'
 import { getCalendarConfig, type CalendarConfig } from '@/lib/api/calendar'
 import { calendarKeys } from '@/lib/calendar/query-keys'
@@ -164,7 +167,21 @@ describe('CalendarController', () => {
     vi.useRealTimers()
   })
 
-  it('initializes from business-local today and persisted preferences', async () => {
+  it('creates hydration-stable initial state without reading localStorage', () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem')
+
+    expect(createInitialCalendarState(business.timezone)).toEqual({
+      view: 'week',
+      selectedDate: '2026-07-17',
+      density: 60,
+      selectedAppointmentId: null,
+      createAt: null,
+    })
+    expect(getItem).not.toHaveBeenCalled()
+    getItem.mockRestore()
+  })
+
+  it('restores supported persisted preferences after mount', async () => {
     const { queryClient } = renderController()
     const renderer = await screen.findByTestId('calendar-renderer')
 
@@ -176,6 +193,25 @@ describe('CalendarController', () => {
       calendarKeys.range(business.id, '2026-07-17', '2026-07-17'),
     )).toEqual([appointment])
   })
+
+  it.each(['month', 'agenda'])(
+    'ignores stored unsupported view %s until its renderer exists',
+    async (storedView) => {
+      localStorage.setItem('cadence.calendar.view', storedView)
+      renderController()
+
+      const renderer = await screen.findByTestId('calendar-renderer')
+      expect(renderer).toHaveAttribute('data-view', 'week')
+      expect(listAppointments).toHaveBeenCalledWith(
+        business.id,
+        '2026-07-13',
+        '2026-07-19',
+      )
+      await waitFor(() => {
+        expect(localStorage.getItem('cadence.calendar.view')).toBe('week')
+      })
+    },
+  )
 
   it('prefetches adjacent ranges and owns calendar overlays and waiting state', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
@@ -202,6 +238,18 @@ describe('CalendarController', () => {
     expect(screen.getByText('Optimizer open')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Waiting list' }))
+    expect(screen.getByText('Waiting list content')).toBeInTheDocument()
+  })
+
+  it('does not run calendar keyboard shortcuts while waiting list is active', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderController()
+
+    await screen.findByTestId('calendar-renderer')
+    await user.click(screen.getByRole('button', { name: 'Waiting list' }))
+    fireEvent.keyDown(window, { key: 'n' })
+
+    expect(screen.queryByTestId('appointment-dialog')).not.toBeInTheDocument()
     expect(screen.getByText('Waiting list content')).toBeInTheDocument()
   })
 })

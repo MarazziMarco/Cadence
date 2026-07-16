@@ -9,6 +9,7 @@ import {
   confirmCalendarMutationInteractively,
   isCalendarWarningConfirmation,
 } from '@/lib/api/calendar'
+import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { useWorkspace } from '@/lib/workspace-context'
@@ -141,7 +142,7 @@ export function VoiceAppointment() {
         await setPatientWeekdayAvailability(pid, (parsed.availableWeekdays ?? []) as any, parsed.preferredPartOfDay)
       }
       toast.success(t.created)
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      invalidateCalendarAppointments(qc, businessId)
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['patients'] })
       qc.invalidateQueries({ queryKey: ['patients-select'] })

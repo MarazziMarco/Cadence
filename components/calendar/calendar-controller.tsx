@@ -44,7 +44,10 @@ import {
   businessToday,
   formatBusinessDate,
 } from '@/lib/calendar/date'
-import { calendarKeys } from '@/lib/calendar/query-keys'
+import {
+  calendarKeys,
+  invalidateCalendarAppointments,
+} from '@/lib/calendar/query-keys'
 import type {
   CalendarView,
   DateRange,
@@ -76,24 +79,19 @@ type CalendarChange =
   | { kind: 'resize'; request: ResizeIntent }
 const EMPTY_APPOINTMENTS: CalendarAppointment[] = []
 
-interface InitialStateInput {
-  timezone: string
+type SupportedCalendarView = Extract<CalendarView, 'day' | 'week'>
+
+function isSupportedCalendarView(
+  view: CalendarView | null,
+): view is SupportedCalendarView {
+  return view === 'day' || view === 'week'
 }
 
-function initializeCalendarState({ timezone }: InitialStateInput): CalendarState {
-  const storedView = typeof window === 'undefined'
-    ? null
-    : parseStoredCalendarView(localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY))
-  const storedDensity = typeof window === 'undefined'
-    ? null
-    : parseStoredCalendarDensity(
-        localStorage.getItem(CALENDAR_DENSITY_STORAGE_KEY),
-      )
-
+export function createInitialCalendarState(timezone: string): CalendarState {
   return {
-    view: storedView ?? 'week',
+    view: 'week',
     selectedDate: businessToday(timezone),
-    density: storedDensity ?? 60,
+    density: 60,
     selectedAppointmentId: null,
     createAt: null,
   }
@@ -118,13 +116,27 @@ function shiftedSelectedDate(
 }
 
 function adjacentRange(
-  state: CalendarState,
+  selectedDate: string,
+  view: SupportedCalendarView,
   range: DateRange,
   direction: -1 | 1,
 ): DateRange {
+  return visibleSupportedRange(
+    shiftedSelectedDate(view, range, direction),
+    view,
+  )
+}
+
+function visibleSupportedRange(
+  selectedDate: string,
+  view: SupportedCalendarView,
+): DateRange {
   return visibleRange({
-    ...state,
-    selectedDate: shiftedSelectedDate(state.view, range, direction),
+    view,
+    selectedDate,
+    density: 60,
+    selectedAppointmentId: null,
+    createAt: null,
   })
 }
 
@@ -168,23 +180,27 @@ export function CalendarController() {
   const queryClient = useQueryClient()
   const [state, dispatch] = useReducer(
     calendarReducer,
-    { timezone },
-    initializeCalendarState,
+    timezone,
+    createInitialCalendarState,
   )
   const [section, setSection] = useState<CalendarSection>('calendar')
   const [optimizeOpen, setOptimizeOpen] = useState(false)
+  const [preferencesRestored, setPreferencesRestored] = useState(false)
   const isDesktop = useDesktopMediaQuery()
+  const supportedView: SupportedCalendarView = isSupportedCalendarView(state.view)
+    ? state.view
+    : 'week'
   const range = useMemo(
-    () => visibleRange(state),
-    [state.selectedDate, state.view],
+    () => visibleSupportedRange(state.selectedDate, supportedView),
+    [state.selectedDate, supportedView],
   )
   const previousRange = useMemo(
-    () => adjacentRange(state, range, -1),
-    [range, state.selectedDate, state.view],
+    () => adjacentRange(state.selectedDate, supportedView, range, -1),
+    [range, state.selectedDate, supportedView],
   )
   const nextRange = useMemo(
-    () => adjacentRange(state, range, 1),
-    [range, state.selectedDate, state.view],
+    () => adjacentRange(state.selectedDate, supportedView, range, 1),
+    [range, state.selectedDate, supportedView],
   )
 
   const [appointmentsQuery, configQuery] = useQueries({
@@ -228,19 +244,37 @@ export function CalendarController() {
   const selectedAppointment = state.selectedAppointmentId
     ? appointmentById.get(state.selectedAppointmentId) ?? null
     : null
-  const rendererView = state.view === 'week' ? 'week' : 'day'
+  const rendererView = supportedView
   const Renderer = RENDERERS[isDesktop ? 'desktop' : 'mobile']
 
   useEffect(() => {
-    localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, state.view)
-  }, [state.view])
+    const storedView = parseStoredCalendarView(
+      localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY),
+    )
+    const storedDensity = parseStoredCalendarDensity(
+      localStorage.getItem(CALENDAR_DENSITY_STORAGE_KEY),
+    )
+    if (isSupportedCalendarView(storedView)) {
+      dispatch({ type: 'set-view', view: storedView })
+    }
+    if (storedDensity !== null) {
+      dispatch({ type: 'set-density', density: storedDensity })
+    }
+    setPreferencesRestored(true)
+  }, [])
 
   useEffect(() => {
+    if (!preferencesRestored) return
+    localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, supportedView)
+  }, [preferencesRestored, supportedView])
+
+  useEffect(() => {
+    if (!preferencesRestored) return
     localStorage.setItem(
       CALENDAR_DENSITY_STORAGE_KEY,
       String(state.density),
     )
-  }, [state.density])
+  }, [preferencesRestored, state.density])
 
   useEffect(() => {
     if (!businessId) return
@@ -280,10 +314,7 @@ export function CalendarController() {
   ])
 
   const finishCalendarChange = useCallback(() => {
-    void queryClient.invalidateQueries({
-      queryKey: calendarKeys.all(businessId),
-    })
-    void queryClient.invalidateQueries({ queryKey: ['appointments'] })
+    invalidateCalendarAppointments(queryClient, businessId)
   }, [businessId, queryClient])
 
   const calendarChange = useMutation({
@@ -406,17 +437,21 @@ export function CalendarController() {
     if (open) return
     dispatch({ type: 'select-appointment', id: null })
     dispatch({ type: 'create-at', value: null })
-    void queryClient.invalidateQueries({
-      queryKey: calendarKeys.all(businessId),
-    })
+    invalidateCalendarAppointments(queryClient, businessId)
   }, [businessId, queryClient])
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null
+      if (section !== 'calendar') return
+      const target = event.target
       if (
         dialogOpen
-        || target?.matches('input, textarea, select, [contenteditable="true"]')
+        || (
+          target instanceof Element
+          && target.matches(
+            'input, textarea, select, [contenteditable="true"]',
+          )
+        )
       ) return
 
       if (event.key === 'n') {
@@ -437,7 +472,7 @@ export function CalendarController() {
 
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [dialogOpen, navigate, openNew, timezone])
+  }, [dialogOpen, navigate, openNew, section, timezone])
 
   const label = rendererView === 'day'
     ? formatBusinessDate(state.selectedDate, dateLocale, {

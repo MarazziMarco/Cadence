@@ -17,6 +17,7 @@ import {
   confirmCalendarMutationInteractively,
   isCalendarWarningConfirmation,
 } from '@/lib/api/calendar'
+import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { WEEKDAYS, type Weekday } from '@/lib/types/db'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -177,7 +178,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
 
   function finishSave() {
     toast.success(editing ? t('appt.updated') : t('appt.created'))
-    qc.invalidateQueries({ queryKey: ['appointments'] })
+    invalidateCalendarAppointments(qc, businessId)
     qc.invalidateQueries({ queryKey: ['patients'] })
     qc.invalidateQueries({ queryKey: ['patients-select'] })
     qc.invalidateQueries({ queryKey: ['waiting'] })
@@ -186,7 +187,7 @@ export function AppointmentDialog({ businessId, appt, defaultDate, defaultStart,
 
   function finishDelete() {
     toast.success(t('appt.deleted'))
-    qc.invalidateQueries({ queryKey: ['appointments'] })
+    invalidateCalendarAppointments(qc, businessId)
     onOpenChange(false)
   }
 

@@ -1,3 +1,5 @@
+import type { QueryClient } from '@tanstack/react-query'
+
 import type { AgendaFilters } from '@/lib/calendar/types'
 
 function stableAgendaFilters(filters: AgendaFilters): AgendaFilters {
@@ -15,4 +17,14 @@ export const calendarKeys = {
     ['calendar', businessId, 'range', from, to] as const,
   agenda: (businessId: string, filters: AgendaFilters) =>
     ['calendar', businessId, 'agenda', stableAgendaFilters(filters)] as const,
+}
+
+export function invalidateCalendarAppointments(
+  queryClient: Pick<QueryClient, 'invalidateQueries'>,
+  businessId: string,
+) {
+  void queryClient.invalidateQueries({
+    queryKey: calendarKeys.all(businessId),
+  })
+  void queryClient.invalidateQueries({ queryKey: ['appointments'] })
 }

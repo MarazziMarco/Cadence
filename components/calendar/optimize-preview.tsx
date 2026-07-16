@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Clock, DollarSign, ListChecks, ArrowRightLeft, Check, ArrowRight, Sparkles, PlusCircle, Loader2 } from 'lucide-react'
 import { applyChanges } from '@/lib/api/scheduler'
+import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
 import { Button } from '@/components/ui/button'
@@ -48,7 +49,7 @@ export function OptimizePreview({ businessId, run, changes, onApplied }: {
     setApplying(true)
     try {
       const applied = await applyChanges(businessId, run.id, changes, excluded)
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      invalidateCalendarAppointments(qc, businessId)
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['waiting'] })
       qc.invalidateQueries({ queryKey: ['schedule-health'] })
