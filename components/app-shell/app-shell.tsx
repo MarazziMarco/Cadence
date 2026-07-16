@@ -14,6 +14,7 @@ import { ThemeToggle } from './theme-toggle'
 import { NAV_SECTIONS } from '@/lib/brand'
 import { navKey, normalizeLocale, translate } from '@/lib/i18n'
 import { WorkspaceProvider, type WorkspaceBusiness } from '@/lib/workspace-context'
+import type { AppointmentEditorPresentation } from '@/components/calendar/appointment-dialog'
 
 const AppointmentDialog = dynamic(
   () => import('@/components/calendar/appointment-dialog')
@@ -56,7 +57,17 @@ export function AppShell({ user, business, children }: { user: { email: string; 
   // the dialog so it always opens with fresh state.
   const [quick, setQuick] = useState<QuickKind | null>(null)
   const [quickKey, setQuickKey] = useState(0)
-  const openQuick = (kind: QuickKind) => { setQuickKey((k) => k + 1); setQuick(kind) }
+  const [appointmentPresentation, setAppointmentPresentation] =
+    useState<AppointmentEditorPresentation>('dialog')
+  const openQuick = (kind: QuickKind) => {
+    setQuickKey((k) => k + 1)
+    if (kind === 'appointment') {
+      setAppointmentPresentation(
+        window.matchMedia('(min-width: 1024px)').matches ? 'dialog' : 'drawer',
+      )
+    }
+    setQuick(kind)
+  }
 
   // Clear any leftover Radix pointer-events lock on navigation, so the app never
   // becomes unclickable after a modal/sheet closes while the route changes.
@@ -107,6 +118,7 @@ export function AppShell({ user, business, children }: { user: { email: string; 
           key={`appt-${quickKey}`}
           businessId={businessId}
           open
+          presentation={appointmentPresentation}
           onOpenChange={(open) => { if (!open) setQuick(null) }}
         />
       ) : null}

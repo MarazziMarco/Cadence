@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 
 import type { CalendarAppointment } from '@/lib/api/appointments'
+import { formatBusinessDate } from '@/lib/calendar/date'
+import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
 import { Button } from '@/components/ui/button'
 import {
@@ -45,6 +47,8 @@ export interface AppointmentQuickSheetProps {
   onToggleLock(): void | Promise<void>
   onDuplicate(): void | Promise<void>
   onDelete(): void | Promise<void>
+  lockPending?: boolean
+  deletePending?: boolean
 }
 
 function safePhoneHref(phone: string | null | undefined): string | null {
@@ -64,12 +68,6 @@ function safeEmailHref(email: string | null | undefined): string | null {
   return `mailto:${normalized}`
 }
 
-function titleCase(value: string): string {
-  return value
-    .replaceAll('_', ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
 export function AppointmentQuickSheet({
   open,
   appointment,
@@ -79,8 +77,10 @@ export function AppointmentQuickSheet({
   onToggleLock,
   onDuplicate,
   onDelete,
+  lockPending = false,
+  deletePending = false,
 }: AppointmentQuickSheetProps) {
-  const { t } = useT()
+  const { t, locale } = useT()
 
   if (!appointment) return null
 
@@ -100,6 +100,11 @@ export function AppointmentQuickSheet({
     || appointment.services?.color
     || appointment.color
     || '#6d4bd8'
+  )
+  const formattedDate = formatBusinessDate(
+    appointment.appointment_date,
+    bcp47(locale),
+    { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' },
   )
 
   return (
@@ -143,7 +148,7 @@ export function AppointmentQuickSheet({
                   className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground"
                 />
                 <div>
-                  <p className="font-medium">{appointment.appointment_date}</p>
+                  <p className="font-medium">{formattedDate}</p>
                   <p className="text-sm text-muted-foreground">
                     {appointment.start_time.slice(0, 5)}
                     {' – '}
@@ -155,7 +160,7 @@ export function AppointmentQuickSheet({
               </div>
               <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3 text-sm">
                 <span className="rounded-full bg-secondary px-2.5 py-1 font-medium text-secondary-foreground">
-                  {titleCase(appointment.status)}
+                  {t(`cal.status.${appointment.status}`)}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-medium">
                   {appointment.locked ? (
@@ -203,6 +208,7 @@ export function AppointmentQuickSheet({
                 type="button"
                 variant="outline"
                 className="min-h-11 flex-col gap-1 py-2"
+                disabled={lockPending}
                 onClick={() => void onToggleLock()}
               >
                 {appointment.locked ? (
@@ -239,6 +245,7 @@ export function AppointmentQuickSheet({
                     type="button"
                     variant="ghost"
                     className="min-h-11 text-destructive hover:text-destructive"
+                    disabled={deletePending}
                   >
                     <Trash2 aria-hidden className="mr-2 h-4 w-4" />
                     {t('common.delete')}
@@ -255,6 +262,7 @@ export function AppointmentQuickSheet({
                     <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deletePending}
                       onClick={() => void onDelete()}
                     >
                       {t('appt.deleteAction')}

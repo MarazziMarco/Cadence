@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Loader2, Mic, MicOff, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,6 +22,7 @@ import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients
 import { listServices } from '@/lib/api/services'
 import { createAdvanceWaiting } from '@/lib/api/waiting-list'
 import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
+import { businessToday } from '@/lib/calendar/date'
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
 import { cn } from '@/lib/utils.js'
@@ -34,6 +35,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 export interface AppointmentFormProps {
   businessId: string
@@ -45,15 +57,10 @@ export interface AppointmentFormProps {
   defaultDurationMinutes?: number
   onSaved(appointmentId: string): void
   onCancel(): void
-}
-
-function localDate(): string {
-  const date = new Date()
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-')
+  onDirtyChange?(dirty: boolean): void
+  className?: string
+  bodyClassName?: string
+  actionsClassName?: string
 }
 
 function shortWeekdays(locale: string): string[] {
@@ -74,6 +81,10 @@ export function AppointmentForm({
   defaultDurationMinutes,
   onSaved,
   onCancel,
+  onDirtyChange,
+  className,
+  bodyClassName,
+  actionsClassName,
 }: AppointmentFormProps) {
   const queryClient = useQueryClient()
   const { business } = useWorkspace()
@@ -94,6 +105,16 @@ export function AppointmentForm({
   const [neverAvailable, setNeverAvailable] = useState<Set<Weekday>>(new Set())
   const [preferred, setPreferred] = useState<'morning' | 'afternoon' | null>(null)
   const [advanceUp, setAdvanceUp] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const setFormDirty = useCallback((nextDirty: boolean) => {
+    onDirtyChange?.(nextDirty)
+  }, [onDirtyChange])
+
+  const markDirty = useCallback(() => {
+    setFormError(null)
+    setFormDirty(true)
+  }, [setFormDirty])
 
   const { data: patients = [] } = useQuery({
     queryKey: ['patients-select', businessId],
@@ -116,7 +137,11 @@ export function AppointmentForm({
     setPatientId(appointment?.patient_id ?? defaultPatientId ?? '')
     setNewClient('')
     setServiceId(appointment?.service_id ?? defaultServiceId ?? 'none')
-    setDate(appointment?.appointment_date ?? defaultDate ?? localDate())
+    setDate(
+      appointment?.appointment_date
+      ?? defaultDate
+      ?? businessToday(business?.timezone || 'UTC'),
+    )
     setStart(
       appointment?.start_time.slice(0, 5)
       ?? defaultStart
@@ -134,14 +159,18 @@ export function AppointmentForm({
     setNeverAvailable(new Set())
     setPreferred(null)
     setAdvanceUp(false)
+    setFormError(null)
+    setFormDirty(false)
   }, [
     appointment,
     business?.default_appointment_duration,
+    business?.timezone,
     defaultDate,
     defaultDurationMinutes,
     defaultPatientId,
     defaultServiceId,
     defaultStart,
+    setFormDirty,
   ])
 
   function applyVoice(text: string) {
@@ -154,6 +183,15 @@ export function AppointmentForm({
     if (result.date) setDate(result.date)
     if (result.time) setStart(result.time)
     if (result.durationMinutes) setDuration(String(result.durationMinutes))
+    if (
+      result.patientId
+      || result.serviceId
+      || result.date
+      || result.time
+      || result.durationMinutes
+    ) {
+      markDirty()
+    }
     if (!result.patientId && !result.date && !result.time) {
       toast(t('appt.didntCatch'))
     }
@@ -191,9 +229,11 @@ export function AppointmentForm({
     if (next.has(weekday)) next.delete(weekday)
     else next.add(weekday)
     setValues(next)
+    markDirty()
   }
 
   function onServiceChange(nextServiceId: string) {
+    markDirty()
     setServiceId(nextServiceId)
     const service = services.find((candidate: any) => candidate.id === nextServiceId)
     if (service) setDuration(String(service.duration_minutes))
@@ -231,6 +271,9 @@ export function AppointmentForm({
 
       const startMinute = timeToMin(`${start}:00`)
       const durationMinutes = Number.parseInt(duration, 10) || 30
+      if (startMinute + durationMinutes > 24 * 60) {
+        throw new RangeError(t('appt.endNextDay'))
+      }
       const service = services.find((candidate: any) => candidate.id === serviceId)
       const values = {
         patient_id: resolvedPatientId,
@@ -267,6 +310,7 @@ export function AppointmentForm({
     },
     onSuccess: (savedAppointment) => {
       if (!savedAppointment?.id) return
+      setFormDirty(false)
       toast.success(editing ? t('appt.updated') : t('appt.created'))
       invalidateAfterSave()
       onSaved(savedAppointment.id)
@@ -289,6 +333,7 @@ export function AppointmentForm({
             durationMinutes: Number(values.duration_minutes),
           })
         }
+        setFormDirty(false)
         toast.success(editing ? t('appt.updated') : t('appt.created'))
         invalidateAfterSave()
         onSaved(confirmed.appointment.id)
@@ -307,6 +352,7 @@ export function AppointmentForm({
       appointment!.version,
     ),
     onSuccess: () => {
+      setFormDirty(false)
       toast.success(t('appt.deleted'))
       invalidateCalendarAppointments(queryClient, businessId)
       onSaved(appointment!.id)
@@ -319,6 +365,7 @@ export function AppointmentForm({
       try {
         const confirmed = await confirmCalendarMutationInteractively(error)
         if (!confirmed) return
+        setFormDirty(false)
         toast.success(t('appt.deleted'))
         invalidateCalendarAppointments(queryClient, businessId)
         onSaved(appointment!.id)
@@ -332,8 +379,17 @@ export function AppointmentForm({
 
   return (
     <form
+      className={className}
+      onChangeCapture={markDirty}
       onSubmit={(event) => {
         event.preventDefault()
+        const startMinute = timeToMin(`${start}:00`)
+        const durationMinutes = Number.parseInt(duration, 10) || 30
+        if (startMinute + durationMinutes > 24 * 60) {
+          setFormError(t('appt.endNextDay'))
+          return
+        }
+        setFormError(null)
         save.mutate()
       }}
     >
@@ -363,12 +419,13 @@ export function AppointmentForm({
         </div>
       ) : null}
 
-      <div className="space-y-4 py-4">
+      <div className={cn('space-y-4 py-4', bodyClassName)}>
         <div className="space-y-2">
           <Label>{t('appt.client')}</Label>
           <Select
             value={patientId}
             onValueChange={(value) => {
+              markDirty()
               setPatientId(value)
               setNewClient('')
             }}
@@ -389,6 +446,7 @@ export function AppointmentForm({
               placeholder={t('appt.newClientPh')}
               value={newClient}
               onChange={(event) => {
+                markDirty()
                 setNewClient(event.target.value)
                 if (event.target.value) setPatientId('')
               }}
@@ -421,7 +479,10 @@ export function AppointmentForm({
               id="appointment-date"
               type="date"
               value={date}
-              onChange={(event) => setDate(event.target.value)}
+              onChange={(event) => {
+                markDirty()
+                setDate(event.target.value)
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -430,7 +491,10 @@ export function AppointmentForm({
               id="appointment-start"
               type="time"
               value={start}
-              onChange={(event) => setStart(event.target.value)}
+              onChange={(event) => {
+                markDirty()
+                setStart(event.target.value)
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -438,7 +502,10 @@ export function AppointmentForm({
             <select
               id="appointment-duration"
               value={duration}
-              onChange={(event) => setDuration(event.target.value)}
+              onChange={(event) => {
+                markDirty()
+                setDuration(event.target.value)
+              }}
               className="flex h-9 w-24 rounded-md border border-input bg-transparent px-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
             >
               {Array.from({ length: 200 }, (_, index) => index + 1).map(
@@ -482,7 +549,10 @@ export function AppointmentForm({
                   </div>
                   <Switch
                     checked={showAvailability}
-                    onCheckedChange={setShowAvailability}
+                    onCheckedChange={(checked) => {
+                      markDirty()
+                      setShowAvailability(checked)
+                    }}
                   />
                 </div>
                 {showAvailability ? (
@@ -527,9 +597,10 @@ export function AppointmentForm({
                             <button
                               key={value}
                               type="button"
-                              onClick={() => setPreferred(
-                                value === 'any' ? null : value,
-                              )}
+                              onClick={() => {
+                                markDirty()
+                                setPreferred(value === 'any' ? null : value)
+                              }}
                               className={cn(
                                 'min-h-9 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
                                 active
@@ -559,7 +630,13 @@ export function AppointmentForm({
                       {t('appt.advanceHint')}
                     </p>
                   </div>
-                  <Switch checked={advanceUp} onCheckedChange={setAdvanceUp} />
+                  <Switch
+                    checked={advanceUp}
+                    onCheckedChange={(checked) => {
+                      markDirty()
+                      setAdvanceUp(checked)
+                    }}
+                  />
                 </div>
               ) : null}
             </div>
@@ -567,19 +644,49 @@ export function AppointmentForm({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
+      {formError ? (
+        <p className="px-1 pb-3 text-sm text-destructive" role="alert">
+          {formError}
+        </p>
+      ) : null}
+
+      <div className={cn(
+        'flex items-center justify-between gap-3',
+        actionsClassName,
+      )}>
         {editing ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={t('common.delete')}
-            className="min-h-11 min-w-11 text-destructive"
-            disabled={remove.isPending}
-            onClick={() => remove.mutate()}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t('common.delete')}
+                className="min-h-11 min-w-11 text-destructive"
+                disabled={remove.isPending}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('appt.deleteTitle')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('appt.deleteDescription')}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate()}
+                >
+                  {t('appt.deleteAction')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         ) : <span />}
         <div className="flex gap-2">
           <Button type="button" variant="ghost" onClick={onCancel}>
