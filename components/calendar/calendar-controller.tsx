@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner'
 
 import {
+  deleteAppointment,
   listAppointments,
   minToTime,
   timeToMin,
@@ -28,6 +29,7 @@ import {
   confirmCalendarMutationInteractively,
   getCalendarConfig,
   isCalendarWarningConfirmation,
+  mutateCalendarOrThrow,
   type CalendarConfig,
 } from '@/lib/api/calendar'
 import {
@@ -66,17 +68,20 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { AppointmentDialog } from './appointment-dialog'
+import { AppointmentQuickSheet } from './appointment-quick-sheet'
 import {
   DesktopWeekCalendar,
   type CalendarRendererProps,
 } from './desktop-week-calendar'
 import { MobileDayCalendar } from './mobile-day-calendar'
+import { MoveAppointmentSheet } from './move-appointment-sheet'
 import { OptimizeDialog } from './optimize-dialog'
 
 type CalendarSection = 'calendar' | 'waiting'
 type CalendarChange =
   | { kind: 'move'; request: MoveIntent }
   | { kind: 'resize'; request: ResizeIntent }
+type QuickAction = 'delete' | 'toggle-lock'
 const EMPTY_APPOINTMENTS: CalendarAppointment[] = []
 
 type SupportedCalendarView = Extract<CalendarView, 'day' | 'week'>
@@ -170,6 +175,9 @@ export function CalendarController() {
   )
   const [section, setSection] = useState<CalendarSection>('calendar')
   const [optimizeOpen, setOptimizeOpen] = useState(false)
+  const [mobileEditorOpen, setMobileEditorOpen] = useState(false)
+  const [moveSheetOpen, setMoveSheetOpen] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [preferencesRestored, setPreferencesRestored] = useState(false)
   const desktopOptimizeButtonRef = useRef<HTMLButtonElement>(null)
   const mobileOptimizeButtonRef = useRef<HTMLButtonElement>(null)
@@ -376,11 +384,75 @@ export function CalendarController() {
   })
   const mutateCalendarChange = calendarChange.mutate
 
+  const finishQuickAction = useCallback((action: QuickAction) => {
+    invalidateCalendarAppointments(queryClient, businessId)
+    if (action === 'delete') {
+      dispatch({ type: 'select-appointment', id: null })
+    }
+  }, [businessId, queryClient])
+
+  const quickAction = useMutation({
+    mutationFn: async (action: QuickAction) => {
+      if (!selectedAppointment) {
+        throw new Error('Appointment is no longer available')
+      }
+
+      if (action === 'delete') {
+        return deleteAppointment(
+          businessId,
+          selectedAppointment.id,
+          selectedAppointment.version,
+        )
+      }
+
+      return mutateCalendarOrThrow({
+        businessId,
+        operation: selectedAppointment.locked ? 'unlock' : 'lock',
+        appointmentId: selectedAppointment.id,
+        expectedVersion: selectedAppointment.version,
+        idempotencyKey: crypto.randomUUID(),
+        values: {},
+      })
+    },
+    onSuccess: (_, action) => {
+      toast.success(
+        action === 'delete'
+          ? 'Appointment deleted'
+          : selectedAppointment?.locked
+            ? 'Appointment unlocked'
+            : 'Appointment locked',
+      )
+      finishQuickAction(action)
+    },
+    onError: async (error: unknown, action) => {
+      if (!isCalendarWarningConfirmation(error)) {
+        toast.error(
+          error instanceof Error ? error.message : 'Calendar update failed',
+        )
+        return
+      }
+
+      try {
+        const confirmed = await confirmCalendarMutationInteractively(error)
+        if (confirmed) finishQuickAction(action)
+      } catch (retryError) {
+        toast.error(
+          retryError instanceof Error
+            ? retryError.message
+            : 'Calendar update failed',
+        )
+      }
+    },
+  })
+
   const handleSelectDate = useCallback((date: string) => {
     dispatch({ type: 'select-date', date })
   }, [])
 
   const handleSelectAppointment = useCallback((id: string) => {
+    setMobileEditorOpen(false)
+    setMoveSheetOpen(false)
+    setDuplicating(false)
     dispatch({ type: 'create-at', value: null })
     dispatch({ type: 'select-appointment', id })
   }, [])
@@ -444,7 +516,21 @@ export function CalendarController() {
     state.selectedDate,
   ])
 
-  const dialogOpen = Boolean(state.createAt || state.selectedAppointmentId)
+  const quickSheetOpen = (
+    !isDesktop
+    && Boolean(selectedAppointment)
+    && !mobileEditorOpen
+    && !moveSheetOpen
+  )
+  const appointmentDialogOpen = Boolean(
+    state.createAt
+    || (selectedAppointment && (isDesktop || mobileEditorOpen)),
+  )
+  const dialogOpen = (
+    appointmentDialogOpen
+    || quickSheetOpen
+    || moveSheetOpen
+  )
   const navigate = useCallback((direction: -1 | 1) => {
     const amount = rendererView === 'day' ? 1 : 7
     dispatch({
@@ -459,8 +545,26 @@ export function CalendarController() {
 
   const closeAppointmentDialog = useCallback((open: boolean) => {
     if (open) return
+    setMobileEditorOpen(false)
+    setDuplicating(false)
     dispatch({ type: 'select-appointment', id: null })
     dispatch({ type: 'create-at', value: null })
+    invalidateCalendarAppointments(queryClient, businessId)
+  }, [businessId, queryClient])
+
+  const handleQuickSheetOpenChange = useCallback((open: boolean) => {
+    if (open) return
+    dispatch({ type: 'select-appointment', id: null })
+  }, [])
+
+  const handleMoveSheetOpenChange = useCallback((open: boolean) => {
+    setMoveSheetOpen(open)
+    if (!open) invalidateCalendarAppointments(queryClient, businessId)
+  }, [businessId, queryClient])
+
+  const handleMoved = useCallback(() => {
+    setMoveSheetOpen(false)
+    dispatch({ type: 'select-appointment', id: null })
     invalidateCalendarAppointments(queryClient, businessId)
   }, [businessId, queryClient])
 
@@ -679,16 +783,56 @@ export function CalendarController() {
           ) : null}
 
           {businessId ? (
+            <AppointmentQuickSheet
+              open={quickSheetOpen}
+              appointment={selectedAppointment}
+              onOpenChange={handleQuickSheetOpenChange}
+              onMove={() => {
+                setDuplicating(false)
+                setMoveSheetOpen(true)
+              }}
+              onEdit={() => {
+                setDuplicating(false)
+                setMobileEditorOpen(true)
+              }}
+              onToggleLock={() => quickAction.mutate('toggle-lock')}
+              onDuplicate={() => {
+                setDuplicating(true)
+                setMobileEditorOpen(true)
+              }}
+              onDelete={() => quickAction.mutate('delete')}
+            />
+          ) : null}
+
+          {businessId ? (
+            <MoveAppointmentSheet
+              businessId={businessId}
+              appointment={selectedAppointment}
+              open={moveSheetOpen}
+              onOpenChange={handleMoveSheetOpenChange}
+              onMoved={handleMoved}
+            />
+          ) : null}
+
+          {businessId ? (
             <AppointmentDialog
               businessId={businessId}
-              appt={selectedAppointment}
-              defaultDate={state.createAt?.date}
+              appt={(state.createAt || duplicating) ? null : selectedAppointment}
+              defaultDate={
+                state.createAt?.date
+                ?? (duplicating ? selectedAppointment?.appointment_date : undefined)
+              }
               defaultStart={
                 state.createAt
                   ? minToTime(state.createAt.startMinute).slice(0, 5)
-                  : undefined
+                  : duplicating
+                    ? selectedAppointment?.start_time.slice(0, 5)
+                    : undefined
               }
-              open={dialogOpen}
+              defaultPatientId={
+                duplicating ? selectedAppointment?.patient_id : undefined
+              }
+              open={appointmentDialogOpen}
               onOpenChange={closeAppointmentDialog}
             />
           ) : null}

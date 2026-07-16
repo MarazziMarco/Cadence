@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
+import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Logo } from '@/components/brand/logo'
@@ -13,9 +14,22 @@ import { ThemeToggle } from './theme-toggle'
 import { NAV_SECTIONS } from '@/lib/brand'
 import { navKey, normalizeLocale, translate } from '@/lib/i18n'
 import { WorkspaceProvider, type WorkspaceBusiness } from '@/lib/workspace-context'
-import { AppointmentDialog } from '@/components/calendar/appointment-dialog'
-import { PatientFormDialog } from '@/components/patients/patient-form-dialog'
-import { VoiceAppointment } from '@/components/ai/voice-appointment'
+
+const AppointmentDialog = dynamic(
+  () => import('@/components/calendar/appointment-dialog')
+    .then((module) => module.AppointmentDialog),
+  { ssr: false },
+)
+const PatientFormDialog = dynamic(
+  () => import('@/components/patients/patient-form-dialog')
+    .then((module) => module.PatientFormDialog),
+  { ssr: false },
+)
+const VoiceAppointment = dynamic(
+  () => import('@/components/ai/voice-appointment')
+    .then((module) => module.VoiceAppointment),
+  { ssr: false },
+)
 
 // Returns the matched nav href for the current path (null = no match).
 function useTitleHref(): string | null {

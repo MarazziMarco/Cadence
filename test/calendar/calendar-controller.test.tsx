@@ -96,10 +96,41 @@ vi.mock('@/components/calendar/appointment-dialog', () => ({
     appt?: CalendarAppointment | null
     defaultDate?: string
     defaultStart?: string
+    defaultPatientId?: string
   }) => props.open ? (
     <div data-testid="appointment-dialog">
-      {props.appt?.id ?? `${props.defaultDate}-${props.defaultStart}`}
+      {props.appt?.id ?? [
+        props.defaultDate,
+        props.defaultStart,
+        props.defaultPatientId,
+      ].filter(Boolean).join('-')}
     </div>
+  ) : null,
+}))
+
+vi.mock('@/components/calendar/appointment-quick-sheet', () => ({
+  AppointmentQuickSheet: (props: {
+    open: boolean
+    appointment?: CalendarAppointment | null
+    onEdit(): void
+    onMove(): void
+    onDuplicate(): void
+  }) => props.open ? (
+    <div data-testid="appointment-quick-sheet">
+      {props.appointment?.id}
+      <button onClick={props.onEdit}>Edit quick appointment</button>
+      <button onClick={props.onMove}>Move quick appointment</button>
+      <button onClick={props.onDuplicate}>Duplicate quick appointment</button>
+    </div>
+  ) : null,
+}))
+
+vi.mock('@/components/calendar/move-appointment-sheet', () => ({
+  MoveAppointmentSheet: (props: {
+    open: boolean
+    appointment?: CalendarAppointment | null
+  }) => props.open ? (
+    <div data-testid="move-appointment-sheet">{props.appointment?.id}</div>
   ) : null,
 }))
 
@@ -326,7 +357,17 @@ describe('CalendarController', () => {
     })
 
     await user.click(screen.getByRole('button', { name: 'Select appointment' }))
-    expect(screen.getByTestId('appointment-dialog')).toHaveTextContent('appointment-1')
+    expect(screen.getByTestId('appointment-quick-sheet')).toHaveTextContent(
+      'appointment-1',
+    )
+    expect(screen.queryByTestId('appointment-dialog')).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', { name: 'Move quick appointment' }),
+    )
+    expect(screen.getByTestId('move-appointment-sheet')).toHaveTextContent(
+      'appointment-1',
+    )
 
     await user.click(screen.getByRole('button', { name: 'Open mobile optimizer' }))
     expect(screen.getByText('Optimizer open')).toBeInTheDocument()
@@ -345,6 +386,22 @@ describe('CalendarController', () => {
 
     expect(screen.queryByTestId('appointment-dialog')).not.toBeInTheDocument()
     expect(screen.getByText('Waiting list content')).toBeInTheDocument()
+  })
+
+  it('duplicates by opening a prefilled create form instead of creating an overlap', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderController()
+
+    await screen.findByTestId('calendar-renderer')
+    await user.click(screen.getByRole('button', { name: 'Select appointment' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Duplicate quick appointment' }),
+    )
+
+    expect(screen.getByTestId('appointment-dialog')).toHaveTextContent(
+      '2026-07-17-09:00-patient-1',
+    )
+    expect(screen.queryByTestId('appointment-quick-sheet')).not.toBeInTheDocument()
   })
 
   it('treats kept previous query data as loading until the selected range resolves', async () => {
