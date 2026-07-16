@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { act, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   calculateWeekDragPreview,
+  useWeekAppointmentGesture,
   weekDragDateAtX,
   type WeekDragGeometry,
 } from '@/hooks/use-week-appointment-gesture'
@@ -21,6 +23,25 @@ const geometry: WeekDragGeometry = {
   railWidth: 46,
   columnWidth: 100,
   contentLeft: 10,
+}
+
+function gestureEvent(
+  target: HTMLElement,
+  pointerId: number,
+  clientX = 80,
+  clientY = 200,
+) {
+  return {
+    pointerId,
+    pointerType: 'touch',
+    clientX,
+    clientY,
+    isPrimary: true,
+    button: 0,
+    currentTarget: target,
+    preventDefault: vi.fn(),
+    stopPropagation: vi.fn(),
+  }
 }
 
 describe('week appointment drag geometry', () => {
@@ -79,5 +100,92 @@ describe('week appointment drag geometry', () => {
       rangeEnd: 21 * 60,
       durationMinutes: 60,
     }).startMinute).toBe(9 * 60 + 30)
+  })
+})
+
+describe('week appointment gesture lifecycle', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('releases the active interlock when unmounted during a drag', () => {
+    const viewport = document.createElement('div')
+    const card = document.createElement('button')
+    card.setPointerCapture = vi.fn()
+    const scrollRef = { current: viewport }
+    const onActiveChange = vi.fn()
+    const { result, unmount } = renderHook(() => useWeekAppointmentGesture({
+      appointmentId: 'appointment-1',
+      expectedVersion: 1,
+      date: dates[0],
+      startMinute: 9 * 60,
+      durationMinutes: 60,
+      rangeStart: 7 * 60,
+      rangeEnd: 21 * 60,
+      density: 60,
+      snapIntervalMinutes: 15,
+      dates,
+      railWidth: 46,
+      columnWidth: 100,
+      scrollRef,
+      onActiveChange,
+      onMove: vi.fn(),
+    }))
+    const event = gestureEvent(card, 71)
+
+    act(() => {
+      result.current.cardHandlers.onPointerDown(event as never)
+      vi.advanceTimersByTime(450)
+    })
+    expect(onActiveChange).toHaveBeenCalledWith(true)
+
+    unmount()
+
+    expect(onActiveChange.mock.calls).toEqual([[true], [false]])
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('cancels on lost capture and does not finish twice after pointer up', () => {
+    const viewport = document.createElement('div')
+    const card = document.createElement('button')
+    card.setPointerCapture = vi.fn()
+    const scrollRef = { current: viewport }
+    const onActiveChange = vi.fn()
+    const onMove = vi.fn()
+    const { result } = renderHook(() => useWeekAppointmentGesture({
+      appointmentId: 'appointment-1',
+      expectedVersion: 1,
+      date: dates[0],
+      startMinute: 9 * 60,
+      durationMinutes: 60,
+      rangeStart: 7 * 60,
+      rangeEnd: 21 * 60,
+      density: 60,
+      snapIntervalMinutes: 15,
+      dates,
+      railWidth: 46,
+      columnWidth: 100,
+      scrollRef,
+      onActiveChange,
+      onMove,
+    }))
+    const event = gestureEvent(card, 72)
+
+    act(() => {
+      result.current.cardHandlers.onPointerDown(event as never)
+      vi.advanceTimersByTime(450)
+      result.current.cardHandlers.onLostPointerCapture(event as never)
+      result.current.cardHandlers.onPointerUp(event as never)
+    })
+
+    expect(onMove).not.toHaveBeenCalled()
+    expect(onActiveChange.mock.calls).toEqual([[true], [false]])
+    expect(result.current.state.phase).toBe('idle')
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

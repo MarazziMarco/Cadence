@@ -70,12 +70,79 @@ interface AutoScrollDirection {
   y: number
 }
 
+const AUTO_SCROLL_EDGE_PX = 48
+const AUTO_SCROLL_STEP_PX = 7
+
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
 function snap(value: number, interval: number) {
   return Math.round(value / interval) * interval
+}
+
+function autoScrollDirectionAt(
+  scrollContainer: HTMLElement,
+  bounds: DOMRect,
+  clientX: number,
+  clientY: number,
+): AutoScrollDirection {
+  const maxScrollLeft = Math.max(
+    0,
+    scrollContainer.scrollWidth - scrollContainer.clientWidth,
+  )
+  const maxScrollTop = Math.max(
+    0,
+    scrollContainer.scrollHeight - scrollContainer.clientHeight,
+  )
+  return {
+    x: clientX < bounds.left + AUTO_SCROLL_EDGE_PX
+      && scrollContainer.scrollLeft > 0
+      ? -1
+      : clientX > bounds.right - AUTO_SCROLL_EDGE_PX
+        && scrollContainer.scrollLeft < maxScrollLeft
+        ? 1
+        : 0,
+    y: clientY < bounds.top + AUTO_SCROLL_EDGE_PX
+      && scrollContainer.scrollTop > 0
+      ? -1
+      : clientY > bounds.bottom - AUTO_SCROLL_EDGE_PX
+        && scrollContainer.scrollTop < maxScrollTop
+        ? 1
+        : 0,
+  }
+}
+
+function applyBoundedAutoScroll(
+  scrollContainer: HTMLElement,
+  direction: AutoScrollDirection,
+) {
+  const maxScrollLeft = Math.max(
+    0,
+    scrollContainer.scrollWidth - scrollContainer.clientWidth,
+  )
+  const maxScrollTop = Math.max(
+    0,
+    scrollContainer.scrollHeight - scrollContainer.clientHeight,
+  )
+  const nextLeft = clamp(
+    scrollContainer.scrollLeft + direction.x * AUTO_SCROLL_STEP_PX,
+    0,
+    maxScrollLeft,
+  )
+  const nextTop = clamp(
+    scrollContainer.scrollTop + direction.y * AUTO_SCROLL_STEP_PX,
+    0,
+    maxScrollTop,
+  )
+  const changed = (
+    nextLeft !== scrollContainer.scrollLeft
+    || nextTop !== scrollContainer.scrollTop
+  )
+  if (!changed) return false
+  scrollContainer.scrollLeft = nextLeft
+  scrollContainer.scrollTop = nextTop
+  return true
 }
 
 export function weekDragDateAtX(
@@ -158,6 +225,18 @@ export function useWeekAppointmentGesture({
   const lastClientYRef = useRef(0)
   const startScrollTopRef = useRef(0)
   const suppressClickRef = useRef(false)
+  const activeReportedRef = useRef(false)
+  const onActiveChangeRef = useRef(onActiveChange)
+
+  useEffect(() => {
+    onActiveChangeRef.current = onActiveChange
+  }, [onActiveChange])
+
+  const reportActive = useCallback((active: boolean) => {
+    if (activeReportedRef.current === active) return
+    activeReportedRef.current = active
+    onActiveChangeRef.current?.(active)
+  }, [])
 
   const transition = useCallback((event: CalendarGestureEvent) => {
     const next = calendarGestureReducer(stateRef.current, event)
@@ -236,16 +315,33 @@ export function useWeekAppointmentGesture({
   }, [calculatePreview])
 
   const runAutoScroll = useCallback(() => {
+    autoScrollFrameRef.current = null
     const scrollContainer = scrollRef.current
-    const direction = autoScrollDirectionRef.current
-    if (!scrollContainer || (direction.x === 0 && direction.y === 0)) {
-      autoScrollFrameRef.current = null
+    if (!scrollContainer) return
+    const bounds = scrollContainer.getBoundingClientRect()
+    const direction = autoScrollDirectionAt(
+      scrollContainer,
+      bounds,
+      lastClientXRef.current,
+      lastClientYRef.current,
+    )
+    autoScrollDirectionRef.current = direction
+    if (direction.x === 0 && direction.y === 0) return
+    if (!applyBoundedAutoScroll(scrollContainer, direction)) {
+      autoScrollDirectionRef.current = { x: 0, y: 0 }
       return
     }
-    scrollContainer.scrollLeft += direction.x * 7
-    scrollContainer.scrollTop += direction.y * 7
     schedulePreview(lastClientXRef.current, lastClientYRef.current)
-    autoScrollFrameRef.current = window.requestAnimationFrame(runAutoScroll)
+    const nextDirection = autoScrollDirectionAt(
+      scrollContainer,
+      bounds,
+      lastClientXRef.current,
+      lastClientYRef.current,
+    )
+    autoScrollDirectionRef.current = nextDirection
+    if (nextDirection.x !== 0 || nextDirection.y !== 0) {
+      autoScrollFrameRef.current = window.requestAnimationFrame(runAutoScroll)
+    }
   }, [schedulePreview, scrollRef])
 
   const updateAutoScroll = useCallback((
@@ -255,19 +351,12 @@ export function useWeekAppointmentGesture({
     const scrollContainer = scrollRef.current
     if (!scrollContainer) return
     const bounds = scrollContainer.getBoundingClientRect()
-    const edge = 48
-    const direction = {
-      x: clientX < bounds.left + edge
-        ? -1
-        : clientX > bounds.right - edge
-          ? 1
-          : 0,
-      y: clientY < bounds.top + edge
-        ? -1
-        : clientY > bounds.bottom - edge
-          ? 1
-          : 0,
-    }
+    const direction = autoScrollDirectionAt(
+      scrollContainer,
+      bounds,
+      clientX,
+      clientY,
+    )
     autoScrollDirectionRef.current = direction
     if (
       (direction.x !== 0 || direction.y !== 0)
@@ -300,20 +389,21 @@ export function useWeekAppointmentGesture({
       at: performance.now(),
     })
     activationTimerRef.current = window.setTimeout(() => {
+      activationTimerRef.current = null
       const next = transition({
         type: 'activate',
         at: performance.now(),
       })
       if (next.phase !== 'active') return
       suppressClickRef.current = true
-      onActiveChange?.(true)
+      reportActive(true)
       navigator.vibrate?.(15)
       schedulePreview(lastClientXRef.current, lastClientYRef.current)
     }, CALENDAR_LONG_PRESS_MS)
   }, [
     clearActivationTimer,
     disabled,
-    onActiveChange,
+    reportActive,
     schedulePreview,
     scrollRef,
     stopAutoScroll,
@@ -381,7 +471,7 @@ export function useWeekAppointmentGesture({
     }
 
     transition({ type: cancelled ? 'pointer-cancel' : 'pointer-up' })
-    if (current.phase === 'active') onActiveChange?.(false)
+    if (current.phase === 'active') reportActive(false)
     setPreview(null)
   }, [
     appointmentId,
@@ -389,9 +479,9 @@ export function useWeekAppointmentGesture({
     clearActivationTimer,
     date,
     expectedVersion,
-    onActiveChange,
     onMove,
     preview,
+    reportActive,
     startMinute,
     stopAutoScroll,
     transition,
@@ -402,8 +492,10 @@ export function useWeekAppointmentGesture({
     stopAutoScroll()
     if (previewFrameRef.current !== null) {
       window.cancelAnimationFrame(previewFrameRef.current)
+      previewFrameRef.current = null
     }
-  }, [clearActivationTimer, stopAutoScroll])
+    reportActive(false)
+  }, [clearActivationTimer, reportActive, stopAutoScroll])
 
   useEffect(() => {
     if (!disabled) return
@@ -412,11 +504,11 @@ export function useWeekAppointmentGesture({
     stopAutoScroll()
     transition({ type: 'pointer-cancel' })
     setPreview(null)
-    if (wasActive) onActiveChange?.(false)
+    if (wasActive) reportActive(false)
   }, [
     clearActivationTimer,
     disabled,
-    onActiveChange,
+    reportActive,
     stopAutoScroll,
     transition,
   ])
@@ -431,6 +523,10 @@ export function useWeekAppointmentGesture({
       onPointerMove: handlePointerMove,
       onPointerUp: (event: ReactPointerEvent<HTMLElement>) => finish(event),
       onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => finish(
+        event,
+        true,
+      ),
+      onLostPointerCapture: (event: ReactPointerEvent<HTMLElement>) => finish(
         event,
         true,
       ),

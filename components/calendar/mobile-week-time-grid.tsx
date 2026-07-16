@@ -97,7 +97,6 @@ export function MobileWeekTimeGrid({
   onSelectAppointment,
   onCreateAt,
   onMove,
-  onResize,
   onDensityChange,
   onViewChange,
   onOptimize,
@@ -353,7 +352,6 @@ export function MobileWeekTimeGrid({
                           onGestureActiveChange={setCalendarGestureActive}
                           onSelect={onSelectAppointment}
                           onMove={onMove}
-                          onResize={onResize}
                         />
                       )
                     })}

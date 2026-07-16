@@ -105,7 +105,11 @@ function renderWeek(overrides: Partial<React.ComponentProps<
 
 function pointer(
   target: Element,
-  type: 'pointerdown' | 'pointermove' | 'pointerup',
+  type:
+    | 'pointerdown'
+    | 'pointermove'
+    | 'pointerup'
+    | 'lostpointercapture',
   {
     pointerId,
     clientX,
@@ -128,6 +132,28 @@ function pointer(
     button: { value: 0 },
   })
   fireEvent(target, event)
+}
+
+function setViewportDimensions(
+  viewport: HTMLElement,
+  {
+    clientWidth,
+    scrollWidth,
+    clientHeight,
+    scrollHeight,
+  }: {
+    clientWidth: number
+    scrollWidth: number
+    clientHeight: number
+    scrollHeight: number
+  },
+) {
+  Object.defineProperties(viewport, {
+    clientWidth: { configurable: true, value: clientWidth },
+    scrollWidth: { configurable: true, value: scrollWidth },
+    clientHeight: { configurable: true, value: clientHeight },
+    scrollHeight: { configurable: true, value: scrollHeight },
+  })
 }
 
 function pinchHeaderToThreeDays() {
@@ -298,6 +324,47 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
     })
   })
 
+  it('releases body pinch after an active appointment loses pointer capture', () => {
+    const onDensityChange = vi.fn()
+    renderWeek({ onDensityChange })
+    const card = screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })
+    const viewport = screen.getByTestId('mobile-week-viewport')
+
+    pointer(card, 'pointerdown', {
+      pointerId: 32,
+      clientX: 140,
+      clientY: 200,
+    })
+    act(() => vi.advanceTimersByTime(450))
+    pointer(card, 'lostpointercapture', {
+      pointerId: 32,
+      clientX: 140,
+      clientY: 200,
+    })
+
+    pointer(viewport, 'pointerdown', {
+      pointerId: 43,
+      clientX: 120,
+      clientY: 180,
+    })
+    pointer(viewport, 'pointerdown', {
+      pointerId: 44,
+      clientX: 120,
+      clientY: 280,
+      isPrimary: false,
+    })
+    pointer(viewport, 'pointermove', {
+      pointerId: 44,
+      clientX: 120,
+      clientY: 340,
+      isPrimary: false,
+    })
+
+    expect(onDensityChange).toHaveBeenCalledTimes(1)
+  })
+
   it('moves a long-pressed appointment within Monday with versioned intent', () => {
     const onMove = vi.fn()
     renderWeek({
@@ -424,6 +491,7 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
 
   it('suppresses the synthetic click after a completed weekly drag', () => {
     const onSelectAppointment = vi.fn()
+    const onCreateAt = vi.fn()
     renderWeek({
       appointments: [{
         ...appointment,
@@ -431,6 +499,7 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
       }],
       selectedDate: '2026-07-13',
       onSelectAppointment,
+      onCreateAt,
     })
     const card = screen.getByRole('button', {
       name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
@@ -455,9 +524,10 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
     fireEvent.click(card)
 
     expect(onSelectAppointment).not.toHaveBeenCalled()
+    expect(onCreateAt).not.toHaveBeenCalled()
   })
 
-  it('auto-scrolls both viewport axes near the bottom-right edge', () => {
+  it('does not claim horizontal auto-scroll when the viewport has no overflow', () => {
     renderWeek({
       appointments: [{
         ...appointment,
@@ -469,6 +539,12 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
       name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
     })
     const viewport = screen.getByTestId('mobile-week-viewport')
+    setViewportDimensions(viewport, {
+      clientWidth: 390,
+      scrollWidth: 390,
+      clientHeight: 600,
+      scrollHeight: 1_200,
+    })
     vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
       x: 0,
       y: 0,
@@ -480,6 +556,7 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
       height: 600,
       toJSON: () => ({}),
     })
+    act(() => vi.runOnlyPendingTimers())
 
     pointer(card, 'pointerdown', {
       pointerId: 54,
@@ -490,15 +567,77 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
     pointer(card, 'pointermove', {
       pointerId: 54,
       clientX: 380,
+      clientY: 300,
+    })
+    act(() => vi.advanceTimersByTime(40))
+
+    expect(viewport.scrollLeft).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+
+    pointer(card, 'pointerup', {
+      pointerId: 54,
+      clientX: 380,
+      clientY: 300,
+    })
+  })
+
+  it('clamps auto-scroll to real bounds and stops scheduling at the edge', () => {
+    renderWeek({
+      appointments: [{
+        ...appointment,
+        appointment_date: '2026-07-13',
+      }],
+      selectedDate: '2026-07-13',
+    })
+    const card = screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })
+    const viewport = screen.getByTestId('mobile-week-viewport')
+    setViewportDimensions(viewport, {
+      clientWidth: 390,
+      scrollWidth: 800,
+      clientHeight: 600,
+      scrollHeight: 1_200,
+    })
+    viewport.scrollLeft = 403
+    viewport.scrollTop = 593
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 390,
+      bottom: 600,
+      left: 0,
+      width: 390,
+      height: 600,
+      toJSON: () => ({}),
+    })
+    act(() => vi.runOnlyPendingTimers())
+    viewport.scrollLeft = 403
+    viewport.scrollTop = 593
+
+    pointer(card, 'pointerdown', {
+      pointerId: 56,
+      clientX: 70,
+      clientY: 200,
+    })
+    act(() => vi.advanceTimersByTime(450))
+    pointer(card, 'pointermove', {
+      pointerId: 56,
+      clientX: 380,
       clientY: 590,
     })
     act(() => vi.advanceTimersByTime(40))
 
-    expect(viewport.scrollLeft).toBeGreaterThan(0)
-    expect(viewport.scrollTop).toBeGreaterThan(0)
+    expect(viewport.scrollLeft).toBe(410)
+    expect(viewport.scrollTop).toBe(600)
+    act(() => vi.advanceTimersByTime(160))
+    expect(viewport.scrollLeft).toBe(410)
+    expect(viewport.scrollTop).toBe(600)
+    expect(vi.getTimerCount()).toBe(0)
 
     pointer(card, 'pointerup', {
-      pointerId: 54,
+      pointerId: 56,
       clientX: 380,
       clientY: 590,
     })

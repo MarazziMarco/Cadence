@@ -8,7 +8,7 @@ import {
   type CalendarAppointment,
 } from '@/lib/api/appointments'
 import { minutesToY } from '@/lib/calendar/geometry'
-import type { MoveIntent, ResizeIntent } from '@/lib/calendar/types'
+import type { MoveIntent } from '@/lib/calendar/types'
 import { useT } from '@/lib/i18n/use-t'
 import { cn } from '@/lib/utils'
 import { useWeekAppointmentGesture } from '@/hooks/use-week-appointment-gesture'
@@ -48,7 +48,6 @@ interface MobileWeekAppointmentWithGestureProps extends Omit<
   gestureDisabled?: boolean
   onGestureActiveChange?(active: boolean): void
   onMove(request: MoveIntent): void
-  onResize(request: ResizeIntent): void
 }
 
 function patientName(appointment: CalendarAppointment, fallback: string) {
@@ -182,7 +181,6 @@ export function MobileWeekAppointmentWithGesture({
   onGestureActiveChange,
   onSelect,
   onMove,
-  onResize,
 }: MobileWeekAppointmentWithGestureProps) {
   const gesture = useWeekAppointmentGesture({
     appointmentId: appointment.id,
