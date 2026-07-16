@@ -22,6 +22,54 @@ vi.mock('@/components/ui/button', () => ({
   }) => <button {...props} />,
 }))
 
+vi.mock('@/components/ui/popover', async () => {
+  const React = await import('react')
+  const PopoverContext = React.createContext<{
+    open: boolean
+    onOpenChange(open: boolean): void
+  } | null>(null)
+  return {
+    Popover: ({
+      open,
+      onOpenChange,
+      children,
+    }: {
+      open: boolean
+      onOpenChange(open: boolean): void
+      children: React.ReactNode
+    }) => (
+      <PopoverContext.Provider value={{ open, onOpenChange }}>
+        {children}
+      </PopoverContext.Provider>
+    ),
+    PopoverTrigger: ({
+      children,
+    }: {
+      asChild?: boolean
+      children: React.ReactElement
+    }) => {
+      const context = React.useContext(PopoverContext)!
+      return React.cloneElement(children, {
+        onClick: (event: React.MouseEvent) => {
+          children.props.onClick?.(event)
+          context.onOpenChange(!context.open)
+        },
+      })
+    },
+    PopoverContent: ({
+      children,
+      ...props
+    }: React.HTMLAttributes<HTMLDivElement> & {
+      align?: string
+    }) => {
+      const context = React.useContext(PopoverContext)!
+      if (!context.open) return null
+      const { align: _align, ...contentProps } = props
+      return <div {...contentProps}>{children}</div>
+    },
+  }
+})
+
 const business: WorkspaceBusiness = {
   id: 'business-1',
   business_name: 'Cadence',
@@ -76,6 +124,48 @@ const appointment: CalendarAppointment = {
     buffer_after_minutes: 0,
     max_daily_bookings: null,
   },
+}
+
+function collisionAppointments(): CalendarAppointment[] {
+  return [
+    {
+      ...appointment,
+      id: 'appointment-1',
+      patient_id: 'patient-1',
+      start_time: '09:00:00',
+      end_time: '10:00:00',
+      patients: {
+        ...appointment.patients!,
+        full_name: 'Marco Rossi',
+      },
+    },
+    {
+      ...appointment,
+      id: 'appointment-2',
+      patient_id: 'patient-2',
+      start_time: '09:15:00',
+      end_time: '10:15:00',
+      patients: {
+        ...appointment.patients!,
+        first_name: 'Giulia',
+        last_name: 'Bianchi',
+        full_name: 'Giulia Bianchi',
+      },
+    },
+    {
+      ...appointment,
+      id: 'appointment-3',
+      patient_id: 'patient-3',
+      start_time: '09:30:00',
+      end_time: '10:30:00',
+      patients: {
+        ...appointment.patients!,
+        first_name: 'Luca',
+        last_name: 'Verdi',
+        full_name: 'Luca Verdi',
+      },
+    },
+  ]
 }
 
 function renderWeek(overrides: Partial<React.ComponentProps<
@@ -207,6 +297,74 @@ describe('MobileWeekTimeGrid appointment presentation', () => {
     expect(screen.getByRole('button', {
       name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
     })).toHaveTextContent('Physio')
+  })
+
+  it('compacts three unreadable collisions into a representative card and +N', () => {
+    renderWeek({ appointments: collisionAppointments() })
+
+    expect(screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })).toBeInTheDocument()
+    expect(screen.queryByRole('button', {
+      name: /09:15, Giulia Bianchi, Physio, 60 minutes, scheduled/i,
+    })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', {
+      name: /09:30, Luca Verdi, Physio, 60 minutes, scheduled/i,
+    })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', {
+      name: /2 more appointments/i,
+    })).toHaveTextContent('+2')
+  })
+
+  it('lists every hidden collision and opens the existing quick sheet callback', () => {
+    const onSelectAppointment = vi.fn()
+    const onCreateAt = vi.fn()
+    renderWeek({
+      appointments: collisionAppointments(),
+      onSelectAppointment,
+      onCreateAt,
+    })
+
+    fireEvent.click(screen.getByRole('button', {
+      name: /2 more appointments/i,
+    }))
+
+    expect(screen.getByRole('button', {
+      name: /09:15, Giulia Bianchi/i,
+    })).toHaveTextContent('09:15')
+    expect(screen.getByRole('button', {
+      name: /09:30, Luca Verdi/i,
+    })).toHaveTextContent('Luca Verdi')
+
+    fireEvent.click(screen.getByRole('button', {
+      name: /09:15, Giulia Bianchi/i,
+    }))
+
+    expect(onSelectAppointment).toHaveBeenCalledWith('appointment-2')
+    expect(onCreateAt).not.toHaveBeenCalled()
+  })
+
+  it('restores individual collision lanes after zooming to three days', () => {
+    renderWeek({ appointments: collisionAppointments() })
+
+    expect(screen.getByRole('button', {
+      name: /2 more appointments/i,
+    })).toBeInTheDocument()
+
+    pinchHeaderToThreeDays()
+
+    expect(screen.queryByRole('button', {
+      name: /2 more appointments/i,
+    })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', {
+      name: /09:00, Marco Rossi, Physio, 60 minutes, scheduled/i,
+    })).toBeInTheDocument()
+    expect(screen.getByRole('button', {
+      name: /09:15, Giulia Bianchi, Physio, 60 minutes, scheduled/i,
+    })).toBeInTheDocument()
+    expect(screen.getByRole('button', {
+      name: /09:30, Luca Verdi, Physio, 60 minutes, scheduled/i,
+    })).toBeInTheDocument()
   })
 
   it('anchors a completed body pinch without changing visible days', () => {

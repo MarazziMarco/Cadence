@@ -1,6 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type Ref } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from 'react'
 
 import { timeToMin, type CalendarAppointment } from '@/lib/api/appointments'
 import type { CalendarConfig } from '@/lib/api/calendar'
@@ -10,6 +17,7 @@ import {
   formatBusinessDate,
   weekRange,
 } from '@/lib/calendar/date'
+import { compactClusters } from '@/lib/calendar/compact-clusters'
 import { minutesToY, yToMinutes } from '@/lib/calendar/geometry'
 import { allocateTemporalOverlapLanes } from '@/lib/calendar/overlap-lanes'
 import type { CalendarView, MoveIntent, ResizeIntent } from '@/lib/calendar/types'
@@ -25,6 +33,7 @@ import { useWeekHeaderPinch } from '@/hooks/use-week-header-pinch'
 import { CalendarToolbar } from './calendar-toolbar'
 import { CalendarZoomControls } from './calendar-zoom-controls'
 import { MobileWeekAppointmentWithGesture } from './mobile-week-appointment-card'
+import { MobileWeekClusterPopover } from './mobile-week-cluster-popover'
 
 interface MobileWeekTimeGridProps {
   appointments: CalendarAppointment[]
@@ -48,6 +57,7 @@ const START = 7 * 60
 const END = 21 * 60
 const SERVICE_MIN_WIDTH = 72
 const SERVICE_MIN_HEIGHT = 52
+const APPOINTMENT_MIN_READABLE_WIDTH = 24
 
 function businessMinute(timezone: string, now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -291,13 +301,17 @@ export function MobileWeekTimeGrid({
                         density,
                       )
                       return {
-                        appointment,
-                        id: appointment.id,
+                        ...appointment,
                         top,
                         height: Math.max(44, temporalHeight),
                         temporalEnd: top + temporalHeight,
                       }
                     }),
+                )
+                const compactItems = compactClusters(
+                  layouts,
+                  columnWidth,
+                  APPOINTMENT_MIN_READABLE_WIDTH,
                 )
                 return (
                   <div
@@ -323,36 +337,50 @@ export function MobileWeekTimeGrid({
                         style={{ top: minutesToY(minute, START, density) }}
                       />
                     ))}
-                    {layouts.map((layout) => {
+                    {compactItems.map((item) => {
+                      const layout = item.kind === 'appointment'
+                        ? item.layout
+                        : item.layouts[0]
+                      const isCluster = item.kind === 'cluster'
                       const renderedWidth = (
-                        columnWidth * layout.widthPercent / 100
+                        isCluster
+                          ? columnWidth
+                          : columnWidth * layout.widthPercent / 100
                       )
                       const showService = (
                         renderedWidth >= SERVICE_MIN_WIDTH
                         && layout.height >= SERVICE_MIN_HEIGHT
                       )
                       return (
-                        <MobileWeekAppointmentWithGesture
-                          key={layout.id}
-                          appointment={layout.appointment}
-                          top={layout.top}
-                          height={layout.height}
-                          leftPercent={layout.leftPercent}
-                          widthPercent={layout.widthPercent}
-                          showService={showService}
-                          rangeStart={START}
-                          rangeEnd={END}
-                          density={density}
-                          snapIntervalMinutes={config.slotIntervalMinutes}
-                          dates={days}
-                          railWidth={RAIL}
-                          columnWidth={columnWidth}
-                          scrollRef={weekViewportRef}
-                          gestureDisabled={verticalPinch.isPinching}
-                          onGestureActiveChange={setCalendarGestureActive}
-                          onSelect={onSelectAppointment}
-                          onMove={onMove}
-                        />
+                        <Fragment key={layout.id}>
+                          <MobileWeekAppointmentWithGesture
+                            appointment={layout}
+                            top={layout.top}
+                            height={layout.height}
+                            leftPercent={isCluster ? 0 : layout.leftPercent}
+                            widthPercent={isCluster ? 100 : layout.widthPercent}
+                            showService={showService}
+                            rangeStart={START}
+                            rangeEnd={END}
+                            density={density}
+                            snapIntervalMinutes={config.slotIntervalMinutes}
+                            dates={days}
+                            railWidth={RAIL}
+                            columnWidth={columnWidth}
+                            scrollRef={weekViewportRef}
+                            gestureDisabled={verticalPinch.isPinching}
+                            onGestureActiveChange={setCalendarGestureActive}
+                            onSelect={onSelectAppointment}
+                            onMove={onMove}
+                          />
+                          {item.kind === 'cluster' ? (
+                            <MobileWeekClusterPopover
+                              appointments={item.layouts.slice(1)}
+                              top={layout.top}
+                              onSelectAppointment={onSelectAppointment}
+                            />
+                          ) : null}
+                        </Fragment>
                       )
                     })}
                   </div>
