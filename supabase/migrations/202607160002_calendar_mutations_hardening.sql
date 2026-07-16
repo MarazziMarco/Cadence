@@ -1,6 +1,37 @@
 alter table public.calendar_mutation_requests
   add column if not exists request_hash text;
 
+-- Migration 001 stored warning confirmations in caller order and allowed
+-- duplicates. Normalize those legacy rows to the same payload shape produced
+-- by the replacement RPC before binding the idempotency hash. jsonb_set keeps
+-- every unrelated legacy payload key unchanged.
+update public.calendar_mutation_requests legacy_request
+   set request_payload = jsonb_set(
+     legacy_request.request_payload,
+     '{confirm_warnings}',
+     case
+       when jsonb_typeof(legacy_request.request_payload -> 'confirm_warnings') = 'array'
+       then coalesce(
+         (
+           select jsonb_agg(
+             to_jsonb(canonical_warning.warning_code)
+             order by canonical_warning.warning_code
+           )
+             from (
+               select distinct warning_value #>> '{}' as warning_code
+                 from jsonb_array_elements(
+                   legacy_request.request_payload -> 'confirm_warnings'
+                 ) warning_value
+                where jsonb_typeof(warning_value) = 'string'
+             ) canonical_warning
+         ),
+         '[]'::jsonb
+       )
+       else '[]'::jsonb
+     end,
+     true
+   );
+
 update public.calendar_mutation_requests
    set request_hash = md5(request_payload::text)
  where request_hash is null;
@@ -8,9 +39,12 @@ update public.calendar_mutation_requests
 alter table public.calendar_mutation_requests
   alter column request_hash set not null;
 
+alter table public.calendar_mutation_requests owner to postgres;
+
 -- Internal idempotency state is intentionally not exposed through direct user
 -- policies. Authenticated callers can only reach it through the tenant-checking
--- SECURITY DEFINER RPC below; service_role retains operational access.
+-- SECURITY DEFINER RPC below. Its postgres owner bypasses forced RLS safely;
+-- service_role retains direct operational access through its BYPASSRLS role.
 alter table public.calendar_mutation_requests enable row level security;
 alter table public.calendar_mutation_requests force row level security;
 revoke all on table public.calendar_mutation_requests from public, anon, authenticated;
@@ -703,6 +737,10 @@ begin
   return v_response;
 end;
 $function$;
+
+alter function public.calendar_validate_mutation(
+  uuid, text, uuid, integer, uuid, jsonb, text[]
+) owner to postgres;
 
 revoke all on function public.calendar_validate_mutation(
   uuid, text, uuid, integer, uuid, jsonb, text[]

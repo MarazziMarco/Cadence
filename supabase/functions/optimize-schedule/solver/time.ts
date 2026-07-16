@@ -140,15 +140,17 @@ export function effectiveAvailability(
     (e) => e.is_available === false && !e.start_time && !e.end_time,
   );
   if (blackout) return [];
-  const override = exc.find(
+  const overrides = exc.filter(
     (e) => e.is_available === true && e.start_time && e.end_time,
   );
-  if (override) {
-    return [{
-      start: toMin(override.start_time!),
-      end: toMin(override.end_time!),
-      priority: "normal",
-    }];
+  if (overrides.length > 0) {
+    return overrides
+      .map((override) => ({
+        start: toMin(override.start_time!),
+        end: toMin(override.end_time!),
+        priority: "normal" as const,
+      }))
+      .sort((left, right) => left.start - right.start || left.end - right.end);
   }
   const w = weekdayOf(date);
   const base = avail.filter(
