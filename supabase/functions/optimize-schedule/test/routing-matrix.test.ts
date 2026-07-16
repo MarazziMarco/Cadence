@@ -269,6 +269,35 @@ Deno.test("cached coordinates avoid repeated geocoding before provider routing",
   );
 });
 
+Deno.test("cache failures do not discard a valid provider route", async () => {
+  const result = await prepareTravelMatrix({
+    businessId: "business-1",
+    studio,
+    locations: [patientA],
+    cache: {
+      async get() {
+        throw new Error("temporary cache read failure");
+      },
+      async put() {
+        throw new Error("temporary cache write failure");
+      },
+    },
+    provider: providerStub({
+      walkingSeconds: 300,
+      drivingSeconds: 180,
+    }),
+    config: defaults(),
+    now: NOW,
+  });
+
+  assertEquals(result.matrix[studio.key][patientA.key], {
+    seconds: 300,
+    meters: 500,
+    mode: "foot-walking",
+    verifiable: true,
+  });
+});
+
 Deno.test("ORS provider geocodes and batches matrix requests without leaking secrets in errors", async () => {
   const requests: Request[] = [];
   const fetchFn: typeof fetch = async (input, init) => {
@@ -603,12 +632,13 @@ Deno.test("routing input resolves tenant business, appointment, and patient loca
 Deno.test("routing input avoids an empty PostgREST in-filter", async () => {
   const queries: Array<{ table: string; filters: Record<string, unknown> }> =
     [];
+  let geocodeCalls = 0;
   const supabase = locationSupabase({
     business: {
       id: "business-1",
-      address: null,
-      city: null,
-      postal_code: null,
+      address: "Via studio 1",
+      city: "Roma",
+      postal_code: "00100",
     },
     appointments: [],
     patients: [],
@@ -621,10 +651,22 @@ Deno.test("routing input avoids an empty PostgREST in-filter", async () => {
       appointments: [],
     },
     defaults(),
+    {
+      provider: {
+        async geocode() {
+          geocodeCalls++;
+          return { latitude: 41.9, longitude: 12.5 };
+        },
+        async matrix() {
+          return {};
+        },
+      },
+    },
   );
 
   assertEquals(routed.appointments, []);
   assertEquals(queries.map((query) => query.table), ["business"]);
+  assertEquals(geocodeCalls, 0);
 });
 
 function defaults() {

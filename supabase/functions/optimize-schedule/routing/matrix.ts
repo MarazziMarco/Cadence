@@ -1,6 +1,7 @@
 import {
   createSupabaseRouteCache,
   type RouteCache,
+  type RouteCacheGet,
   type RouteCacheRecord,
 } from "./cache.ts";
 import { chooseTravelMode } from "./mode.ts";
@@ -156,6 +157,28 @@ function legFromProvider(
   };
 }
 
+async function safeCacheGet(
+  cache: RouteCache,
+  query: RouteCacheGet,
+): Promise<RouteCacheRecord | null> {
+  try {
+    return await cache.get(query);
+  } catch {
+    return null;
+  }
+}
+
+async function safeCachePut(
+  cache: RouteCache,
+  record: RouteCacheRecord,
+): Promise<void> {
+  try {
+    await cache.put(record);
+  } catch {
+    // Route results remain usable even when the best-effort cache write fails.
+  }
+}
+
 function cacheRecord(
   businessId: string,
   pair: Pair,
@@ -243,7 +266,7 @@ async function preloadUnresolvedCache(
       );
       if (!walkingQuery) continue;
 
-      const walking = await cache.get(walkingQuery);
+      const walking = await safeCacheGet(cache, walkingQuery);
       if (walking) {
         hydrateCachedCoordinates(locations, pair, walking);
         if (
@@ -257,7 +280,7 @@ async function preloadUnresolvedCache(
         }
       }
 
-      const driving = await cache.get({
+      const driving = await safeCacheGet(cache, {
         ...walkingQuery,
         profile: "driving-car",
       });
@@ -291,7 +314,7 @@ async function resolveProfile(
   const missing: Pair[] = [];
   for (const pair of pairs) {
     const query = cacheQuery(args.businessId, pair, profile, now);
-    const hit = query ? await args.cache.get(query) : null;
+    const hit = query ? await safeCacheGet(args.cache, query) : null;
     if (hit) {
       result.set(
         `${pair.origin.key}>${pair.destination.key}`,
@@ -322,13 +345,13 @@ async function resolveProfile(
         now,
         args.config.cacheTtlDays,
       );
-      if (row) await args.cache.put(row);
+      if (row) await safeCachePut(args.cache, row);
       continue;
     }
     // A concurrent worker may have populated the cache while the provider was
     // failing or rate-limited. Re-read before declaring the leg unavailable.
     const query = cacheQuery(args.businessId, pair, profile, now);
-    const retry = query ? await args.cache.get(query) : null;
+    const retry = query ? await safeCacheGet(args.cache, query) : null;
     if (retry) result.set(key, legFromCache(retry));
     else unresolved.push(pair);
   }
@@ -510,6 +533,11 @@ interface LocationQueryBuilder<T> extends PromiseLike<QueryResult<T[]>> {
   maybeSingle(): Promise<QueryResult<T>>;
 }
 
+interface RoutingDependencies {
+  cache?: RouteCache;
+  provider?: RoutingProvider;
+}
+
 function composeAddress(
   address: string | null | undefined,
   city: string | null | undefined,
@@ -548,6 +576,7 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
   supabase: Parameters<typeof createSupabaseRouteCache>[0],
   input: T,
   config: RoutingConfig,
+  dependencies: RoutingDependencies = {},
 ): Promise<
   T & {
     studio_location_key: string;
@@ -594,19 +623,20 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
     appointment.id
   );
   if (appointmentIds.length === 0) {
-    const prepared = await prepareTravelMatrix({
-      businessId: input.context.business_id,
-      studio,
-      locations: [],
-      cache: createSupabaseRouteCache(supabase),
-      provider: createOpenRouteServiceProvider(),
-      config,
-    });
     return {
       ...input,
       appointments: [],
-      studio_location_key: prepared.studioLocation.key,
-      travel_matrix: prepared.matrix,
+      studio_location_key: studio.key,
+      travel_matrix: {
+        [studio.key]: {
+          [studio.key]: {
+            seconds: 0,
+            meters: 0,
+            mode: "studio",
+            verifiable: true,
+          },
+        },
+      },
     };
   }
 
@@ -705,8 +735,8 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
     businessId: input.context.business_id,
     studio,
     locations,
-    cache: createSupabaseRouteCache(supabase),
-    provider: createOpenRouteServiceProvider(),
+    cache: dependencies.cache ?? createSupabaseRouteCache(supabase),
+    provider: dependencies.provider ?? createOpenRouteServiceProvider(),
     config,
   });
   return {
