@@ -9,7 +9,11 @@ import {
   createInitialCalendarState,
 } from '@/components/calendar/calendar-controller'
 import { listAppointments, type CalendarAppointment } from '@/lib/api/appointments'
-import { getCalendarConfig, type CalendarConfig } from '@/lib/api/calendar'
+import {
+  getCalendarConfig,
+  mutateCalendarOrThrow,
+  type CalendarConfig,
+} from '@/lib/api/calendar'
 import { calendarKeys } from '@/lib/calendar/query-keys'
 import {
   WorkspaceProvider,
@@ -25,7 +29,11 @@ vi.mock('@/lib/api/appointments', async (importOriginal) => {
 
 vi.mock('@/lib/api/calendar', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/calendar')>()
-  return { ...original, getCalendarConfig: vi.fn() }
+  return {
+    ...original,
+    getCalendarConfig: vi.fn(),
+    mutateCalendarOrThrow: vi.fn(),
+  }
 })
 
 vi.mock('@/components/calendar/desktop-week-calendar', () => ({
@@ -93,6 +101,7 @@ vi.mock('@/components/calendar/mobile-day-calendar', () => ({
 vi.mock('@/components/calendar/appointment-dialog', () => ({
   AppointmentDialog: (props: {
     open: boolean
+    presentation?: string
     appt?: CalendarAppointment | null
     defaultDate?: string
     defaultStart?: string
@@ -100,7 +109,10 @@ vi.mock('@/components/calendar/appointment-dialog', () => ({
     defaultServiceId?: string
     defaultDurationMinutes?: number
   }) => props.open ? (
-    <div data-testid="appointment-dialog">
+    <div
+      data-testid="appointment-dialog"
+      data-presentation={props.presentation}
+    >
       {props.appt?.id ?? [
         props.defaultDate,
         props.defaultStart,
@@ -108,6 +120,7 @@ vi.mock('@/components/calendar/appointment-dialog', () => ({
         props.defaultServiceId,
         props.defaultDurationMinutes,
       ].filter(Boolean).join('-')}
+      <input aria-label="Editor note" />
     </div>
   ) : null,
 }))
@@ -119,12 +132,23 @@ vi.mock('@/components/calendar/appointment-quick-sheet', () => ({
     onEdit(): void
     onMove(): void
     onDuplicate(): void
+    onToggleLock(): void
+    lockPending?: boolean
   }) => props.open ? (
     <div data-testid="appointment-quick-sheet">
       {props.appointment?.id}
+      <span>
+        {String(props.appointment?.locked)}-{props.appointment?.version}
+      </span>
       <button onClick={props.onEdit}>Edit quick appointment</button>
       <button onClick={props.onMove}>Move quick appointment</button>
       <button onClick={props.onDuplicate}>Duplicate quick appointment</button>
+      <button
+        disabled={props.lockPending}
+        onClick={props.onToggleLock}
+      >
+        Toggle appointment lock
+      </button>
     </div>
   ) : null,
 }))
@@ -287,6 +311,7 @@ describe('CalendarController', () => {
     localStorage.setItem('cadence.calendar.view', 'day')
     localStorage.setItem('cadence.calendar.density', '999')
     vi.mocked(getCalendarConfig).mockResolvedValue(config)
+    vi.mocked(mutateCalendarOrThrow).mockReset()
     vi.mocked(listAppointments).mockImplementation(async (_businessId, from) => (
       from === '2026-07-17' ? [appointment] : []
     ))
@@ -450,6 +475,68 @@ describe('CalendarController', () => {
 
     await user.click(screen.getByRole('button', { name: 'Close optimizer' }))
     expect(screen.getByRole('button', { name: 'Optimize' })).toHaveFocus()
+  })
+
+  it('keeps the mobile editor and typed values mounted across a breakpoint change', async () => {
+    const media = installMatchMedia(false)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderController()
+
+    await screen.findByTestId('calendar-renderer')
+    await user.click(screen.getByRole('button', { name: 'Create at 10' }))
+    const input = screen.getByRole('textbox', { name: 'Editor note' })
+    await user.type(input, 'keep me')
+    expect(screen.getByTestId('appointment-dialog')).toHaveAttribute(
+      'data-presentation',
+      'drawer',
+    )
+
+    act(() => media.setMatches(true))
+
+    expect(screen.getByRole('textbox', { name: 'Editor note' })).toHaveValue(
+      'keep me',
+    )
+    expect(screen.getByTestId('appointment-dialog')).toHaveAttribute(
+      'data-presentation',
+      'drawer',
+    )
+  })
+
+  it('disables lock while pending and patches the canonical returned version', async () => {
+    installMatchMedia(false)
+    let resolveLock!: (value: any) => void
+    vi.mocked(mutateCalendarOrThrow).mockImplementationOnce(() => (
+      new Promise((resolve) => {
+        resolveLock = resolve
+      })
+    ))
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const { queryClient } = renderController()
+
+    await screen.findByText('1 appointments')
+    await user.click(screen.getByRole('button', { name: 'Select appointment' }))
+    const toggle = screen.getByRole('button', {
+      name: 'Toggle appointment lock',
+    })
+    await user.click(toggle)
+    expect(toggle).toBeDisabled()
+    await user.click(toggle)
+    expect(mutateCalendarOrThrow).toHaveBeenCalledOnce()
+
+    resolveLock({
+      ok: true,
+      appointment: { ...appointment, locked: true, version: 2 },
+      warnings: [],
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('appointment-quick-sheet')).toHaveTextContent(
+        'true-2',
+      )
+    })
+    expect(queryClient.getQueryData<CalendarAppointment[]>(
+      calendarKeys.range(business.id, '2026-07-17', '2026-07-17'),
+    )?.[0]).toMatchObject({ locked: true, version: 2 })
   })
 
   it('switches an open desktop week optimizer to the mobile day scope once', async () => {

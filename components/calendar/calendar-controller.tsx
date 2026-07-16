@@ -52,6 +52,7 @@ import {
 import {
   calendarKeys,
   invalidateCalendarAppointments,
+  invalidateLegacyAppointments,
 } from '@/lib/calendar/query-keys'
 import type {
   CalendarView,
@@ -70,7 +71,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { AppointmentDialog } from './appointment-dialog'
+import {
+  AppointmentDialog,
+  type AppointmentEditorPresentation,
+} from './appointment-dialog'
 import { AppointmentQuickSheet } from './appointment-quick-sheet'
 import {
   DesktopWeekCalendar,
@@ -213,7 +217,10 @@ export function CalendarController() {
   )
   const [section, setSection] = useState<CalendarSection>('calendar')
   const [optimizeOpen, setOptimizeOpen] = useState(false)
-  const [mobileEditorOpen, setMobileEditorOpen] = useState(false)
+  const [editorPresentation, setEditorPresentation] =
+    useState<AppointmentEditorPresentation | null>(null)
+  const [selectedAppointmentSnapshot, setSelectedAppointmentSnapshot] =
+    useState<CalendarAppointment | null>(null)
   const [moveSheetOpen, setMoveSheetOpen] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [preferencesRestored, setPreferencesRestored] = useState(false)
@@ -278,7 +285,9 @@ export function CalendarController() {
     [appointments],
   )
   const selectedAppointment = state.selectedAppointmentId
-    ? appointmentById.get(state.selectedAppointmentId) ?? null
+    ? selectedAppointmentSnapshot?.id === state.selectedAppointmentId
+      ? selectedAppointmentSnapshot
+      : appointmentById.get(state.selectedAppointmentId) ?? null
     : null
 
   useEffect(() => {
@@ -366,6 +375,9 @@ export function CalendarController() {
   const writeCalendarAppointment = useCallback((
     appointment: CalendarAppointment,
   ) => {
+    setSelectedAppointmentSnapshot((current) => (
+      current?.id === appointment.id ? appointment : current
+    ))
     const ranges = queryClient.getQueriesData<CalendarAppointment[]>({
       queryKey: calendarRangeFilter.queryKey,
     })
@@ -380,7 +392,7 @@ export function CalendarController() {
 
   const invalidateCalendarRanges = useCallback(() => {
     void queryClient.invalidateQueries(calendarRangeFilter)
-    void queryClient.invalidateQueries({ queryKey: ['appointments'] })
+    invalidateLegacyAppointments(queryClient)
   }, [calendarRangeFilter, queryClient])
 
   const undoCalendarChange = useCallback(async (
@@ -404,11 +416,11 @@ export function CalendarController() {
       }
       if (result?.appointment) {
         writeCalendarAppointment(result.appointment)
-        toast.success('Calendar change undone')
+        toast.success(t('cal.changeUndone'))
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : 'Could not undo change',
+        error instanceof Error ? error.message : t('cal.undoFailed'),
       )
     } finally {
       invalidateCalendarRanges()
@@ -416,6 +428,7 @@ export function CalendarController() {
   }, [
     businessId,
     invalidateCalendarRanges,
+    t,
     writeCalendarAppointment,
   ])
 
@@ -425,24 +438,26 @@ export function CalendarController() {
     change: CalendarAppointmentChange,
   ) => {
     toast.success(
-      change.kind === 'move' ? 'Appointment moved' : 'Appointment resized',
+      change.kind === 'move'
+        ? t('cal.appointmentMoved')
+        : t('cal.appointmentResized'),
       {
         duration: 8_000,
         action: {
-          label: 'Undo',
+          label: t('cal.undo'),
           onClick: () => {
             void undoCalendarChange(before, current, change.kind)
           },
         },
       },
     )
-  }, [undoCalendarChange])
+  }, [t, undoCalendarChange])
 
   const calendarChange = useMutation({
     mutationFn: async (change: CalendarAppointmentChange) => {
       const appointment = appointmentById.get(change.request.appointmentId)
       if (!appointment) {
-        throw new Error('Appointment is no longer available')
+        throw new Error(t('cal.appointmentUnavailable'))
       }
       return mutateCalendarOrThrow(
         calendarChangeRequest(businessId, appointment, change),
@@ -451,7 +466,7 @@ export function CalendarController() {
     onMutate: async (change) => {
       const before = appointmentById.get(change.request.appointmentId)
       if (!before) {
-        throw new Error('Appointment is no longer available')
+        throw new Error(t('cal.appointmentUnavailable'))
       }
       await queryClient.cancelQueries(calendarRangeFilter)
       const snapshots = (
@@ -483,7 +498,7 @@ export function CalendarController() {
       }
       if (!isCalendarWarningConfirmation(error)) {
         toast.error(
-          error instanceof Error ? error.message : 'Calendar update failed',
+          error instanceof Error ? error.message : t('cal.updateFailed'),
         )
         return
       }
@@ -501,7 +516,7 @@ export function CalendarController() {
         toast.error(
           retryError instanceof Error
             ? retryError.message
-            : 'Calendar update failed',
+            : t('cal.updateFailed'),
         )
       }
     },
@@ -510,27 +525,30 @@ export function CalendarController() {
   const mutateCalendarChange = calendarChange.mutate
 
   const finishQuickAction = useCallback((action: QuickAction) => {
-    invalidateCalendarAppointments(queryClient, businessId)
     if (action === 'delete') {
+      invalidateCalendarAppointments(queryClient, businessId)
       dispatch({ type: 'select-appointment', id: null })
+    } else {
+      invalidateLegacyAppointments(queryClient)
     }
   }, [businessId, queryClient])
 
   const quickAction = useMutation({
     mutationFn: async (action: QuickAction) => {
       if (!selectedAppointment) {
-        throw new Error('Appointment is no longer available')
+        throw new Error(t('cal.appointmentUnavailable'))
       }
 
       if (action === 'delete') {
-        return deleteAppointment(
+        await deleteAppointment(
           businessId,
           selectedAppointment.id,
           selectedAppointment.version,
         )
+        return { appointment: null }
       }
 
-      return mutateCalendarOrThrow({
+      const result = await mutateCalendarOrThrow({
         businessId,
         operation: selectedAppointment.locked ? 'unlock' : 'lock',
         appointmentId: selectedAppointment.id,
@@ -538,33 +556,40 @@ export function CalendarController() {
         idempotencyKey: crypto.randomUUID(),
         values: {},
       })
+      return { appointment: result.appointment }
     },
-    onSuccess: (_, action) => {
+    onSuccess: (result, action) => {
+      if (action === 'toggle-lock' && result?.appointment) {
+        writeCalendarAppointment(result.appointment)
+      }
       toast.success(
         action === 'delete'
-          ? 'Appointment deleted'
-          : selectedAppointment?.locked
-            ? 'Appointment unlocked'
-            : 'Appointment locked',
+          ? t('appt.deleted')
+          : result?.appointment?.locked
+            ? t('appt.locked')
+            : t('appt.unlocked'),
       )
       finishQuickAction(action)
     },
     onError: async (error: unknown, action) => {
       if (!isCalendarWarningConfirmation(error)) {
         toast.error(
-          error instanceof Error ? error.message : 'Calendar update failed',
+          error instanceof Error ? error.message : t('cal.updateFailed'),
         )
         return
       }
 
       try {
         const confirmed = await confirmCalendarMutationInteractively(error)
+        if (confirmed?.appointment && action === 'toggle-lock') {
+          writeCalendarAppointment(confirmed.appointment)
+        }
         if (confirmed) finishQuickAction(action)
       } catch (retryError) {
         toast.error(
           retryError instanceof Error
             ? retryError.message
-            : 'Calendar update failed',
+            : t('cal.updateFailed'),
         )
       }
     },
@@ -575,17 +600,19 @@ export function CalendarController() {
   }, [])
 
   const handleSelectAppointment = useCallback((id: string) => {
-    setMobileEditorOpen(false)
+    setSelectedAppointmentSnapshot(appointmentById.get(id) ?? null)
+    setEditorPresentation(isDesktop ? 'dialog' : null)
     setMoveSheetOpen(false)
     setDuplicating(false)
     dispatch({ type: 'create-at', value: null })
     dispatch({ type: 'select-appointment', id })
-  }, [])
+  }, [appointmentById, isDesktop])
 
   const handleCreateAt = useCallback((date: string, startMinute: number) => {
+    setEditorPresentation(isDesktop ? 'dialog' : 'drawer')
     dispatch({ type: 'select-appointment', id: null })
     dispatch({ type: 'create-at', value: { date, startMinute } })
-  }, [])
+  }, [isDesktop])
 
   const handleMove = useCallback((request: MoveIntent) => {
     mutateCalendarChange({ kind: 'move', request })
@@ -644,12 +671,12 @@ export function CalendarController() {
   const quickSheetOpen = (
     !isDesktop
     && Boolean(selectedAppointment)
-    && !mobileEditorOpen
+    && !editorPresentation
     && !moveSheetOpen
   )
   const appointmentDialogOpen = Boolean(
     state.createAt
-    || (selectedAppointment && (isDesktop || mobileEditorOpen)),
+    || (selectedAppointment && editorPresentation),
   )
   const dialogOpen = (
     appointmentDialogOpen
@@ -670,7 +697,8 @@ export function CalendarController() {
 
   const closeAppointmentDialog = useCallback((open: boolean) => {
     if (open) return
-    setMobileEditorOpen(false)
+    setEditorPresentation(null)
+    setSelectedAppointmentSnapshot(null)
     setDuplicating(false)
     dispatch({ type: 'select-appointment', id: null })
     dispatch({ type: 'create-at', value: null })
@@ -918,14 +946,22 @@ export function CalendarController() {
               }}
               onEdit={() => {
                 setDuplicating(false)
-                setMobileEditorOpen(true)
+                setEditorPresentation('drawer')
               }}
               onToggleLock={() => quickAction.mutate('toggle-lock')}
               onDuplicate={() => {
                 setDuplicating(true)
-                setMobileEditorOpen(true)
+                setEditorPresentation('drawer')
               }}
               onDelete={() => quickAction.mutate('delete')}
+              lockPending={
+                quickAction.isPending
+                && quickAction.variables === 'toggle-lock'
+              }
+              deletePending={
+                quickAction.isPending
+                && quickAction.variables === 'delete'
+              }
             />
           ) : null}
 
@@ -964,6 +1000,9 @@ export function CalendarController() {
                 duplicating ? selectedAppointment?.duration_minutes : undefined
               }
               open={appointmentDialogOpen}
+              presentation={
+                editorPresentation ?? (isDesktop ? 'dialog' : 'drawer')
+              }
               onOpenChange={closeAppointmentDialog}
             />
           ) : null}

@@ -28,3 +28,9 @@ export function invalidateCalendarAppointments(
   })
   void queryClient.invalidateQueries({ queryKey: ['appointments'] })
 }
+
+export function invalidateLegacyAppointments(
+  queryClient: Pick<QueryClient, 'invalidateQueries'>,
+) {
+  void queryClient.invalidateQueries({ queryKey: ['appointments'] })
+}

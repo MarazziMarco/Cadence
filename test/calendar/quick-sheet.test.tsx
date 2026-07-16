@@ -8,6 +8,10 @@ import { AppointmentQuickSheet } from '@/components/calendar/appointment-quick-s
 import { MoveAppointmentSheet } from '@/components/calendar/move-appointment-sheet'
 import type { CalendarAppointment } from '@/lib/api/appointments'
 import {
+  createAppointment,
+  deleteAppointment,
+} from '@/lib/api/appointments'
+import {
   CalendarMutationError,
   mutateCalendarOrThrow,
 } from '@/lib/api/calendar'
@@ -91,6 +95,8 @@ vi.mock('@/lib/api/appointments', async (importOriginal) => {
   return {
     ...original,
     listPatientsForSelect: vi.fn().mockResolvedValue([]),
+    createAppointment: vi.fn(),
+    deleteAppointment: vi.fn(),
   }
 })
 
@@ -163,16 +169,27 @@ const appointment: CalendarAppointment = {
   },
 }
 
-function renderForm() {
+function renderForm({
+  currentBusiness = business,
+  currentAppointment,
+  defaultDate = '2026-07-16',
+  useBusinessToday = false,
+}: {
+  currentBusiness?: WorkspaceBusiness
+  currentAppointment?: CalendarAppointment
+  defaultDate?: string
+  useBusinessToday?: boolean
+} = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <WorkspaceProvider business={business}>
+      <WorkspaceProvider business={currentBusiness}>
         <AppointmentForm
-          businessId={business.id}
-          defaultDate="2026-07-16"
+          businessId={currentBusiness.id}
+          appointment={currentAppointment}
+          defaultDate={useBusinessToday ? undefined : defaultDate}
           onSaved={vi.fn()}
           onCancel={vi.fn()}
         />
@@ -335,6 +352,11 @@ describe('MoveAppointmentSheet', () => {
 })
 
 describe('AppointmentForm', () => {
+  beforeEach(() => {
+    vi.mocked(createAppointment).mockReset()
+    vi.mocked(deleteAppointment).mockReset()
+  })
+
   it('keeps optional optimizer controls collapsed behind More options', async () => {
     renderForm()
 
@@ -345,5 +367,35 @@ describe('AppointmentForm', () => {
       'aria-expanded',
       'true',
     )
+  })
+
+  it('blocks an appointment that would end after midnight before the API', async () => {
+    renderForm()
+    await userEvent.type(
+      screen.getByPlaceholderText(/new client name/i),
+      'Ada',
+    )
+    await userEvent.clear(screen.getByLabelText(/^start$/i))
+    await userEvent.type(screen.getByLabelText(/^start$/i), '23:30')
+    await userEvent.selectOptions(
+      screen.getByLabelText(/duration/i),
+      '60',
+    )
+    await userEvent.click(screen.getByRole('button', { name: /create/i }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/before midnight/i)
+    expect(createAppointment).not.toHaveBeenCalled()
+  })
+
+  it('requires confirmation before deleting from the edit form', async () => {
+    vi.mocked(deleteAppointment).mockResolvedValue(null)
+    renderForm({ currentAppointment: appointment })
+
+    await userEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    expect(deleteAppointment).not.toHaveBeenCalled()
+    await userEvent.click(
+      screen.getByRole('button', { name: /delete appointment/i }),
+    )
+    await waitFor(() => expect(deleteAppointment).toHaveBeenCalledOnce())
   })
 })
