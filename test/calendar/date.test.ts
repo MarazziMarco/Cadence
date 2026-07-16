@@ -23,6 +23,23 @@ describe('business calendar dates', () => {
     expect(addBusinessDays('2028-02-28', 1)).toBe('2028-02-29')
   })
 
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 1.5, -1.5])(
+    'rejects non-finite and fractional day amounts: %s',
+    (amount) => {
+      expect(() => addBusinessDays('2026-07-16', amount)).toThrow(RangeError)
+    },
+  )
+
+  it.each([
+    ['0000-01-01', -1],
+    ['9999-12-31', 1],
+  ] as const)(
+    'rejects arithmetic outside the canonical date-only year range: %s %d',
+    (date, amount) => {
+      expect(() => addBusinessDays(date, amount)).toThrow(RangeError)
+    },
+  )
+
   it('returns Monday-Sunday week range across month boundaries', () => {
     expect(weekRange('2026-07-16')).toEqual({
       from: '2026-07-13',

@@ -29,7 +29,13 @@ function utcNoon(date: string): Date {
 }
 
 function formatDateOnly(date: Date): string {
-  const year = String(date.getUTCFullYear()).padStart(4, '0')
+  const yearValue = date.getUTCFullYear()
+
+  if (!Number.isInteger(yearValue) || yearValue < 0 || yearValue > 9999) {
+    throw new RangeError('Date is outside the supported date-only range')
+  }
+
+  const year = String(yearValue).padStart(4, '0')
   const month = String(date.getUTCMonth() + 1).padStart(2, '0')
   const day = String(date.getUTCDate()).padStart(2, '0')
 
@@ -57,6 +63,10 @@ export function businessToday(timeZone: string, now = new Date()): string {
 }
 
 export function addBusinessDays(date: string, amount: number): string {
+  if (!Number.isFinite(amount) || !Number.isInteger(amount)) {
+    throw new RangeError(`Invalid day amount: ${amount}`)
+  }
+
   const result = utcNoon(date)
 
   result.setUTCDate(result.getUTCDate() + amount)
