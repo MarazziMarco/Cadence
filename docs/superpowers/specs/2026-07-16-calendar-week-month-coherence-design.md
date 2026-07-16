@@ -234,6 +234,17 @@ immediately visible.
 
 Month optimization continues to use the existing contextual month behavior.
 
+After a successful contextual apply, the dialog must show the existing
+`MovedMessages` flow instead of only an applied-count banner.
+
+- Include every selected and successfully applied change that moved an
+  existing appointment.
+- Exclude waiting-list insertions and rejected changes.
+- Combine moved appointments from every run in a contextual month batch.
+- Preserve the existing editable `appointment_moved` template and copy action.
+- Keep the applied confirmation visible above the message preparation panel.
+- Do not close the optimization dialog automatically after apply.
+
 ### 4.4 Navigation
 
 - Week previous/next moves by seven days.
@@ -337,6 +348,9 @@ create, move, resize, apply, and undo operations.
 - desktop month appointment click opens the shared selection flow;
 - repeated selected-day click enters Day;
 - optimizer scope remains the full week at every zoom/layout.
+- contextual optimization restores message preparation after apply;
+- multi-run month apply prepares messages for all applied appointment moves;
+- waiting-list insertions do not generate moved-appointment messages.
 
 ### Regression verification
 
@@ -363,9 +377,11 @@ The work is complete when:
    cells.
 7. Week and month optimization ranges remain correct and their applied changes
    are immediately visible.
-8. Existing create, edit, move, resize, quick-sheet, and constraint behavior
+8. Every successful contextual apply offers prefilled copyable messages for
+   the appointments it actually moved.
+9. Existing create, edit, move, resize, quick-sheet, and constraint behavior
    remains intact.
-9. Tests, solver verification, and production build pass.
+10. Tests, solver verification, and production build pass.
 
 ## 12. Deferred
 
