@@ -88,3 +88,6 @@ credentials.json
 *.key
 .credentials
 .next/cache/webpack/server-production/0.pack
+
+# graphify output (local only)
+graphify-out/
