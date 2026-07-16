@@ -124,6 +124,7 @@ export interface Service {
   sort_order: number
   buffer_before_minutes: number
   buffer_after_minutes: number
+  max_daily_bookings: number | null
   vat_percentage: number | null
   allow_ai_scheduling: boolean
   online_bookable: boolean
@@ -168,4 +169,6 @@ export interface Appointment {
   locked: boolean
   generated_by_ai: boolean
   color: string | null
+  manual_override: boolean
+  version: number
 }

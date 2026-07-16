@@ -16,17 +16,31 @@ export interface CalendarAppointment {
   patient_id: string
   service_id: string | null
   locked: boolean
-  manual_override?: boolean
+  manual_override: boolean
   version: number
-  patients?: { first_name: string; last_name: string | null; full_name: string | null; color: string | null } | null
-  services?: { name: string; color: string | null } | null
+  patients?: {
+    first_name: string
+    last_name: string | null
+    full_name: string | null
+    color: string | null
+    phone: string | null
+    email: string | null
+  } | null
+  services?: {
+    name: string
+    color: string | null
+    buffer_before_minutes: number
+    buffer_after_minutes: number
+    max_daily_bookings: number | null
+  } | null
 }
 
-const SELECT = 'id, appointment_date, start_time, end_time, duration_minutes, status, color, title, price, patient_id, service_id, locked, manual_override, version, patients:patient_id ( first_name, last_name, full_name, color ), services:service_id ( name, color )'
+const SELECT = 'id, appointment_date, start_time, end_time, duration_minutes, status, color, title, price, patient_id, service_id, locked, manual_override, version, patients:patient_id ( first_name, last_name, full_name, color, phone, email ), services:service_id ( name, color, buffer_before_minutes, buffer_after_minutes, max_daily_bookings )'
 
 export async function listAppointments(businessId: string, startDate: string, endDate: string): Promise<CalendarAppointment[]> {
   const { data, error } = await sb().from('appointments').select(SELECT)
     .eq('business_id', businessId).is('deleted_at', null)
+    .in('status', ['scheduled', 'confirmed'])
     .gte('appointment_date', startDate).lte('appointment_date', endDate)
     .order('start_time', { ascending: true })
   if (error) throw error

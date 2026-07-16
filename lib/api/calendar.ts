@@ -1,6 +1,88 @@
 import type { CalendarAppointment } from '@/lib/api/appointments'
 import { isCalendarConstraint } from '@/lib/calendar/constraints'
-import type { CalendarConstraint } from '@/lib/calendar/types'
+import type { CalendarConstraint, DateRange } from '@/lib/calendar/types'
+import { createClient } from '@/lib/supabase/client'
+import { WEEKDAYS, type WorkingHour } from '@/lib/types/db'
+
+export interface CalendarConfig {
+  timezone: string
+  slotIntervalMinutes: number
+  defaultDurationMinutes: number
+  maxDailyAppointments: number | null
+  workingHours: WorkingHour[]
+  holidays: Array<{ start_date: string; end_date: string; is_closed: boolean }>
+}
+
+function defaultHolidayRange(now = new Date()): DateRange {
+  const year = now.getUTCFullYear()
+  return {
+    from: `${year - 1}-01-01`,
+    to: `${year + 1}-12-31`,
+  }
+}
+
+/**
+ * Loads the client calendar configuration. Callers displaying a known calendar
+ * range should pass it so holiday reads stay exact. The optional fallback is
+ * bounded to the surrounding three UTC calendar years, which safely covers
+ * timezone year boundaries without loading unbounded holiday history.
+ */
+export async function getCalendarConfig(
+  businessId: string,
+  holidayRange: DateRange = defaultHolidayRange(),
+): Promise<CalendarConfig> {
+  const supabase = createClient()
+
+  const [businessResult, workingHoursResult, holidaysResult] = await Promise.all([
+    supabase
+      .from('business')
+      .select('timezone, slot_interval_minutes, default_appointment_duration, max_daily_appointments')
+      .eq('id', businessId)
+      .single(),
+    supabase
+      .from('working_hours')
+      .select('id, business_id, weekday, is_open, morning_start, morning_end, afternoon_start, afternoon_end')
+      .eq('business_id', businessId)
+      .order('weekday', { ascending: true }),
+    supabase
+      .from('business_holidays')
+      .select('start_date, end_date, is_closed')
+      .eq('business_id', businessId)
+      .is('deleted_at', null)
+      .lte('start_date', holidayRange.to)
+      .gte('end_date', holidayRange.from),
+  ])
+
+  if (businessResult.error) throw businessResult.error
+  if (workingHoursResult.error) throw workingHoursResult.error
+  if (holidaysResult.error) throw holidaysResult.error
+  if (!businessResult.data) throw new Error('Calendar business configuration not found')
+
+  const weekdayOrder = new Map(WEEKDAYS.map((weekday, index) => [weekday, index]))
+  const workingHours = [...(workingHoursResult.data ?? [])]
+    .sort((left, right) => (
+      (weekdayOrder.get(left.weekday as WorkingHour['weekday']) ?? WEEKDAYS.length)
+      - (weekdayOrder.get(right.weekday as WorkingHour['weekday']) ?? WEEKDAYS.length)
+    )) as WorkingHour[]
+  const holidays = (holidaysResult.data ?? []) as Array<{
+    start_date: string
+    end_date: string
+    is_closed: boolean
+  }>
+
+  return {
+    timezone: businessResult.data.timezone,
+    slotIntervalMinutes: businessResult.data.slot_interval_minutes,
+    defaultDurationMinutes: businessResult.data.default_appointment_duration,
+    maxDailyAppointments: businessResult.data.max_daily_appointments,
+    workingHours,
+    holidays: holidays.map((holiday) => ({
+      start_date: holiday.start_date,
+      end_date: holiday.end_date,
+      is_closed: holiday.is_closed,
+    })),
+  }
+}
 
 export type CalendarMutationOperation =
   | 'create'

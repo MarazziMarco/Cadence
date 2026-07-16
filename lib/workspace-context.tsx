@@ -13,6 +13,8 @@ export interface WorkspaceBusiness {
   lunch_break_enabled: boolean
   lunch_start: string | null
   lunch_end: string | null
+  max_daily_appointments: number | null
+  default_buffer_minutes: number
 }
 
 const Ctx = createContext<{ business: WorkspaceBusiness | null }>({ business: null })
