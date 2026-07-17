@@ -564,6 +564,10 @@ const en: Dict = {
   'map.noGain': 'same distance as current order',
   'map.beforeHint': 'optimized: {km} km',
   'map.optimizeDay': 'Optimize this day',
+  'map.optimizeRoute': 'Optimize following the best route',
+  'map.savedTime': '~{min} min',
+  'map.openGoogle': 'Open in Google Maps',
+  'map.openApple': 'Open in Apple Maps',
 }
 
 const it: Dict = {
@@ -1100,6 +1104,10 @@ const it: Dict = {
   'map.noGain': 'stessa distanza dell\u2019ordine attuale',
   'map.beforeHint': 'ottimizzato: {km} km',
   'map.optimizeDay': 'Ottimizza questo giorno',
+  'map.optimizeRoute': 'Ottimizza seguendo la strada migliore',
+  'map.savedTime': '~{min} min',
+  'map.openGoogle': 'Apri in Google Maps',
+  'map.openApple': 'Apri in Mappe (Apple)',
 }
 
 const es: Dict = {
@@ -1636,6 +1644,10 @@ const es: Dict = {
   'map.noGain': 'misma distancia que el orden actual',
   'map.beforeHint': 'optimizado: {km} km',
   'map.optimizeDay': 'Optimizar este día',
+  'map.optimizeRoute': 'Optimizar siguiendo la mejor ruta',
+  'map.savedTime': '~{min} min',
+  'map.openGoogle': 'Abrir en Google Maps',
+  'map.openApple': 'Abrir en Apple Maps',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }

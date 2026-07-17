@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useQuery } from '@tanstack/react-query'
-import { MapPin, Route, Wand2 } from 'lucide-react'
+import { MapPin, Route, Wand2, Navigation } from 'lucide-react'
 import { listAppointments } from '@/lib/api/appointments'
 import { getBusinessSettings } from '@/lib/api/working-hours'
 import { saveAlgorithmMetadata } from '@/lib/api/scheduler'
@@ -107,6 +107,31 @@ function bestOrder(studio: LL | null, pts: LL[]): number[] {
   return twoOpt(studio, seed, pts)
 }
 
+// Full waypoint coords (studio -> stops in `order` -> studio) for one ordering.
+function seqCoords(studio: LL | null, geo: LL[], order: number[]): [number, number][] {
+  const ordered = order.map((i) => geo[i])
+  const seq = [...(studio ? [studio] : []), ...ordered, ...(studio ? [studio] : [])]
+  return seq.map((p) => [p.lat, p.lng] as [number, number])
+}
+
+const ll = (c: [number, number]) => `${c[0]},${c[1]}`
+
+// Google Maps directions with all stops as waypoints (opens the native app on phones).
+function googleMapsHref(coords: [number, number][]): string {
+  if (coords.length < 2) return '#'
+  const q = new URLSearchParams({ api: '1', travelmode: 'driving', origin: ll(coords[0]), destination: ll(coords[coords.length - 1]) })
+  const mids = coords.slice(1, -1).map(ll).join('|')
+  let url = `https://www.google.com/maps/dir/?${q.toString()}`
+  if (mids) url += `&waypoints=${encodeURIComponent(mids)}`
+  return url
+}
+
+// Apple Maps (no multi-stop via URL): route from the studio to the ordered stops.
+function appleMapsHref(coords: [number, number][]): string {
+  if (coords.length < 2) return '#'
+  return `https://maps.apple.com/?saddr=${ll(coords[0])}&daddr=${coords.slice(1).map(ll).join('+to:')}&dirflg=d`
+}
+
 export function DayMap({ businessId, date }: { businessId: string; date: string }) {
   const { t } = useT()
   const [mode, setMode] = useState<'before' | 'after'>('after')
@@ -147,8 +172,8 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
     ? { lat: Number(settings.location_latitude), lng: Number(settings.location_longitude) }
     : null
 
-  const { points, route, km, kmBefore, kmAfter, legMids, legKm, legIds } = useMemo(() => {
-    const empty = { points: [] as MapPoint[], route: [] as [number, number][], km: 0, kmBefore: 0, kmAfter: 0, legMids: [] as [number, number][], legKm: [] as number[], legIds: [] as string[] }
+  const { points, route, km, kmBefore, kmAfter, legMids, legKm, legIds, beforeCoords, afterCoords } = useMemo(() => {
+    const empty = { points: [] as MapPoint[], route: [] as [number, number][], km: 0, kmBefore: 0, kmAfter: 0, legMids: [] as [number, number][], legKm: [] as number[], legIds: [] as string[], beforeCoords: [] as [number, number][], afterCoords: [] as [number, number][] }
     if (geo.length === 0) return empty
     const beforeOrder = geo.map((_, i) => i) // already time-sorted upstream
     const afterOrder = bestOrder(studio, geo)
@@ -184,43 +209,46 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
       legMids: mids,
       legKm: kmPer,
       legIds: ids,
+      beforeCoords: seqCoords(studio, geo, beforeOrder),
+      afterCoords: seqCoords(studio, geo, afterOrder),
     }
   }, [geo, studio, mode, t])
 
-  // Ask the server for the real road geometry + per-leg travel time (ORS).
-  const { data: routeData } = useQuery({
-    queryKey: ['route-geom', route],
-    enabled: route.length >= 2,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const res = await fetch('/api/route', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ coords: route }),
-      })
-      const json = await res.json().catch(() => null)
-      return {
-        geometry: (json?.geometry as [number, number][] | null) ?? null,
-        durations: (json?.durations as number[] | null) ?? null,
-        waypoints: (json?.waypoints as number[] | null) ?? null,
-      }
-    },
-  })
-  // One polyline per leg (sliced from the road geometry when available, else a
-  // straight segment) so hovering a leg shows its travel time. Minutes: real ORS
-  // driving time, else an estimate at ~25 km/h city speed.
-  const legs = legMids.map((_, i) => {
-    const secs = routeData?.durations?.[i]
-    const minutes = secs != null ? Math.max(1, Math.round(secs / 60)) : Math.max(1, Math.round(legKm[i] / 25 * 60))
-    const geom = routeData?.geometry
-    const wp = routeData?.waypoints
-    let path: [number, number][]
-    if (geom && wp && wp.length === route.length) {
-      path = geom.slice(wp[i], wp[i + 1] + 1)
-    } else {
-      path = [route[i], route[i + 1]]
+  // Real road geometry + per-leg travel time (ORS) for both orders, so we can
+  // show time saved and always have the drawn order's data.
+  async function fetchRoute(coords: [number, number][]) {
+    const res = await fetch('/api/route', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ coords }),
+    })
+    const json = await res.json().catch(() => null)
+    return {
+      geometry: (json?.geometry as [number, number][] | null) ?? null,
+      durations: (json?.durations as number[] | null) ?? null,
+      waypoints: (json?.waypoints as number[] | null) ?? null,
     }
+  }
+  const { data: beforeData } = useQuery({ queryKey: ['route-geom', beforeCoords], enabled: beforeCoords.length >= 2, staleTime: 5 * 60_000, queryFn: () => fetchRoute(beforeCoords) })
+  const { data: afterData } = useQuery({ queryKey: ['route-geom', afterCoords], enabled: afterCoords.length >= 2, staleTime: 5 * 60_000, queryFn: () => fetchRoute(afterCoords) })
+  const displayed = mode === 'before' ? beforeData : afterData
+
+  // One polyline per leg (sliced from the road geometry when available, else a
+  // straight segment) so hovering a leg shows its travel time.
+  const legs = legMids.map((_, i) => {
+    const secs = displayed?.durations?.[i]
+    const minutes = secs != null ? Math.max(1, Math.round(secs / 60)) : Math.max(1, Math.round(legKm[i] / 25 * 60))
+    const geom = displayed?.geometry
+    const wp = displayed?.waypoints
+    const path: [number, number][] = (geom && wp && wp.length === route.length)
+      ? geom.slice(wp[i], wp[i + 1] + 1)
+      : [route[i], route[i + 1]]
     return { path, minutes, id: legIds[i] ?? '' }
   })
+
+  // Total travel time each order (real ORS, else estimate at ~25 km/h).
+  const minutesOf = (data: typeof beforeData, kmFallback: number) =>
+    data?.durations ? Math.round(data.durations.reduce((a, b) => a + b, 0) / 60) : Math.round(kmFallback / 25 * 60)
+  const timeSaved = Math.max(0, minutesOf(beforeData, kmBefore) - minutesOf(afterData, kmAfter))
 
   return (
     <Card className="mt-6 shadow-sm">
@@ -246,7 +274,7 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
             <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <Route className="h-3.5 w-3.5" /> {t('map.distance', { km: km.toFixed(1) })}
               {mode === 'after' && kmBefore > kmAfter + 0.05 && (
-                <span className="font-medium text-success">· {t('map.saved', { km: (kmBefore - kmAfter).toFixed(1) })}</span>
+                <span className="font-medium text-success">· {t('map.saved', { km: (kmBefore - kmAfter).toFixed(1) })}{timeSaved > 0 ? ` · ${t('map.savedTime', { min: timeSaved })}` : ''}</span>
               )}
               {mode === 'after' && kmBefore <= kmAfter + 0.05 && (
                 <span>· {t('map.noGain')}</span>
@@ -261,10 +289,24 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
                 ))}
               </div>
             )}
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" onClick={optimizeDay} disabled={!businessId}>
                 <Wand2 className="mr-1.5 h-4 w-4" /> {t('map.optimizeDay')}
               </Button>
+              {route.length >= 2 && (
+                <>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={googleMapsHref(route)} target="_blank" rel="noopener noreferrer">
+                      <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openGoogle')}
+                    </a>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={appleMapsHref(route)} target="_blank" rel="noopener noreferrer">
+                      <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openApple')}
+                    </a>
+                  </Button>
+                </>
+              )}
             </div>
             <OptimizeDialog
               businessId={businessId}
