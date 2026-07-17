@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Tooltip, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -37,11 +37,22 @@ function FitBounds({ points }: { points: MapPoint[] }) {
 }
 
 export default function DayMapCanvas({ points, route }: { points: MapPoint[]; route: [number, number][] }) {
+  // React 18 StrictMode (dev) and Fast Refresh remount this, and Leaflet throws
+  // "Map container is already initialized" if it reuses the same <div>. Mounting
+  // only after the first effect (single mount) plus a per-mount key on a fresh
+  // container avoids it.
+  const [mounted, setMounted] = useState(false)
+  const keyRef = useRef(`daymap-${Math.random().toString(36).slice(2)}`)
+  useEffect(() => { setMounted(true) }, [])
+
   const center: [number, number] = points.length
     ? [points[0].lat, points[0].lng]
     : [45.4642, 9.19] // Milan fallback
+
+  if (!mounted) return <div style={{ height: 360 }} className="w-full animate-pulse rounded-xl bg-muted" />
+
   return (
-    <MapContainer center={center} zoom={13} scrollWheelZoom style={{ height: 360, width: '100%', borderRadius: 12 }}>
+    <MapContainer key={keyRef.current} center={center} zoom={13} scrollWheelZoom style={{ height: 360, width: '100%', borderRadius: 12 }}>
       <TileLayer
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

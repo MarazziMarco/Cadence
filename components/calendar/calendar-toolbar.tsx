@@ -37,13 +37,13 @@ function CalendarToolbarComponent({
   return (
     <header className="flex items-center gap-2 px-2 py-2">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-bold tracking-tight">
+        <p className="truncate text-base font-bold tracking-tight" suppressHydrationWarning>
           {formatBusinessDate(selectedDate, dateLocale, {
             month: 'long',
             year: 'numeric',
           })}
         </p>
-        <p className="truncate text-xs capitalize text-muted-foreground">
+        <p className="truncate text-xs capitalize text-muted-foreground" suppressHydrationWarning>
           {formatBusinessDate(selectedDate, dateLocale, {
             weekday: 'long',
             day: 'numeric',
