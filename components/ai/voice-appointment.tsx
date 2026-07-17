@@ -10,17 +10,29 @@ import {
   isCalendarWarningConfirmation,
 } from '@/lib/api/calendar'
 import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
-import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients'
+import {
+  createPatient,
+  updatePatient,
+  createDefaultWeeklyAvailability,
+  mergePatientWeeklyAvailability,
+  replacePatientWeeklyAvailability,
+  type WeeklyAvailability,
+} from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
+import { listWorkingHours } from '@/lib/api/working-hours'
+import { WEEKDAYS, type Weekday } from '@/lib/types/db'
 import { useWorkspace } from '@/lib/workspace-context'
-import { parseAppointment, type ParsedAppt } from '@/lib/voice/parse-appointment'
+import { useT } from '@/lib/i18n/use-t'
+import { parseAppointment, type ParsedAppt, type AvailabilityPatch } from '@/lib/voice/parse-appointment'
 import { useSpeech, speechLang } from '@/lib/voice/use-speech'
+import { AppointmentLocationFields, emptyLocation, type AppointmentLocationValue } from '@/components/calendar/appointment-location-fields'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 // Interface strings — English by default, Italian only when the business
@@ -41,9 +53,6 @@ const STR = {
     created: 'Appointment created', createErr: 'Could not create the appointment',
     micDenied: 'Microphone permission denied. Type the text below.',
     micFail: 'Could not start the microphone.',
-    prefs: 'Detected preferences', prefMorning: 'Prefers mornings', prefAfternoon: 'Prefers afternoons',
-    availOnly: 'Available only', clearPref: 'Clear',
-    days: { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' } as Record<string, string>,
     exampleList: ['Marco tomorrow at 3pm physiotherapy', 'Giulia on Friday at 10 checkup', 'Anna, only Mondays, prefers mornings'],
   },
   it: {
@@ -61,9 +70,6 @@ const STR = {
     created: 'Appuntamento creato', createErr: 'Errore nella creazione',
     micDenied: 'Permesso microfono negato. Scrivi il testo qui sotto.',
     micFail: 'Impossibile avviare il microfono.',
-    prefs: 'Preferenze rilevate', prefMorning: 'Preferisce la mattina', prefAfternoon: 'Preferisce il pomeriggio',
-    availOnly: 'Disponibile solo', clearPref: 'Rimuovi',
-    days: { monday: 'Lun', tuesday: 'Mar', wednesday: 'Mer', thursday: 'Gio', friday: 'Ven', saturday: 'Sab', sunday: 'Dom' } as Record<string, string>,
     exampleList: ['Marco domani alle 15 fisioterapia', 'Giulia venerdì alle 10 visita di controllo', 'Anna solo il lunedì, preferisce la mattina'],
   },
 } as const
@@ -75,7 +81,25 @@ function endTime(start: string, dur: number): string {
 }
 
 function emptyParsed(): ParsedAppt {
-  return { patientId: null, patientName: null, date: null, time: null, serviceId: null, serviceName: null, durationMinutes: null, preferredPartOfDay: null, availableWeekdays: null }
+  return { patient: { kind: 'none' }, date: null, time: null, serviceId: null, serviceName: null, durationMinutes: null, clientAddress: null, appointmentAddress: null, availability: null }
+}
+
+function splitName(name: string): { first_name: string; last_name: string | null } {
+  const parts = name.trim().split(/\s+/)
+  return { first_name: parts[0] || name, last_name: parts.length > 1 ? parts.slice(1).join(' ') : null }
+}
+
+// Turn a parsed availability patch into DB writes (merge, or replace = listed
+// days keep their state, every other day becomes unavailable).
+async function applyAvailability(pid: string, patch: AvailabilityPatch, workingHours: any[]): Promise<void> {
+  if (patch.mode === 'replace') {
+    const weekly = createDefaultWeeklyAvailability()
+    for (const d of WEEKDAYS) weekly[d] = 'unavailable'
+    for (const [d, state] of Object.entries(patch.days)) weekly[d as Weekday] = state!
+    await replacePatientWeeklyAvailability(pid, weekly as WeeklyAvailability, workingHours)
+  } else {
+    await mergePatientWeeklyAvailability(pid, patch.days as Partial<WeeklyAvailability>, workingHours)
+  }
 }
 
 // Voice-driven appointment creation. Browser Web Speech API for transcription
@@ -86,42 +110,66 @@ export function VoiceAppointment() {
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
   const t = STR[business?.language === 'it' ? 'it' : 'en']
+  const { t: tr } = useT()
 
   const { data: patients = [] } = useQuery({ queryKey: ['patients-select', businessId], queryFn: () => listPatientsForSelect(businessId), enabled: !!businessId })
   const { data: services = [] } = useQuery({ queryKey: ['services', businessId], queryFn: () => listServices(businessId), enabled: !!businessId })
+  const { data: workingHours = [] } = useQuery({ queryKey: ['working-hours', businessId], queryFn: () => listWorkingHours(businessId), enabled: !!businessId })
 
   const { supported, listening, start, stop } = useSpeech(speechLang(business?.language))
   const [transcript, setTranscript] = useState('')
   const [parsed, setParsed] = useState<ParsedAppt | null>(null)
-  const [newClient, setNewClient] = useState('')
+  const [selectedId, setSelectedId] = useState('')
+  const [newName, setNewName] = useState('')
+  const [ambiguousIds, setAmbiguousIds] = useState<string[]>([])
+  const [clientAddr, setClientAddr] = useState('')
+  const [updateClientAddr, setUpdateClientAddr] = useState(false)
+  const [location, setLocation] = useState<AppointmentLocationValue>(emptyLocation())
+  const [avail, setAvail] = useState<AvailabilityPatch | null>(null)
   const [creating, setCreating] = useState(false)
 
   function applyParse(text: string) {
-    setParsed(parseAppointment(text, patients as any, services as any))
+    const p = parseAppointment(text, patients as any, services as any)
+    setParsed(p)
+    if (p.patient.kind === 'existing') { setSelectedId(p.patient.id); setNewName(''); setAmbiguousIds([]) }
+    else if (p.patient.kind === 'new') { setNewName(p.patient.proposedName); setSelectedId(''); setAmbiguousIds([]) }
+    else if (p.patient.kind === 'ambiguous') { setAmbiguousIds(p.patient.candidateIds); setSelectedId(''); setNewName('') }
+    else { setSelectedId(''); setNewName(''); setAmbiguousIds([]) }
+    setLocation(p.appointmentAddress ? { mode: 'custom', address: p.appointmentAddress, city: '', postalCode: '' } : emptyLocation())
+    setClientAddr(p.clientAddress || '')
+    setUpdateClientAddr(p.patient.kind === 'new' && !!p.clientAddress)
+    setAvail(p.availability)
+  }
+
+  function reset() {
+    setTranscript(''); setParsed(null); setSelectedId(''); setNewName(''); setAmbiguousIds([])
+    setClientAddr(''); setUpdateClientAddr(false); setLocation(emptyLocation()); setAvail(null)
   }
 
   function toggleMic() {
     if (listening) { stop(); return }
-    setTranscript(''); setParsed(null); setNewClient('')
+    reset()
     start(
       (text) => { setTranscript(text); applyParse(text) },
       () => toast.error(t.micDenied),
     )
   }
 
-  function set<K extends keyof ParsedAppt>(key: K, value: ParsedAppt[K]) {
-    setParsed((p) => ({ ...(p ?? emptyParsed()), [key]: value }))
-  }
+  const patientReady = !!selectedId || !!newName.trim()
 
   async function create() {
     if (!parsed?.date || !parsed?.time) { toast.error(t.needDateTime); return }
-    if (!parsed.patientId && !newClient.trim()) { toast.error(t.needClient); return }
+    if (!patientReady) { toast.error(t.needClient); return }
     const dur = parsed.durationMinutes ?? business?.default_appointment_duration ?? 30
     setCreating(true)
     try {
-      // Existing client wins; otherwise create a new one from the typed name.
-      let pid = parsed.patientId
-      if (!pid && newClient.trim()) { const np = await createPatient(businessId, { first_name: newClient.trim() }); pid = np.id }
+      let pid = selectedId
+      if (!pid && newName.trim()) {
+        const np = await createPatient(businessId, { ...splitName(newName), address: clientAddr.trim() || null })
+        pid = np.id
+      } else if (pid && clientAddr.trim() && updateClientAddr) {
+        await updatePatient(pid, { address: clientAddr.trim() })
+      }
       try {
         await createAppointment(businessId, {
           patient_id: pid,
@@ -131,27 +179,33 @@ export function VoiceAppointment() {
           end_time: endTime(parsed.time, dur),
           duration_minutes: dur,
           price: services.find((s) => s.id === parsed.serviceId)?.price ?? null,
+          location_mode: location.mode,
+          location_address: location.mode === 'custom' ? (location.address.trim() || null) : null,
+          location_city: location.mode === 'custom' ? (location.city.trim() || null) : null,
+          location_postal_code: location.mode === 'custom' ? (location.postalCode.trim() || null) : null,
         })
       } catch (error) {
         if (!isCalendarWarningConfirmation(error)) throw error
         const confirmed = await confirmCalendarMutationInteractively(error)
         if (!confirmed) return
       }
-      // Persist any availability / preference the phrase carried about this client.
-      if (pid && (parsed.availableWeekdays?.length || parsed.preferredPartOfDay)) {
-        await setPatientWeekdayAvailability(pid, (parsed.availableWeekdays ?? []) as any, parsed.preferredPartOfDay)
-      }
+      if (pid && avail) await applyAvailability(pid, avail, workingHours)
       toast.success(t.created)
       invalidateCalendarAppointments(qc, businessId)
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['patients'] })
       qc.invalidateQueries({ queryKey: ['patients-select'] })
-      setTranscript(''); setParsed(null); setNewClient('')
+      reset()
     } catch (e: any) {
       toast.error(e.message || t.createErr)
     } finally {
       setCreating(false)
     }
+  }
+
+  const patientName = (id: string) => {
+    const p = patients.find((x: any) => x.id === id)
+    return p ? (p.full_name || p.first_name) : id
   }
 
   return (
@@ -175,7 +229,7 @@ export function VoiceAppointment() {
           <Label>{t.text} {supported ? t.textHint : ''}</Label>
           <div className="flex gap-2">
             <Textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={2} placeholder={t.placeholder} />
-            <Button type="button" variant="outline" onClick={() => applyParse(transcript)} disabled={!transcript.trim()}><Sparkles className="h-4 w-4" /></Button>
+            <Button type="button" variant="outline" data-testid="voice-parse" aria-label="Parse text" onClick={() => applyParse(transcript)} disabled={!transcript.trim()}><Sparkles className="h-4 w-4" /></Button>
           </div>
           <div>
             <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t.examples}</p>
@@ -193,11 +247,26 @@ export function VoiceAppointment() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>{t.client}</Label>
-                <Select value={parsed.patientId ?? ''} onValueChange={(v) => { set('patientId', v); setNewClient('') }}>
-                  <SelectTrigger><SelectValue placeholder={t.chooseClient} /></SelectTrigger>
-                  <SelectContent>{patients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name || p.first_name}</SelectItem>)}</SelectContent>
-                </Select>
-                <Input value={newClient} onChange={(e) => { setNewClient(e.target.value); if (e.target.value) set('patientId', null) }} placeholder={t.newClientPh} />
+                {ambiguousIds.length > 0 && !selectedId ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-amber-600">{tr('vp.ambiguous')}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ambiguousIds.map((id) => (
+                        <button key={id} type="button" onClick={() => { setSelectedId(id); setAmbiguousIds([]) }}
+                          className="rounded-md border border-border bg-card px-2.5 py-1 text-xs hover:bg-accent">{patientName(id)}</button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Select value={selectedId} onValueChange={(v) => { setSelectedId(v); setNewName(''); setAmbiguousIds([]) }}>
+                      <SelectTrigger><SelectValue placeholder={t.chooseClient} /></SelectTrigger>
+                      <SelectContent>{patients.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name || p.first_name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Input value={newName} onChange={(e) => { setNewName(e.target.value); if (e.target.value) setSelectedId('') }} placeholder={t.newClientPh} aria-label={tr('vp.newClient')} />
+                    {newName.trim() && !selectedId && <Badge variant="secondary" className="font-normal">{tr('vp.newClient')}</Badge>}
+                  </>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>{t.service}</Label>
@@ -206,29 +275,44 @@ export function VoiceAppointment() {
                   <SelectContent>{services.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} · {s.duration_minutes}m</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5"><Label>{t.date}</Label><Input type="date" value={parsed.date ?? ''} onChange={(e) => set('date', e.target.value || null)} /></div>
-              <div className="space-y-1.5"><Label>{t.time}</Label><Input type="time" value={parsed.time ?? ''} onChange={(e) => set('time', e.target.value || null)} /></div>
+              <div className="space-y-1.5"><Label>{t.date}</Label><Input type="date" value={parsed.date ?? ''} onChange={(e) => setParsed((p) => ({ ...(p ?? emptyParsed()), date: e.target.value || null }))} /></div>
+              <div className="space-y-1.5"><Label>{t.time}</Label><Input type="time" value={parsed.time ?? ''} onChange={(e) => setParsed((p) => ({ ...(p ?? emptyParsed()), time: e.target.value || null }))} /></div>
             </div>
 
-            {(parsed.preferredPartOfDay || parsed.availableWeekdays?.length) && (
+            <AppointmentLocationFields
+              value={location}
+              onChange={setLocation}
+              patientAddress={selectedId ? (patients.find((p: any) => p.id === selectedId)?.address ?? null) : (clientAddr || null)}
+            />
+
+            {(clientAddr || parsed.clientAddress) && (
+              <div className="space-y-1.5 rounded-md border border-dashed border-border bg-muted/30 p-2.5">
+                <Label className="text-xs">{tr('vp.clientAddress')}</Label>
+                <Input value={clientAddr} onChange={(e) => setClientAddr(e.target.value)} />
+                {selectedId && (
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox checked={updateClientAddr} onCheckedChange={(v) => setUpdateClientAddr(v === true)} />
+                    {tr('vp.updateClientAddress')}
+                  </label>
+                )}
+              </div>
+            )}
+
+            {avail && (
               <div className="rounded-md border border-dashed border-border bg-muted/30 p-2.5">
-                <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t.prefs}</p>
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">{tr('vp.availability')}</p>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {parsed.preferredPartOfDay && (
-                    <Badge variant="secondary" className="cursor-pointer font-normal" onClick={() => set('preferredPartOfDay', null)}>
-                      {parsed.preferredPartOfDay === 'morning' ? t.prefMorning : t.prefAfternoon} ✕
-                    </Badge>
-                  )}
-                  {parsed.availableWeekdays?.length ? (
-                    <Badge variant="secondary" className="cursor-pointer font-normal" onClick={() => set('availableWeekdays', null)}>
-                      {t.availOnly}: {parsed.availableWeekdays.map((d) => t.days[d] ?? d).join(', ')} ✕
-                    </Badge>
-                  ) : null}
+                  {Object.entries(avail.days).map(([d, state]) => (
+                    <Badge key={d} variant="secondary" className="cursor-pointer font-normal" onClick={() => {
+                      setAvail((a) => { if (!a) return a; const days = { ...a.days }; delete days[d as Weekday]; return Object.keys(days).length ? { ...a, days } : null })
+                    }}>{d.slice(0, 3)}: {state} ✕</Badge>
+                  ))}
                 </div>
               </div>
             )}
+
             <div className="flex justify-end">
-              <Button onClick={create} disabled={creating}>{creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarPlus className="mr-2 h-4 w-4" />} {t.create}</Button>
+              <Button onClick={create} disabled={creating || !patientReady}>{creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarPlus className="mr-2 h-4 w-4" />} {t.create}</Button>
             </div>
           </div>
         )}

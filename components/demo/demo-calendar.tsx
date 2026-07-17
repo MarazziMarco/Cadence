@@ -116,9 +116,13 @@ export function DemoCalendar() {
       .filter((n) => (seen.has(n) ? false : (seen.add(n), true)))
       .map((n) => ({ id: n, first_name: n.split(' ')[0], last_name: n.split(' ').slice(1).join(' ') || null, full_name: n }))
     const r = parseAppointment(text, patients, [])
+    const name = r.patient.kind === 'existing' ? r.patient.displayName
+      : r.patient.kind === 'new' ? r.patient.proposedName
+      : r.patient.kind === 'ambiguous' ? r.patient.proposedName
+      : ''
     let dateOffset = view === 'day' ? dayIdx : 0
     if (r.date) { const idx = days.findIndex((d) => ymd(d) === r.date); if (idx >= 0) dateOffset = Math.min(idx, 4) }
-    setDraft({ name: r.patientName || '', dateOffset, time: r.time || '09:00', duration: r.durationMinutes || 30 })
+    setDraft({ name, dateOffset, time: r.time || '09:00', duration: r.durationMinutes || 30 })
   }
 
   function toggleMic() {

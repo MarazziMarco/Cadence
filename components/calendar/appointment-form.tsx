@@ -23,6 +23,7 @@ import {
   createPatient,
   getPatientWeeklyAvailability,
   replacePatientWeeklyAvailability,
+  type WeeklyAvailability,
 } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { createAdvanceWaiting } from '@/lib/api/waiting-list'
@@ -35,7 +36,7 @@ import { cn } from '@/lib/utils.js'
 import { parseAppointment } from '@/lib/voice/parse-appointment'
 import { speechLang, useSpeech } from '@/lib/voice/use-speech'
 import { useWorkspace } from '@/lib/workspace-context'
-import { WEEKDAYS } from '@/lib/types/db'
+import { WEEKDAYS, type Weekday } from '@/lib/types/db'
 import { PatientAvailabilityEditor } from '@/components/patients/patient-availability-editor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -203,24 +204,43 @@ export function AppointmentForm({
 
   function applyVoice(text: string) {
     const result = parseAppointment(text, patients as any, services as any)
-    if (result.patientId) {
-      setPatientId(result.patientId)
+    let matchedPatient = false
+    if (result.patient.kind === 'existing') {
+      setPatientId(result.patient.id)
       setNewClient('')
+      matchedPatient = true
+    } else if (result.patient.kind === 'new') {
+      setNewClient(result.patient.proposedName)
+      setPatientId('')
+      matchedPatient = true
     }
     if (result.serviceId) setServiceId(result.serviceId)
     if (result.date) setDate(result.date)
     if (result.time) setStart(result.time)
     if (result.durationMinutes) setDuration(String(result.durationMinutes))
+    if (result.availability) {
+      const patch = result.availability
+      setShowAvailability(true)
+      availabilityEditedRef.current = true
+      setWeeklyAvailability((current) => {
+        const base: WeeklyAvailability = patch.mode === 'replace'
+          ? (Object.fromEntries(WEEKDAYS.map((d) => [d, 'unavailable'])) as WeeklyAvailability)
+          : { ...current }
+        for (const [d, state] of Object.entries(patch.days)) base[d as Weekday] = state!
+        return base
+      })
+    }
     if (
-      result.patientId
+      matchedPatient
       || result.serviceId
       || result.date
       || result.time
       || result.durationMinutes
+      || result.availability
     ) {
       markDirty()
     }
-    if (!result.patientId && !result.date && !result.time) {
+    if (!matchedPatient && !result.date && !result.time) {
       toast(t('appt.didntCatch'))
     }
   }

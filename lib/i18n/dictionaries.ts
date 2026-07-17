@@ -505,6 +505,26 @@ const en: Dict = {
   'lab.seedBtn': 'Seed demo appointments',
   'lab.seeded': 'Added {n} demo appointments across the next 4 weeks',
   'lab.seedFailed': 'Seeding failed',
+
+  // Appointment location
+  'loc.label': 'Location',
+  'loc.inherit': 'Automatic',
+  'loc.studio': 'Studio',
+  'loc.patient': 'Client',
+  'loc.custom': 'Custom',
+  'loc.address': 'Address',
+  'loc.city': 'City',
+  'loc.postal': 'Postal code',
+  'loc.uses': 'Uses: {label}',
+  'loc.noAddress': 'No address on file',
+
+  // Voice preview
+  'vp.newClient': 'New client',
+  'vp.ambiguous': 'Several clients match — pick one',
+  'vp.pickClient': 'Pick a client',
+  'vp.clientAddress': 'Client address',
+  'vp.updateClientAddress': "Update this client's saved address",
+  'vp.availability': 'Availability',
 }
 
 const it: Dict = {
@@ -987,6 +1007,24 @@ const it: Dict = {
   'lab.seedBtn': 'Genera appuntamenti demo',
   'lab.seeded': 'Aggiunti {n} appuntamenti demo nelle prossime 4 settimane',
   'lab.seedFailed': 'Generazione non riuscita',
+
+  'loc.label': 'Luogo',
+  'loc.inherit': 'Automatico',
+  'loc.studio': 'Studio',
+  'loc.patient': 'Cliente',
+  'loc.custom': 'Personalizzato',
+  'loc.address': 'Indirizzo',
+  'loc.city': 'Città',
+  'loc.postal': 'CAP',
+  'loc.uses': 'Usa: {label}',
+  'loc.noAddress': 'Nessun indirizzo salvato',
+
+  'vp.newClient': 'Nuovo cliente',
+  'vp.ambiguous': 'Più clienti corrispondono — scegline uno',
+  'vp.pickClient': 'Scegli un cliente',
+  'vp.clientAddress': 'Indirizzo cliente',
+  'vp.updateClientAddress': 'Aggiorna l’indirizzo salvato di questo cliente',
+  'vp.availability': 'Disponibilità',
 }
 
 const es: Dict = {
@@ -1469,6 +1507,24 @@ const es: Dict = {
   'lab.seedBtn': 'Generar citas de demostración',
   'lab.seeded': 'Añadidas {n} citas de demostración en las próximas 4 semanas',
   'lab.seedFailed': 'La generación falló',
+
+  'loc.label': 'Ubicación',
+  'loc.inherit': 'Automática',
+  'loc.studio': 'Estudio',
+  'loc.patient': 'Cliente',
+  'loc.custom': 'Personalizada',
+  'loc.address': 'Dirección',
+  'loc.city': 'Ciudad',
+  'loc.postal': 'Código postal',
+  'loc.uses': 'Usa: {label}',
+  'loc.noAddress': 'Sin dirección guardada',
+
+  'vp.newClient': 'Nuevo cliente',
+  'vp.ambiguous': 'Varios clientes coinciden — elige uno',
+  'vp.pickClient': 'Elige un cliente',
+  'vp.clientAddress': 'Dirección del cliente',
+  'vp.updateClientAddress': 'Actualizar la dirección guardada de este cliente',
+  'vp.availability': 'Disponibilidad',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }
