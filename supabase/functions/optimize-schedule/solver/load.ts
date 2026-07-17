@@ -223,7 +223,7 @@ export async function loadInput(
     const { data: availRows, error: availErr } = await supabase
       .from("patient_availability")
       .select(
-        "patient_id, weekday, start_time, end_time, priority, valid_from, valid_until, recurring",
+        "patient_id, weekday, start_time, end_time, priority, is_available, valid_from, valid_until, recurring",
       )
       .in("patient_id", patientIds)
       .is("deleted_at", null);

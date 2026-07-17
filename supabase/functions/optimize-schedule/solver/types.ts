@@ -107,6 +107,7 @@ export interface PatientAvailability {
   start_time: string;
   end_time: string;
   priority: Priority;
+  is_available: boolean;
   valid_from: string | null;
   valid_until: string | null;
   recurring: boolean;

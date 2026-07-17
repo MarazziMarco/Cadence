@@ -162,11 +162,39 @@ export function effectiveAvailability(
       (!a.valid_until || date <= a.valid_until),
   );
   if (base.length === 0) return null;
-  return base.map((a) => ({
-    start: toMin(a.start_time),
-    end: toMin(a.end_time),
-    priority: a.priority,
-  }));
+  if (base.some((row) => row.is_available === false)) return [];
+
+  const hard = base
+    .filter((row) => row.is_available && row.priority === "normal")
+    .map((row) => ({
+      start: toMin(row.start_time),
+      end: toMin(row.end_time),
+      priority: "normal" as const,
+    }))
+    .filter((window) => window.start < window.end);
+  if (hard.length === 0) return null;
+
+  // Preference rows are retained for scoring, but clipped to normal windows so
+  // they can never make a hard-unavailable time feasible.
+  const preferred = base
+    .filter((row) => row.is_available && row.priority === "high")
+    .flatMap((row) => {
+      const preferredStart = toMin(row.start_time);
+      const preferredEnd = toMin(row.end_time);
+      return hard.flatMap((normal) => {
+        const start = Math.max(preferredStart, normal.start);
+        const end = Math.min(preferredEnd, normal.end);
+        return start < end
+          ? [{ start, end, priority: "high" as const }]
+          : [];
+      });
+    });
+
+  return [...hard, ...preferred].sort((left, right) => (
+    left.start - right.start
+    || left.end - right.end
+    || (left.priority === "normal" ? -1 : 1)
+  ));
 }
 
 /** Is [start,end) fully inside at least one window? */

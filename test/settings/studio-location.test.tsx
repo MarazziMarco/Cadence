@@ -18,7 +18,7 @@ const watchPosition = vi.fn()
 const locationMigration = readFileSync(
   join(
     process.cwd(),
-    'supabase/migrations/202607160004_client_locations_and_availability.sql',
+    'supabase/migrations/202607160006_client_availability.sql',
   ),
   'utf8',
 )

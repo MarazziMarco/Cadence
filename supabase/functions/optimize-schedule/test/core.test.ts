@@ -254,6 +254,48 @@ Deno.test("G: exact intra-block case (09:00-09:30 + 11:30-12:00, no buffer) comp
   assertBudgets(input, res);
 });
 
+Deno.test("high availability preference changes solver selection without changing feasibility", async () => {
+  const preferred = await load("g_intrablock_exact.json");
+  preferred.context.settings.weight_patient_preference = 1000;
+  preferred.patient_availability = [
+    {
+      patient_id: "pat-b",
+      weekday: "monday",
+      start_time: "00:00:00",
+      end_time: "24:00:00",
+      priority: "normal",
+      is_available: true,
+      valid_from: null,
+      valid_until: null,
+      recurring: true,
+    },
+    {
+      patient_id: "pat-b",
+      weekday: "monday",
+      start_time: "11:00:00",
+      end_time: "13:00:00",
+      priority: "high",
+      is_available: true,
+      valid_from: null,
+      valid_until: null,
+      recurring: true,
+    },
+  ];
+
+  const ignored = structuredClone(preferred);
+  ignored.context.settings.weight_patient_preference = 0;
+
+  const preferredResult = runSolver(preferred);
+  const ignoredResult = runSolver(ignored);
+  const preferredSlot = preferredResult.slots.find((slot) => slot.id === "appt-2");
+  const ignoredSlot = ignoredResult.slots.find((slot) => slot.id === "appt-2");
+
+  assertEquals(findHardViolation(preferred, preferredResult.slots), null);
+  assertEquals(findHardViolation(ignored, ignoredResult.slots), null);
+  assertEquals(preferredSlot?.start, toMin("11:00"));
+  assertEquals(ignoredSlot?.start, toMin("09:30"));
+});
+
 Deno.test("H: advance pre-pass pulls a 'move me up' client into an earlier slot", async () => {
   const input = await load("h_advance.json")
   const res = runSolver(input)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Loader2, Mic, MicOff, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,9 +18,15 @@ import {
   confirmCalendarMutationInteractively,
   isCalendarWarningConfirmation,
 } from '@/lib/api/calendar'
-import { createPatient, setPatientWeekdayAvailability } from '@/lib/api/patients'
+import {
+  createDefaultWeeklyAvailability,
+  createPatient,
+  getPatientWeeklyAvailability,
+  replacePatientWeeklyAvailability,
+} from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
 import { createAdvanceWaiting } from '@/lib/api/waiting-list'
+import { listWorkingHours } from '@/lib/api/working-hours'
 import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { businessToday } from '@/lib/calendar/date'
 import { bcp47 } from '@/lib/i18n'
@@ -29,7 +35,8 @@ import { cn } from '@/lib/utils.js'
 import { parseAppointment } from '@/lib/voice/parse-appointment'
 import { speechLang, useSpeech } from '@/lib/voice/use-speech'
 import { useWorkspace } from '@/lib/workspace-context'
-import { WEEKDAYS, type Weekday } from '@/lib/types/db'
+import { WEEKDAYS } from '@/lib/types/db'
+import { PatientAvailabilityEditor } from '@/components/patients/patient-availability-editor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -101,11 +108,12 @@ export function AppointmentForm({
   )
   const [moreOpen, setMoreOpen] = useState(false)
   const [showAvailability, setShowAvailability] = useState(false)
-  const [availableOnly, setAvailableOnly] = useState<Set<Weekday>>(new Set())
-  const [neverAvailable, setNeverAvailable] = useState<Set<Weekday>>(new Set())
-  const [preferred, setPreferred] = useState<'morning' | 'afternoon' | null>(null)
+  const [weeklyAvailability, setWeeklyAvailability] = useState(
+    createDefaultWeeklyAvailability,
+  )
   const [advanceUp, setAdvanceUp] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const availabilityEditedRef = useRef(false)
 
   const setFormDirty = useCallback((nextDirty: boolean) => {
     onDirtyChange?.(nextDirty)
@@ -125,6 +133,16 @@ export function AppointmentForm({
     queryKey: ['services', businessId],
     queryFn: () => listServices(businessId),
     enabled: Boolean(businessId),
+  })
+  const { data: workingHours = [] } = useQuery({
+    queryKey: ['working-hours', businessId],
+    queryFn: () => listWorkingHours(businessId),
+    enabled: Boolean(businessId),
+  })
+  const { data: savedWeeklyAvailability } = useQuery({
+    queryKey: ['patient-weekly-availability', patientId, workingHours],
+    queryFn: () => getPatientWeeklyAvailability(patientId, workingHours),
+    enabled: Boolean(showAvailability && patientId),
   })
   const {
     supported: micSupported,
@@ -155,9 +173,8 @@ export function AppointmentForm({
     ))
     setMoreOpen(false)
     setShowAvailability(false)
-    setAvailableOnly(new Set())
-    setNeverAvailable(new Set())
-    setPreferred(null)
+    setWeeklyAvailability(createDefaultWeeklyAvailability())
+    availabilityEditedRef.current = false
     setAdvanceUp(false)
     setFormError(null)
     setFormDirty(false)
@@ -172,6 +189,17 @@ export function AppointmentForm({
     defaultStart,
     setFormDirty,
   ])
+
+  useEffect(() => {
+    if (
+      showAvailability
+      && patientId
+      && savedWeeklyAvailability
+      && !availabilityEditedRef.current
+    ) {
+      setWeeklyAvailability(savedWeeklyAvailability)
+    }
+  }, [patientId, savedWeeklyAvailability, showAvailability])
 
   function applyVoice(text: string) {
     const result = parseAppointment(text, patients as any, services as any)
@@ -205,33 +233,6 @@ export function AppointmentForm({
     startRecording(applyVoice, () => toast.error(t('appt.micDenied')))
   }
 
-  function resolveAvailability(): Weekday[] | null {
-    if (!showAvailability) return null
-    if (availableOnly.size > 0) {
-      return WEEKDAYS.filter(
-        (weekday) => (
-          availableOnly.has(weekday) && !neverAvailable.has(weekday)
-        ),
-      )
-    }
-    if (neverAvailable.size > 0) {
-      return WEEKDAYS.filter((weekday) => !neverAvailable.has(weekday))
-    }
-    return null
-  }
-
-  function toggleWeekday(
-    values: Set<Weekday>,
-    setValues: (next: Set<Weekday>) => void,
-    weekday: Weekday,
-  ) {
-    const next = new Set(values)
-    if (next.has(weekday)) next.delete(weekday)
-    else next.add(weekday)
-    setValues(next)
-    markDirty()
-  }
-
   function onServiceChange(nextServiceId: string) {
     markDirty()
     setServiceId(nextServiceId)
@@ -256,16 +257,11 @@ export function AppointmentForm({
         resolvedPatientId = patient.id
       }
 
-      const availability = resolveAvailability()
-      if (
-        resolvedPatientId
-        && showAvailability
-        && ((availability && availability.length > 0) || preferred)
-      ) {
-        await setPatientWeekdayAvailability(
+      if (resolvedPatientId && showAvailability) {
+        await replacePatientWeeklyAvailability(
           resolvedPatientId,
-          availability ?? [],
-          preferred,
+          weeklyAvailability,
+          workingHours,
         )
       }
 
@@ -428,6 +424,8 @@ export function AppointmentForm({
               markDirty()
               setPatientId(value)
               setNewClient('')
+              setWeeklyAvailability(createDefaultWeeklyAvailability())
+              availabilityEditedRef.current = false
             }}
           >
             <SelectTrigger>
@@ -448,7 +446,11 @@ export function AppointmentForm({
               onChange={(event) => {
                 markDirty()
                 setNewClient(event.target.value)
-                if (event.target.value) setPatientId('')
+                if (event.target.value) {
+                  setPatientId('')
+                  setWeeklyAvailability(createDefaultWeeklyAvailability())
+                  availabilityEditedRef.current = false
+                }
               }}
             />
           ) : null}
@@ -552,68 +554,37 @@ export function AppointmentForm({
                     onCheckedChange={(checked) => {
                       markDirty()
                       setShowAvailability(checked)
+                      availabilityEditedRef.current = false
+                      if (!checked || !patientId) {
+                        setWeeklyAvailability(createDefaultWeeklyAvailability())
+                      }
                     }}
                   />
                 </div>
                 {showAvailability ? (
                   <div className="mt-3 space-y-3">
-                    <WeekdayChoices
-                      label={t('appt.onlyDays')}
-                      weekdays={weekdays}
-                      selected={availableOnly}
-                      tone="primary"
-                      onToggle={(weekday) => toggleWeekday(
-                        availableOnly,
-                        setAvailableOnly,
-                        weekday,
+                    <PatientAvailabilityEditor
+                      value={weeklyAvailability}
+                      weekdayLabels={Object.fromEntries(
+                        WEEKDAYS.map((weekday, index) => [
+                          weekday,
+                          weekdays[index],
+                        ]),
                       )}
+                      stateLabels={{
+                        unavailable: t('appt.neverDays'),
+                        all_day: t('appt.any'),
+                        morning_only: t('appt.morning'),
+                        afternoon_only: t('appt.afternoon'),
+                        prefer_morning: `${t('appt.preferredTime')}: ${t('appt.morning')}`,
+                        prefer_afternoon: `${t('appt.preferredTime')}: ${t('appt.afternoon')}`,
+                      }}
+                      onChange={(next) => {
+                        markDirty()
+                        availabilityEditedRef.current = true
+                        setWeeklyAvailability(next)
+                      }}
                     />
-                    <WeekdayChoices
-                      label={t('appt.neverDays')}
-                      weekdays={weekdays}
-                      selected={neverAvailable}
-                      tone="destructive"
-                      onToggle={(weekday) => toggleWeekday(
-                        neverAvailable,
-                        setNeverAvailable,
-                        weekday,
-                      )}
-                    />
-                    <div>
-                      <p className="mb-1.5 text-xs font-medium">
-                        {t('appt.preferredTime')}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {([
-                          ['any', 'appt.any'],
-                          ['morning', 'appt.morning'],
-                          ['afternoon', 'appt.afternoon'],
-                        ] as const).map(([value, key]) => {
-                          const active = (
-                            (value === 'any' && !preferred)
-                            || preferred === value
-                          )
-                          return (
-                            <button
-                              key={value}
-                              type="button"
-                              onClick={() => {
-                                markDirty()
-                                setPreferred(value === 'any' ? null : value)
-                              }}
-                              className={cn(
-                                'min-h-9 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
-                                active
-                                  ? 'border-primary bg-primary text-primary-foreground'
-                                  : 'border-border bg-card hover:bg-accent',
-                              )}
-                            >
-                              {t(key)}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
                     <p className="text-[11px] text-muted-foreground">
                       {t('appt.availNote')}
                     </p>
@@ -708,45 +679,5 @@ export function AppointmentForm({
         </div>
       </div>
     </form>
-  )
-}
-
-function WeekdayChoices({
-  label,
-  weekdays,
-  selected,
-  tone,
-  onToggle,
-}: {
-  label: string
-  weekdays: string[]
-  selected: Set<Weekday>
-  tone: 'primary' | 'destructive'
-  onToggle(weekday: Weekday): void
-}) {
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-medium">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {WEEKDAYS.map((weekday, index) => (
-          <button
-            key={weekday}
-            type="button"
-            aria-pressed={selected.has(weekday)}
-            onClick={() => onToggle(weekday)}
-            className={cn(
-              'min-h-9 rounded-md border px-2.5 py-1 text-xs font-medium capitalize transition-colors',
-              selected.has(weekday)
-                ? tone === 'primary'
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-destructive bg-destructive text-destructive-foreground'
-                : 'border-border bg-card hover:bg-accent',
-            )}
-          >
-            {weekdays[index]}
-          </button>
-        ))}
-      </div>
-    </div>
   )
 }
