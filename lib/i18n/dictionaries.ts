@@ -525,6 +525,32 @@ const en: Dict = {
   'vp.clientAddress': 'Client address',
   'vp.updateClientAddress': "Update this client's saved address",
   'vp.availability': 'Availability',
+
+  // Free a day / afternoon
+  'fp.title': 'Free up time',
+  'fp.freeDay': 'Free this day',
+  'fp.freeAfternoon': 'Free this afternoon',
+  'fp.building': 'Finding a way to free it…',
+  'fp.complete': 'This period can be fully freed.',
+  'fp.partial': 'Only part can be freed — see what blocks the rest.',
+  'fp.impossible': "This period can't be freed.",
+  'fp.blockers': 'Blocked ({n})',
+  'fp.blocker.LOCKED': 'Locked appointment',
+  'fp.blocker.UNAVAILABLE': 'Client not available elsewhere this week',
+  'fp.blocker.ROUTE': 'Not enough travel time',
+  'fp.blocker.NO_SLOT': 'No free slot this week',
+  'fp.apply': 'Apply this plan',
+
+  // Routing strategy settings
+  'route.settings': 'Travel & routing',
+  'route.strategy': 'Route strategy',
+  'route.balanced': 'Balanced',
+  'route.balancedDesc': 'Ignore travel time between appointments.',
+  'route.smart_route': 'Smart route',
+  'route.smart_routeDesc': 'Minimize travel between appointments.',
+  'route.walkMax': 'Max walking (min)',
+  'route.unknownLeg': 'Unknown-studio leg (min)',
+  'route.smartSaving': 'Min saving to reroute (min)',
 }
 
 const it: Dict = {
@@ -1025,6 +1051,30 @@ const it: Dict = {
   'vp.clientAddress': 'Indirizzo cliente',
   'vp.updateClientAddress': 'Aggiorna l’indirizzo salvato di questo cliente',
   'vp.availability': 'Disponibilità',
+
+  'fp.title': 'Libera tempo',
+  'fp.freeDay': 'Libera questo giorno',
+  'fp.freeAfternoon': 'Libera questo pomeriggio',
+  'fp.building': 'Cerco un modo per liberarlo…',
+  'fp.complete': 'Questo periodo può essere liberato del tutto.',
+  'fp.partial': 'Solo una parte può essere liberata — vedi cosa blocca il resto.',
+  'fp.impossible': 'Questo periodo non può essere liberato.',
+  'fp.blockers': 'Bloccati ({n})',
+  'fp.blocker.LOCKED': 'Appuntamento bloccato',
+  'fp.blocker.UNAVAILABLE': 'Cliente non disponibile altrove questa settimana',
+  'fp.blocker.ROUTE': 'Tempo di viaggio insufficiente',
+  'fp.blocker.NO_SLOT': 'Nessuno slot libero questa settimana',
+  'fp.apply': 'Applica questo piano',
+
+  'route.settings': 'Spostamenti e percorsi',
+  'route.strategy': 'Strategia percorso',
+  'route.balanced': 'Bilanciata',
+  'route.balancedDesc': 'Ignora i tempi di viaggio tra appuntamenti.',
+  'route.smart_route': 'Percorso intelligente',
+  'route.smart_routeDesc': 'Minimizza gli spostamenti tra appuntamenti.',
+  'route.walkMax': 'Max a piedi (min)',
+  'route.unknownLeg': 'Tratta studio sconosciuta (min)',
+  'route.smartSaving': 'Risparmio minimo per ricalcolare (min)',
 }
 
 const es: Dict = {
@@ -1525,6 +1575,30 @@ const es: Dict = {
   'vp.clientAddress': 'Dirección del cliente',
   'vp.updateClientAddress': 'Actualizar la dirección guardada de este cliente',
   'vp.availability': 'Disponibilidad',
+
+  'fp.title': 'Liberar tiempo',
+  'fp.freeDay': 'Liberar este día',
+  'fp.freeAfternoon': 'Liberar esta tarde',
+  'fp.building': 'Buscando cómo liberarlo…',
+  'fp.complete': 'Este periodo se puede liberar por completo.',
+  'fp.partial': 'Solo se puede liberar una parte — mira qué bloquea el resto.',
+  'fp.impossible': 'Este periodo no se puede liberar.',
+  'fp.blockers': 'Bloqueados ({n})',
+  'fp.blocker.LOCKED': 'Cita bloqueada',
+  'fp.blocker.UNAVAILABLE': 'Cliente no disponible en otro momento esta semana',
+  'fp.blocker.ROUTE': 'Tiempo de viaje insuficiente',
+  'fp.blocker.NO_SLOT': 'Sin hueco libre esta semana',
+  'fp.apply': 'Aplicar este plan',
+
+  'route.settings': 'Desplazamientos y rutas',
+  'route.strategy': 'Estrategia de ruta',
+  'route.balanced': 'Equilibrada',
+  'route.balancedDesc': 'Ignora el tiempo de viaje entre citas.',
+  'route.smart_route': 'Ruta inteligente',
+  'route.smart_routeDesc': 'Minimiza los desplazamientos entre citas.',
+  'route.walkMax': 'Máx. a pie (min)',
+  'route.unknownLeg': 'Tramo de estudio desconocido (min)',
+  'route.smartSaving': 'Ahorro mínimo para recalcular (min)',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }

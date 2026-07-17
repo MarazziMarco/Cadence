@@ -97,6 +97,61 @@ export async function runOptimization(businessId: string, dateFrom: string, date
   return data.run_id as string
 }
 
+export type FreePeriodKind = 'day' | 'afternoon'
+export interface FreePeriodBlocker { appointment_id: string; patient_id: string; code: string }
+export interface FreePeriodRun {
+  runId: string
+  completion: 'complete' | 'partial' | 'impossible'
+  blockers: FreePeriodBlocker[]
+  exactPlan: boolean
+}
+
+function fpYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function fpWeek(dateStr: string): { from: string; to: string } {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const base = new Date(y, m - 1, d)
+  const mon = new Date(base); mon.setDate(base.getDate() - ((base.getDay() + 6) % 7))
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+  return { from: fpYmd(mon), to: fpYmd(sun) }
+}
+
+// Free a whole day or just its afternoon: the Edge Function evacuates the period
+// and returns an exact plan (apply all-or-nothing) plus any blockers.
+export async function runFreePeriodOptimization(
+  input: { businessId: string; date: string; kind: FreePeriodKind; afternoonStartMinute?: number },
+): Promise<FreePeriodRun> {
+  await ensureAlgorithmSettings(input.businessId)
+  const { from, to } = fpWeek(input.date)
+  const startMinute = input.kind === 'day' ? 0 : (input.afternoonStartMinute ?? 14 * 60)
+  const { data, error } = await sb().functions.invoke('optimize-schedule', {
+    body: {
+      business_id: input.businessId,
+      date_from: from,
+      date_to: to,
+      scope_kind: 'week',
+      free_period: { date: input.date, start_minute: startMinute, end_minute: 24 * 60 },
+    },
+  })
+  if (error) {
+    let message = error.message || 'Edge function error'
+    const ctx = (error as any).context
+    if (ctx && typeof ctx.json === 'function') {
+      try { const body = await ctx.json(); if (body?.error) message = body.error } catch {}
+    }
+    throw new Error(message)
+  }
+  if (!data || data.error) throw new Error(data?.error || 'Free-period optimization failed')
+  if (!data.run_id) throw new Error('No run_id returned')
+  return {
+    runId: data.run_id as string,
+    completion: data.completion ?? 'complete',
+    blockers: (data.blockers ?? []) as FreePeriodBlocker[],
+    exactPlan: data.exact_plan === true,
+  }
+}
+
 export async function fetchRun(runId: string) {
   const client = sb()
   const { data: run, error: rErr } = await client.from('optimization_runs').select('*').eq('id', runId).single()

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Clock, DollarSign, ListChecks, ArrowRightLeft, Check, ArrowRight, Sparkles, PlusCircle, Loader2 } from 'lucide-react'
@@ -18,11 +18,14 @@ const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '—')
 // Shared optimize result view (used by the Scheduler modal and the calendar
 // OptimizeDialog). Every change starts SELECTED; the user unticks the ones to
 // skip, then a SINGLE "Apply" button applies all selected at once.
-export function OptimizePreview({ businessId, run, changes, onApplied }: {
+export function OptimizePreview({ businessId, run, changes, onApplied, exact = false, banner, applyLabel }: {
   businessId: string
   run: any
   changes: any[]
   onApplied?: () => void
+  exact?: boolean // exact plan: no per-change opt-out, apply all-or-nothing
+  banner?: ReactNode
+  applyLabel?: string
 }) {
   const { business } = useWorkspace()
   const { t } = useT()
@@ -86,15 +89,22 @@ export function OptimizePreview({ businessId, run, changes, onApplied }: {
   }
 
   if (changes.length === 0) {
-    return <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">{t('opt.alreadyOptimal')}</div>
+    return (
+      <div className="space-y-4">
+        {banner}
+        <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">{t('opt.alreadyOptimal')}</div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2 rounded-xl border border-primary/30 bg-accent/40 px-3 py-2.5 text-sm">
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <span className="text-muted-foreground">{run?.ai_summary || t('sched.previewDefault')}</span>
-      </div>
+      {banner ?? (
+        <div className="flex items-start gap-2 rounded-xl border border-primary/30 bg-accent/40 px-3 py-2.5 text-sm">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <span className="text-muted-foreground">{run?.ai_summary || t('sched.previewDefault')}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpis.map((k) => (
@@ -107,15 +117,15 @@ export function OptimizePreview({ businessId, run, changes, onApplied }: {
 
       <div>
         <p className="mb-1 text-sm font-semibold">{t('sched.proposedChanges', { n: changes.length })}</p>
-        <p className="mb-2 text-xs text-muted-foreground">{t('opt.excludeHint')}</p>
+        {!exact && <p className="mb-2 text-xs text-muted-foreground">{t('opt.excludeHint')}</p>}
         <div className="space-y-2">
           {changes.map((c) => {
             const isMove = !!c.appointment_id
             const name = c.patients?.full_name || c.patients?.first_name || t('dash.client')
             const on = !excluded.has(c.id)
             return (
-              <div key={c.id} className={cnRow(on)}>
-                <Checkbox checked={on} onCheckedChange={() => toggle(c.id)} className="mt-1 shrink-0" />
+              <div key={c.id} className={cnRow(exact ? true : on)}>
+                {!exact && <Checkbox checked={on} onCheckedChange={() => toggle(c.id)} className="mt-1 shrink-0" />}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -142,7 +152,7 @@ export function OptimizePreview({ businessId, run, changes, onApplied }: {
       <div className="sticky bottom-0 -mx-5 border-t border-border bg-background/95 px-5 py-3 backdrop-blur">
         <Button className="w-full" size="lg" onClick={apply} disabled={applying || selectedCount === 0}>
           {applying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-          {selectedCount === 0 ? t('opt.applyNone') : t('opt.apply', { n: selectedCount })}
+          {selectedCount === 0 ? t('opt.applyNone') : applyLabel ?? t('opt.apply', { n: selectedCount })}
         </Button>
       </div>
     </div>
