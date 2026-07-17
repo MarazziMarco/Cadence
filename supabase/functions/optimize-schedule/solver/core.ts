@@ -1054,3 +1054,186 @@ function wlTimeOk(wl: WaitingListEntry, start: number, dur: number): boolean {
 export function solveCore(input: SolverInput): SolverOutput {
   return runSolver(input).output;
 }
+
+// ---- free a day / afternoon (evacuation search) --------------------------
+
+export interface ExcludedPeriod {
+  date: string;
+  startMinute: number;
+  endMinute: number;
+}
+export type FreePeriodCompletion = "complete" | "partial" | "impossible";
+export interface FreePeriodBlocker {
+  appointment_id: string;
+  patient_id: string;
+  code: string; // LOCKED | UNAVAILABLE | ROUTE | NO_SLOT
+}
+export interface FreePeriodResult {
+  output: SolverOutput;
+  completion: FreePeriodCompletion;
+  blockers: FreePeriodBlocker[];
+}
+
+function datesInRange(from: string, to: string): string[] {
+  const out: string[] = [];
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const end = Date.UTC(ty, tm - 1, td);
+  for (let t = Date.UTC(fy, fm - 1, fd); t <= end; t += 86400000) {
+    const d = new Date(t);
+    out.push(
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${
+        String(d.getUTCDate()).padStart(2, "0")
+      }`,
+    );
+  }
+  return out;
+}
+
+const overlapsPeriod = (
+  date: string,
+  occS: number,
+  occE: number,
+  ex: ExcludedPeriod,
+): boolean =>
+  date === ex.date && occS < ex.endMinute && ex.startMinute < occE;
+
+/**
+ * Free an entire period (a day, or an afternoon) by relocating every appointment
+ * that overlaps it to another feasible slot in the same week — without ever
+ * placing anything back inside the period. Most-constrained appointments move
+ * first; anything that cannot move is reported as a blocker.
+ */
+export function runFreePeriod(
+  input: SolverInput,
+  ex: ExcludedPeriod,
+): FreePeriodResult {
+  const t0 = Date.now();
+  const K = tuning(input.context.settings);
+  const patientMap = new Map<string, Patient>(
+    input.patients.map((p) => [p.id, p]),
+  );
+  const { slots } = buildSlots(input);
+  const origin = new Map<string, Origin>();
+  for (const s of slots) origin.set(s.id, { date: s.date, start: s.start });
+
+  const base = idleAndGaps(input, slots, K.MIN_IDLE_GAP);
+  const idleBefore = base.idle;
+  const revenueBefore = slots.reduce((sum, s) => sum + s.price, 0);
+  const dates = datesInRange(input.context.date_from, input.context.date_to);
+
+  // Placement that also refuses to land back inside the excluded period.
+  const feasibleOut = (slot: Slot, date: string, start: number): boolean => {
+    const occS = start - slot.bufBefore;
+    const occE = start + slot.dur + slot.bufAfter;
+    if (overlapsPeriod(date, occS, occE, ex)) return false;
+    return feasibleAt(input, slots, slot, date, start);
+  };
+  const placementsFor = (slot: Slot): { date: string; start: number }[] => {
+    const out: { date: string; start: number }[] = [];
+    for (const d of dates) {
+      for (const c of candidateStarts(input, slots, slot, d)) {
+        if (feasibleOut(slot, d, c)) out.push({ date: d, start: c });
+      }
+    }
+    return out;
+  };
+
+  const targets = slots.filter((s) =>
+    !s.created && overlapsPeriod(s.date, occStart(s), occEnd(s), ex)
+  );
+  const blockers: FreePeriodBlocker[] = [];
+
+  // Locked appointments in the period can never move: hard blockers.
+  for (const l of targets.filter((s) => !s.movable)) {
+    blockers.push({
+      appointment_id: l.id,
+      patient_id: l.patient_id,
+      code: "LOCKED",
+    });
+  }
+
+  // Most-constrained-first: evacuate the appointments with the fewest options.
+  const movable = targets.filter((s) => s.movable)
+    .map((s) => ({ s, count: placementsFor(s).length }))
+    .sort((a, b) => a.count - b.count || a.s.id.localeCompare(b.s.id));
+
+  let movedCount = 0;
+  for (const { s } of movable) {
+    const opts = placementsFor(s).sort((a, b) =>
+      a.date < b.date ? -1 : a.date > b.date ? 1 : a.start - b.start
+    );
+    if (opts.length === 0) {
+      blockers.push({
+        appointment_id: s.id,
+        patient_id: s.patient_id,
+        code: blockerCode(input, slots, s, dates, ex),
+      });
+      continue;
+    }
+    s.date = opts[0].date;
+    s.start = opts[0].start;
+    movedCount++;
+  }
+
+  const completion: FreePeriodCompletion = blockers.length === 0
+    ? "complete"
+    : movedCount > 0
+    ? "partial"
+    : "impossible";
+
+  const baselineGapCount = base.gapCount;
+  const finalCost = totalCost(
+    input,
+    slots,
+    origin,
+    patientMap,
+    baselineGapCount,
+    K,
+  );
+  const output = buildOutput(
+    input,
+    slots,
+    origin,
+    patientMap,
+    idleBefore,
+    revenueBefore,
+    finalCost,
+    Date.now() - t0,
+  );
+  return { output, completion, blockers };
+}
+
+// Why couldn't this appointment leave the period? Prefer the most specific
+// cause: a client availability that blocks every slot, then a route violation,
+// otherwise simply no open slot.
+function blockerCode(
+  input: SolverInput,
+  slots: Slot[],
+  slot: Slot,
+  dates: string[],
+  ex: ExcludedPeriod,
+): string {
+  let sawWindow = false;
+  let sawAvail = false;
+  for (const d of dates) {
+    for (const c of candidateStarts(input, slots, slot, d)) {
+      const occS = c - slot.bufBefore, occE = c + slot.dur + slot.bufAfter;
+      if (overlapsPeriod(d, occS, occE, ex)) continue;
+      sawWindow = true;
+      const av = availFor(input, slot.patient_id, d);
+      const availOk = av === null || av.some((w) => c >= w.start && c + slot.dur <= w.end);
+      if (availOk) {
+        sawAvail = true;
+        // window + availability fine but still infeasible => conflict/route/split
+        const prevDate = slot.date, prevStart = slot.start;
+        slot.date = d; slot.start = c;
+        const route = routeViolationForDay(input, slots, d) !== null;
+        slot.date = prevDate; slot.start = prevStart;
+        if (route) return "ROUTE";
+      }
+    }
+  }
+  if (sawWindow && !sawAvail) return "UNAVAILABLE";
+  return "NO_SLOT";
+}

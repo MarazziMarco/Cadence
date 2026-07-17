@@ -8,7 +8,7 @@ import {
   assert,
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { findHardViolation, runSolver } from "../solver/core.ts";
+import { findHardViolation, runFreePeriod, runSolver } from "../solver/core.ts";
 import { capacityWindows, dayDiff } from "../solver/time.ts";
 import type { SolverInput } from "../solver/types.ts";
 
@@ -544,4 +544,50 @@ Deno.test("determinism: same input yields identical output", async () => {
     JSON.stringify(r1.output.changes),
     JSON.stringify(r2.output.changes),
   );
+});
+
+Deno.test("J: freeing a whole day relocates every appointment off it", async () => {
+  const input = await load("j_free_period.json");
+  const res = runFreePeriod(input, {
+    date: "2026-07-15",
+    startMinute: 0,
+    endMinute: 24 * 60,
+  });
+  assertEquals(res.completion, "complete");
+  assertEquals(res.blockers.length, 0);
+  // No appointment remains on the freed day.
+  const moves = res.output.changes.filter((c) => c.kind === "move");
+  assertEquals(moves.length, 2);
+  for (const m of moves) assert(m.new_date !== "2026-07-15");
+});
+
+Deno.test("J: freeing the afternoon moves only the afternoon appointment", async () => {
+  const input = await load("j_free_period.json");
+  const res = runFreePeriod(input, {
+    date: "2026-07-15",
+    startMinute: 14 * 60,
+    endMinute: 18 * 60,
+  });
+  assertEquals(res.completion, "complete");
+  const moves = res.output.changes.filter((c) => c.kind === "move");
+  assertEquals(moves.length, 1);
+  assertEquals(moves[0].appointment_id, "appt-2");
+  // the freed slot must not be re-used on the same afternoon
+  const back = moves[0].new_date === "2026-07-15" &&
+    parseInt(moves[0].new_start_time.slice(0, 2), 10) >= 14;
+  assert(!back, "must not land back in the freed afternoon");
+});
+
+Deno.test("J: a locked appointment blocks a full free but partials the rest", async () => {
+  const input = await load("j_free_period.json");
+  input.appointments[0].locked = true; // appt-1 pinned inside the day
+  const res = runFreePeriod(input, {
+    date: "2026-07-15",
+    startMinute: 0,
+    endMinute: 24 * 60,
+  });
+  assertEquals(res.completion, "partial");
+  assert(res.blockers.some((b) => b.appointment_id === "appt-1" && b.code === "LOCKED"));
+  // the movable one still evacuates
+  assert(res.output.changes.some((c) => c.kind === "move" && c.appointment_id === "appt-2"));
 });

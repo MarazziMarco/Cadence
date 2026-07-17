@@ -11,7 +11,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.74.0";
 import { prepareRoutingInput } from "./routing/matrix.ts";
-import { solveCore } from "./solver/core.ts";
+import { runFreePeriod, solveCore } from "./solver/core.ts";
 import { loadInput } from "./solver/load.ts";
 import { persistOutput } from "./solver/persist.ts";
 import type { Mode } from "./solver/types.ts";
@@ -56,6 +56,9 @@ Deno.serve(async (req: Request) => {
   const week_key = (body.week_key as string | undefined) ?? null;
   const allow_cross_week = body.allow_cross_week === true;
   const max_cross_week_days = Number(body.max_cross_week_days ?? 7);
+  const free_period = body.free_period as
+    | { date: string; start_minute: number; end_minute: number }
+    | undefined;
 
   if (!business_id) return json({ error: "business_id is required" }, 400);
   if (!date_from || !DATE_RE.test(date_from)) {
@@ -157,6 +160,39 @@ Deno.serve(async (req: Request) => {
         365,
       ),
     });
+    // Free-a-day / free-an-afternoon: evacuate the excluded period instead of a
+    // full optimization. The result is an exact plan (apply all-or-nothing).
+    if (
+      free_period && DATE_RE.test(free_period.date) &&
+      Number.isFinite(free_period.start_minute) &&
+      Number.isFinite(free_period.end_minute) &&
+      free_period.end_minute > free_period.start_minute
+    ) {
+      const fp = runFreePeriod(routedInput, {
+        date: free_period.date,
+        startMinute: Number(free_period.start_minute),
+        endMinute: Number(free_period.end_minute),
+      });
+      const run_id = await persistOutput(supabase, {
+        businessId: business_id,
+        output: fp.output,
+        input: routedInput,
+        profileId: user.id,
+        batchId: batch_id,
+        scopeKind: scope_kind,
+        scopeFrom: date_from,
+        scopeTo: date_to,
+        weekKey: week_key,
+        allowCrossWeek: allow_cross_week,
+      });
+      return json({
+        run_id,
+        exact_plan: true,
+        completion: fp.completion,
+        blockers: fp.blockers,
+      });
+    }
+
     const output = solveCore(routedInput);
     const run_id = await persistOutput(supabase, {
       businessId: business_id,
