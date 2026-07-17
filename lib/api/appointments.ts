@@ -70,6 +70,43 @@ export async function createAppointment(businessId: string, values: any) {
   return result.appointment
 }
 
+export type CreateWithClientPatient =
+  | { id: string; address?: string | null; city?: string | null; postalCode?: string | null }
+  | { firstName: string; lastName?: string | null; address?: string | null; city?: string | null; postalCode?: string | null }
+
+// Atomically create (or reuse) a client and their appointment via
+// POST /api/calendar/create-with-client. On an unconfirmed soft warning it asks
+// `confirm` and retries with the confirmed codes; returns null if the user
+// cancels. A hard rejection throws — and the server transaction guarantees no
+// orphan client is left behind in any of those cases.
+export async function createAppointmentWithClient(
+  input: { businessId: string; patient: CreateWithClientPatient; appointment: any },
+  opts?: { confirm?: (message: string) => boolean },
+): Promise<{ appointment: any; patient: any } | null> {
+  let confirmWarnings: string[] = []
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch('/api/calendar/create-with-client', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...input, idempotencyKey: crypto.randomUUID(), confirmWarnings }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data?.error || 'Could not create the appointment')
+    if (data.ok) return { appointment: data.appointment, patient: data.patient }
+    if (data.code === 'WARNING_CONFIRMATION') {
+      const confirm = opts?.confirm ?? ((m: string) => window.confirm(m))
+      const details = (data.constraints ?? []).map((c: any) => `• ${c.message}`).join('\n')
+      if (!confirm(details)) return null
+      confirmWarnings = Array.from(new Set(
+        (data.constraints ?? []).filter((c: any) => c.level === 'warning').map((c: any) => c.code),
+      ))
+      continue
+    }
+    throw new Error((data.constraints ?? []).map((c: any) => c.message).join('; ') || data.code || 'appointment rejected')
+  }
+  return null
+}
+
 export async function updateAppointment(
   businessId: string,
   id: string,

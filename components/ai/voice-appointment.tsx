@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Mic, MicOff, Loader2, CalendarPlus, Sparkles } from 'lucide-react'
-import { listPatientsForSelect, createAppointment } from '@/lib/api/appointments'
+import { listPatientsForSelect, createAppointment, createAppointmentWithClient } from '@/lib/api/appointments'
 import {
   confirmCalendarMutationInteractively,
   isCalendarWarningConfirmation,
@@ -163,31 +163,38 @@ export function VoiceAppointment() {
     const dur = parsed.durationMinutes ?? business?.default_appointment_duration ?? 30
     setCreating(true)
     try {
+      const appointment = {
+        service_id: parsed.serviceId,
+        appointment_date: parsed.date,
+        start_time: `${parsed.time}:00`,
+        end_time: endTime(parsed.time, dur),
+        duration_minutes: dur,
+        price: services.find((s) => s.id === parsed.serviceId)?.price ?? null,
+        location_mode: location.mode,
+        location_address: location.mode === 'custom' ? (location.address.trim() || null) : null,
+        location_city: location.mode === 'custom' ? (location.city.trim() || null) : null,
+        location_postal_code: location.mode === 'custom' ? (location.postalCode.trim() || null) : null,
+      }
       let pid = selectedId
       if (!pid && newName.trim()) {
-        const np = await createPatient(businessId, { ...splitName(newName), address: clientAddr.trim() || null })
-        pid = np.id
-      } else if (pid && clientAddr.trim() && updateClientAddr) {
-        await updatePatient(pid, { address: clientAddr.trim() })
-      }
-      try {
-        await createAppointment(businessId, {
-          patient_id: pid,
-          service_id: parsed.serviceId,
-          appointment_date: parsed.date,
-          start_time: `${parsed.time}:00`,
-          end_time: endTime(parsed.time, dur),
-          duration_minutes: dur,
-          price: services.find((s) => s.id === parsed.serviceId)?.price ?? null,
-          location_mode: location.mode,
-          location_address: location.mode === 'custom' ? (location.address.trim() || null) : null,
-          location_city: location.mode === 'custom' ? (location.city.trim() || null) : null,
-          location_postal_code: location.mode === 'custom' ? (location.postalCode.trim() || null) : null,
+        // Atomic: the client is only persisted if the appointment is accepted.
+        const parts = newName.trim().split(/\s+/)
+        const created = await createAppointmentWithClient({
+          businessId,
+          patient: { firstName: parts[0], lastName: parts.length > 1 ? parts.slice(1).join(' ') : null, address: clientAddr.trim() || null },
+          appointment,
         })
-      } catch (error) {
-        if (!isCalendarWarningConfirmation(error)) throw error
-        const confirmed = await confirmCalendarMutationInteractively(error)
-        if (!confirmed) return
+        if (!created) return // hard-cancelled soft warning
+        pid = created.patient.id
+      } else {
+        if (pid && clientAddr.trim() && updateClientAddr) await updatePatient(pid, { address: clientAddr.trim() })
+        try {
+          await createAppointment(businessId, { patient_id: pid, ...appointment })
+        } catch (error) {
+          if (!isCalendarWarningConfirmation(error)) throw error
+          const confirmed = await confirmCalendarMutationInteractively(error)
+          if (!confirmed) return
+        }
       }
       if (pid && avail) await applyAvailability(pid, avail, workingHours)
       toast.success(t.created)
