@@ -30,26 +30,16 @@ function escapeHtml(s: string): string {
 }
 
 export interface RouteLeg {
-  mid: [number, number]
+  path: [number, number][] // the leg's line (road-following when available)
   label: string // short arc id, e.g. "2-3"
-}
-
-// Small centred arc badge (its id, e.g. "2-3"). translate(-50%,-50%) centres it
-// on the arc midpoint regardless of text width.
-function legIcon(label: string): L.DivIcon {
-  return L.divIcon({
-    className: '',
-    html: `<div style="transform:translate(-50%,-50%);white-space:nowrap;padding:1px 7px;border-radius:9999px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.35)">${escapeHtml(label)}</div>`,
-    iconSize: [0, 0],
-    iconAnchor: [0, 0],
-  })
+  minutes: number
 }
 
 // Raw Leaflet (not react-leaflet): the map is created once with an explicit
 // cleanup (map.remove()), which is robust to React 18 StrictMode / Fast Refresh
 // double-mounts — react-leaflet's MapContainer instead threw "Map container is
 // already initialized" on the reused <div>.
-export default function DayMapCanvas({ points, route, legs = [] }: { points: MapPoint[]; route: [number, number][]; legs?: RouteLeg[] }) {
+export default function DayMapCanvas({ points, legs = [] }: { points: MapPoint[]; legs?: RouteLeg[] }) {
   const elRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layerRef = useRef<L.LayerGroup | null>(null)
@@ -77,11 +67,12 @@ export default function DayMapCanvas({ points, route, legs = [] }: { points: Map
     const layer = layerRef.current
     if (!map || !layer) return
     layer.clearLayers()
-    if (route.length >= 2) {
-      L.polyline(route, { color: '#2563eb', weight: 4, opacity: 0.85 }).addTo(layer)
-    }
+    // One polyline per leg, each with a tooltip that appears on hover.
     for (const leg of legs) {
-      L.marker(leg.mid, { icon: legIcon(leg.label), interactive: false, keyboard: false }).addTo(layer)
+      if (leg.path.length < 2) continue
+      L.polyline(leg.path, { color: '#2563eb', weight: 4, opacity: 0.85 })
+        .addTo(layer)
+        .bindTooltip(`${escapeHtml(leg.label)} · ${leg.minutes} min`, { sticky: true, direction: 'top' })
     }
     for (const p of points) {
       L.marker([p.lat, p.lng], { icon: pin(p) })
@@ -97,7 +88,7 @@ export default function DayMapCanvas({ points, route, legs = [] }: { points: Map
         maxZoom: 15,
       })
     }
-  }, [points, route, legs])
+  }, [points, legs])
 
   return <div ref={elRef} style={{ height: 360, width: '100%', borderRadius: 12 }} />
 }

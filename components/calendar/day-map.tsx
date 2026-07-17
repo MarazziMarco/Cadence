@@ -201,15 +201,25 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
       return {
         geometry: (json?.geometry as [number, number][] | null) ?? null,
         durations: (json?.durations as number[] | null) ?? null,
+        waypoints: (json?.waypoints as number[] | null) ?? null,
       }
     },
   })
-  const drawnRoute = routeData?.geometry && routeData.geometry.length >= 2 ? routeData.geometry : route
-  // Per-leg minutes: real ORS driving time, else estimate at ~25 km/h city speed.
-  const legs = legMids.map((mid, i) => {
+  // One polyline per leg (sliced from the road geometry when available, else a
+  // straight segment) so hovering a leg shows its travel time. Minutes: real ORS
+  // driving time, else an estimate at ~25 km/h city speed.
+  const legs = legMids.map((_, i) => {
     const secs = routeData?.durations?.[i]
     const minutes = secs != null ? Math.max(1, Math.round(secs / 60)) : Math.max(1, Math.round(legKm[i] / 25 * 60))
-    return { mid, minutes, id: legIds[i] ?? '' }
+    const geom = routeData?.geometry
+    const wp = routeData?.waypoints
+    let path: [number, number][]
+    if (geom && wp && wp.length === route.length) {
+      path = geom.slice(wp[i], wp[i + 1] + 1)
+    } else {
+      path = [route[i], route[i + 1]]
+    }
+    return { path, minutes, id: legIds[i] ?? '' }
   })
 
   return (
@@ -232,7 +242,7 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
           <p className="py-10 text-center text-sm text-muted-foreground">{t('map.empty')}</p>
         ) : (
           <>
-            <DayMapCanvas points={points} route={drawnRoute} legs={legs.map((l) => ({ mid: l.mid, label: l.id }))} />
+            <DayMapCanvas points={points} legs={legs.map((l) => ({ path: l.path, label: l.id, minutes: l.minutes }))} />
             <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <Route className="h-3.5 w-3.5" /> {t('map.distance', { km: km.toFixed(1) })}
               {mode === 'after' && kmBefore > kmAfter + 0.05 && (

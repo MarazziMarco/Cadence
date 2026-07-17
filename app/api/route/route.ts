@@ -37,9 +37,13 @@ export async function POST(request: Request) {
     const durations = (feature?.properties?.segments ?? [])
       .map((s: any) => Number(s?.duration))
       .filter((n: number) => Number.isFinite(n))
+    // Indices into `geometry` where each waypoint sits (to slice the road path
+    // into per-leg segments).
+    const waypoints = feature?.properties?.way_points as number[] | undefined
     return Response.json({
       geometry: line.map(([lng, lat]) => [lat, lng]),
       durations: durations.length ? durations : null,
+      waypoints: Array.isArray(waypoints) ? waypoints : null,
     })
   } catch {
     return Response.json({ geometry: null, reason: 'fetch-failed' })
