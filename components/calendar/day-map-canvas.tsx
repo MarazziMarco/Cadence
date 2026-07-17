@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Tooltip, Polyline, useMap } from 'react-leaflet'
+import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -26,48 +25,60 @@ function pin(p: MapPoint): L.DivIcon {
   })
 }
 
-function FitBounds({ points }: { points: MapPoint[] }) {
-  const map = useMap()
-  useEffect(() => {
-    if (points.length === 0) return
-    const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]))
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 })
-  }, [map, points])
-  return null
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 }
 
+// Raw Leaflet (not react-leaflet): the map is created once with an explicit
+// cleanup (map.remove()), which is robust to React 18 StrictMode / Fast Refresh
+// double-mounts — react-leaflet's MapContainer instead threw "Map container is
+// already initialized" on the reused <div>.
 export default function DayMapCanvas({ points, route }: { points: MapPoint[]; route: [number, number][] }) {
-  // React 18 StrictMode (dev) and Fast Refresh remount this, and Leaflet throws
-  // "Map container is already initialized" if it reuses the same <div>. Mounting
-  // only after the first effect (single mount) plus a per-mount key on a fresh
-  // container avoids it.
-  const [mounted, setMounted] = useState(false)
-  const keyRef = useRef(`daymap-${Math.random().toString(36).slice(2)}`)
-  useEffect(() => { setMounted(true) }, [])
+  const elRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const layerRef = useRef<L.LayerGroup | null>(null)
 
-  const center: [number, number] = points.length
-    ? [points[0].lat, points[0].lng]
-    : [45.4642, 9.19] // Milan fallback
+  // create / destroy the map
+  useEffect(() => {
+    if (!elRef.current) return
+    const map = L.map(elRef.current, { scrollWheelZoom: true }).setView([45.4642, 9.19], 13)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map)
+    const layer = L.layerGroup().addTo(map)
+    mapRef.current = map
+    layerRef.current = layer
+    return () => {
+      map.remove()
+      mapRef.current = null
+      layerRef.current = null
+    }
+  }, [])
 
-  if (!mounted) return <div style={{ height: 360 }} className="w-full animate-pulse rounded-xl bg-muted" />
+  // (re)draw markers + route whenever the data changes
+  useEffect(() => {
+    const map = mapRef.current
+    const layer = layerRef.current
+    if (!map || !layer) return
+    layer.clearLayers()
+    if (route.length >= 2) {
+      L.polyline(route, { color: '#2563eb', weight: 4, opacity: 0.85 }).addTo(layer)
+    }
+    for (const p of points) {
+      L.marker([p.lat, p.lng], { icon: pin(p) })
+        .addTo(layer)
+        .bindTooltip(`<b>${escapeHtml(p.label)}</b>${p.time ? ` · ${escapeHtml(p.time)}` : ''}`, {
+          direction: 'top',
+          offset: [0, -14],
+        })
+    }
+    if (points.length) {
+      map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number])), {
+        padding: [40, 40],
+        maxZoom: 15,
+      })
+    }
+  }, [points, route])
 
-  return (
-    <MapContainer key={keyRef.current} center={center} zoom={13} scrollWheelZoom style={{ height: 360, width: '100%', borderRadius: 12 }}>
-      <TileLayer
-        attribution='&copy; OpenStreetMap contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {route.length >= 2 && (
-        <Polyline positions={route} pathOptions={{ color: '#2563eb', weight: 4, opacity: 0.85 }} />
-      )}
-      {points.map((p, i) => (
-        <Marker key={i} position={[p.lat, p.lng]} icon={pin(p)}>
-          <Tooltip direction="top" offset={[0, -14]} opacity={1}>
-            <span style={{ fontWeight: 600 }}>{p.label}</span>{p.time ? ` · ${p.time}` : ''}
-          </Tooltip>
-        </Marker>
-      ))}
-      <FitBounds points={points} />
-    </MapContainer>
-  )
+  return <div ref={elRef} style={{ height: 360, width: '100%', borderRadius: 12 }} />
 }
