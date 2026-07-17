@@ -137,10 +137,17 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
   const [mode, setMode] = useState<'before' | 'after'>('after')
   const [optimizeOpen, setOptimizeOpen] = useState(false)
 
-  // Turn the geographic preview into a real optimization for this day: force the
-  // route-aware strategy (session + travel times), then open the apply preview.
+  // Real optimization for this day (session + travel + idle + constraints), then
+  // the apply preview + messages.
   async function optimizeDay() {
     try { await saveAlgorithmMetadata(businessId, { OPTIMIZATION_STRATEGY: 'smart_route' }) } catch {}
+    setOptimizeOpen(true)
+  }
+
+  // Route-first: also lower the reroute threshold so it reorders even for small
+  // travel savings (what the map shows). Same preview + apply + messages.
+  async function optimizeRoute() {
+    try { await saveAlgorithmMetadata(businessId, { OPTIMIZATION_STRATEGY: 'smart_route', SMART_ROUTE_MIN_SAVING_MINUTES: 1 }) } catch {}
     setOptimizeOpen(true)
   }
 
@@ -292,6 +299,9 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" onClick={optimizeDay} disabled={!businessId}>
                 <Wand2 className="mr-1.5 h-4 w-4" /> {t('map.optimizeDay')}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={optimizeRoute} disabled={!businessId}>
+                <Route className="mr-1.5 h-4 w-4" /> {t('map.optimizeRoute')}
               </Button>
               {route.length >= 2 && (
                 <>
