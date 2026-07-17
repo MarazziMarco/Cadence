@@ -111,6 +111,22 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
     return { points: pts, route: routeCoords, km: total }
   }, [geo, studio, mode, t])
 
+  // Ask the server for the real road geometry (ORS); fall back to straight lines.
+  const { data: roadGeometry } = useQuery({
+    queryKey: ['route-geom', route],
+    enabled: route.length >= 2,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const res = await fetch('/api/route', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ coords: route }),
+      })
+      const json = await res.json().catch(() => null)
+      return (json?.geometry as [number, number][] | null) ?? null
+    },
+  })
+  const drawnRoute = roadGeometry && roadGeometry.length >= 2 ? roadGeometry : route
+
   return (
     <Card className="mt-6 shadow-sm">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
@@ -131,7 +147,7 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
           <p className="py-10 text-center text-sm text-muted-foreground">{t('map.empty')}</p>
         ) : (
           <>
-            <DayMapCanvas points={points} route={route} />
+            <DayMapCanvas points={points} route={drawnRoute} />
             <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
               <Route className="h-3.5 w-3.5" /> {t('map.distance', { km: km.toFixed(1) })}
               {!studio && <span>· {t('map.noStudio')}</span>}
