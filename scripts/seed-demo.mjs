@@ -51,6 +51,25 @@ const SERVICES = [
 const STARTS = [540, 630, 690, 780, 870, 930, 990, 1020] // scattered, with gaps
 const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
+// Real-ish Milan addresses (approx coords) so the day map + route optimization
+// have geographic data to work with. One per demo patient.
+const STUDIO = { address: 'Via Dogana 3', city: 'Milano', postal: '20123', lat: 45.4640, lng: 9.1900 }
+const ADDRESSES = [
+  { address: 'Via Dante 7', city: 'Milano', postal: '20121', lat: 45.4655, lng: 9.1859 },
+  { address: 'Corso Buenos Aires 33', city: 'Milano', postal: '20124', lat: 45.4790, lng: 9.2100 },
+  { address: 'Via Torino 61', city: 'Milano', postal: '20123', lat: 45.4610, lng: 9.1840 },
+  { address: 'Viale Monza 12', city: 'Milano', postal: '20125', lat: 45.4990, lng: 9.2160 },
+  { address: 'Via Padova 40', city: 'Milano', postal: '20127', lat: 45.4960, lng: 9.2270 },
+  { address: 'Corso Vercelli 22', city: 'Milano', postal: '20144', lat: 45.4680, lng: 9.1560 },
+  { address: 'Via Washington 50', city: 'Milano', postal: '20146', lat: 45.4620, lng: 9.1500 },
+  { address: 'Viale Certosa 100', city: 'Milano', postal: '20156', lat: 45.5010, lng: 9.1450 },
+  { address: 'Via Ripamonti 88', city: 'Milano', postal: '20141', lat: 45.4370, lng: 9.2000 },
+  { address: 'Corso Lodi 55', city: 'Milano', postal: '20139', lat: 45.4460, lng: 9.2130 },
+  { address: 'Via Novara 30', city: 'Milano', postal: '20153', lat: 45.4720, lng: 9.1200 },
+  { address: 'Piazzale Loreto 2', city: 'Milano', postal: '20131', lat: 45.4855, lng: 9.2170 },
+]
+const COORD = Object.fromEntries(ADDRESSES.map((a) => [a.address, a]))
+
 const rand = (n) => Math.floor(Math.random() * n)
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const minToTime = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`
@@ -109,6 +128,10 @@ export async function resetDemo(env = loadEnv()) {
     profile_id: userId, business_name: 'Demo Clinic', business_type: 'physiotherapist',
     timezone: 'Europe/Rome', language: 'en', currency: 'EUR',
     default_appointment_duration: 30, lunch_break_enabled: true, lunch_start: '13:00', lunch_end: '14:00',
+    address: STUDIO.address, city: STUDIO.city, postal_code: STUDIO.postal,
+    location_latitude: STUDIO.lat, location_longitude: STUDIO.lng,
+    location_accuracy_meters: 20, location_source: 'device_geolocation',
+    location_captured_at: new Date().toISOString(),
   }).select('id').single()
   if (bErr) throw bErr
   const businessId = biz.id
@@ -127,13 +150,17 @@ export async function resetDemo(env = loadEnv()) {
     SERVICES.map((s) => ({ business_id: businessId, ...s, allow_ai_scheduling: true }))
   ).select('id, duration_minutes, price, color, name')
 
-  // Patients
+  // Patients — each gets a real Milan address (so voice + routing have data).
   const { data: pats } = await sb.from('patients').insert(
-    NAMES.map(([first_name, last_name], i) => ({
-      business_id: businessId, first_name, last_name,
-      color: COLORS[i % COLORS.length], is_vip: i % 5 === 0,
-    }))
-  ).select('id, color')
+    NAMES.map(([first_name, last_name], i) => {
+      const a = ADDRESSES[i % ADDRESSES.length]
+      return {
+        business_id: businessId, first_name, last_name,
+        color: COLORS[i % COLORS.length], is_vip: i % 5 === 0,
+        address: a.address, city: a.city, postal_code: a.postal,
+      }
+    })
+  ).select('id, color, address, city, postal_code')
 
   // Scattered 4-week calendar (Mon–Fri, 2–4/day, deliberate gaps)
   const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -146,11 +173,17 @@ export async function resetDemo(env = loadEnv()) {
     for (const startMin of chosen) {
       const p = pats[rand(pats.length)]
       const svc = svcs[rand(svcs.length)]
+      const co = COORD[p.address]
       appts.push({
         business_id: businessId, patient_id: p.id, service_id: svc.id,
         appointment_date: ymd(d), start_time: minToTime(startMin), end_time: minToTime(startMin + svc.duration_minutes),
         duration_minutes: svc.duration_minutes, price: svc.price, color: svc.color, title: svc.name,
         status: 'scheduled', source: 'manual',
+        // Appointment happens at the client's address -> geographic data for the map.
+        location_mode: 'custom',
+        location_address: p.address, location_city: p.city, location_postal_code: p.postal_code,
+        location_latitude: co?.lat ?? null, location_longitude: co?.lng ?? null,
+        location_geocoding_status: co ? 'succeeded' : null,
       })
     }
   }

@@ -551,6 +551,15 @@ const en: Dict = {
   'route.walkMax': 'Max walking (min)',
   'route.unknownLeg': 'Unknown-studio leg (min)',
   'route.smartSaving': 'Min saving to reroute (min)',
+
+  // Day map
+  'map.title': 'Day map',
+  'map.before': 'Current order',
+  'map.after': 'Optimized by location',
+  'map.empty': 'No appointments with an address on this day.',
+  'map.studio': 'Studio',
+  'map.distance': '{km} km total',
+  'map.noStudio': 'studio location not set',
 }
 
 const it: Dict = {
@@ -1075,6 +1084,14 @@ const it: Dict = {
   'route.walkMax': 'Max a piedi (min)',
   'route.unknownLeg': 'Tratta studio sconosciuta (min)',
   'route.smartSaving': 'Risparmio minimo per ricalcolare (min)',
+
+  'map.title': 'Mappa della giornata',
+  'map.before': 'Ordine attuale',
+  'map.after': 'Ottimizzato per posizione',
+  'map.empty': 'Nessun appuntamento con indirizzo in questo giorno.',
+  'map.studio': 'Studio',
+  'map.distance': '{km} km totali',
+  'map.noStudio': 'posizione studio non impostata',
 }
 
 const es: Dict = {
@@ -1599,6 +1616,14 @@ const es: Dict = {
   'route.walkMax': 'Máx. a pie (min)',
   'route.unknownLeg': 'Tramo de estudio desconocido (min)',
   'route.smartSaving': 'Ahorro mínimo para recalcular (min)',
+
+  'map.title': 'Mapa del día',
+  'map.before': 'Orden actual',
+  'map.after': 'Optimizado por ubicación',
+  'map.empty': 'No hay citas con dirección en este día.',
+  'map.studio': 'Estudio',
+  'map.distance': '{km} km en total',
+  'map.noStudio': 'ubicación del estudio no configurada',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }
