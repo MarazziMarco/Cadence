@@ -563,6 +563,7 @@ const en: Dict = {
   'map.saved': 'saves {km} km vs current order',
   'map.noGain': 'same distance as current order',
   'map.beforeHint': 'optimized: {km} km',
+  'map.optimizeDay': 'Optimize this day',
 }
 
 const it: Dict = {
@@ -1098,6 +1099,7 @@ const it: Dict = {
   'map.saved': 'risparmia {km} km sull\u2019ordine attuale',
   'map.noGain': 'stessa distanza dell\u2019ordine attuale',
   'map.beforeHint': 'ottimizzato: {km} km',
+  'map.optimizeDay': 'Ottimizza questo giorno',
 }
 
 const es: Dict = {
@@ -1633,6 +1635,7 @@ const es: Dict = {
   'map.saved': 'ahorra {km} km frente al orden actual',
   'map.noGain': 'misma distancia que el orden actual',
   'map.beforeHint': 'optimizado: {km} km',
+  'map.optimizeDay': 'Optimizar este día',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }

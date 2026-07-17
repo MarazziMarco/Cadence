@@ -31,14 +31,15 @@ function escapeHtml(s: string): string {
 
 export interface RouteLeg {
   mid: [number, number]
-  minutes: number
+  label: string // short arc id, e.g. "2-3"
 }
 
-// Small travel-time pill sitting on the middle of an arc.
-function legIcon(minutes: number): L.DivIcon {
+// Small centred arc badge (its id, e.g. "2-3"). translate(-50%,-50%) centres it
+// on the arc midpoint regardless of text width.
+function legIcon(label: string): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: `<div style="white-space:nowrap;padding:1px 6px;border-radius:9999px;background:#fff;color:#2563eb;font-size:11px;font-weight:700;border:1px solid #2563eb;box-shadow:0 1px 3px rgba(0,0,0,.25)">${minutes} min</div>`,
+    html: `<div style="transform:translate(-50%,-50%);white-space:nowrap;padding:1px 7px;border-radius:9999px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.35)">${escapeHtml(label)}</div>`,
     iconSize: [0, 0],
     iconAnchor: [0, 0],
   })
@@ -80,7 +81,7 @@ export default function DayMapCanvas({ points, route, legs = [] }: { points: Map
       L.polyline(route, { color: '#2563eb', weight: 4, opacity: 0.85 }).addTo(layer)
     }
     for (const leg of legs) {
-      L.marker(leg.mid, { icon: legIcon(leg.minutes), interactive: false, keyboard: false }).addTo(layer)
+      L.marker(leg.mid, { icon: legIcon(leg.label), interactive: false, keyboard: false }).addTo(layer)
     }
     for (const p of points) {
       L.marker([p.lat, p.lng], { icon: pin(p) })

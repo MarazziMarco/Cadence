@@ -3,12 +3,15 @@
 import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useQuery } from '@tanstack/react-query'
-import { MapPin, Route } from 'lucide-react'
+import { MapPin, Route, Wand2 } from 'lucide-react'
 import { listAppointments } from '@/lib/api/appointments'
 import { getBusinessSettings } from '@/lib/api/working-hours'
+import { saveAlgorithmMetadata } from '@/lib/api/scheduler'
 import { useT } from '@/lib/i18n/use-t'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { OptimizeDialog } from './optimize-dialog'
 import type { MapPoint } from './day-map-canvas'
 
 // Leaflet touches `window` on import, so load the canvas only on the client.
@@ -107,6 +110,14 @@ function bestOrder(studio: LL | null, pts: LL[]): number[] {
 export function DayMap({ businessId, date }: { businessId: string; date: string }) {
   const { t } = useT()
   const [mode, setMode] = useState<'before' | 'after'>('after')
+  const [optimizeOpen, setOptimizeOpen] = useState(false)
+
+  // Turn the geographic preview into a real optimization for this day: force the
+  // route-aware strategy (session + travel times), then open the apply preview.
+  async function optimizeDay() {
+    try { await saveAlgorithmMetadata(businessId, { OPTIMIZATION_STRATEGY: 'smart_route' }) } catch {}
+    setOptimizeOpen(true)
+  }
 
   const { data: appts = [] } = useQuery({
     queryKey: ['appointments', businessId, date, date],
@@ -136,8 +147,8 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
     ? { lat: Number(settings.location_latitude), lng: Number(settings.location_longitude) }
     : null
 
-  const { points, route, km, kmBefore, kmAfter, legMids, legKm } = useMemo(() => {
-    const empty = { points: [] as MapPoint[], route: [] as [number, number][], km: 0, kmBefore: 0, kmAfter: 0, legMids: [] as [number, number][], legKm: [] as number[] }
+  const { points, route, km, kmBefore, kmAfter, legMids, legKm, legIds } = useMemo(() => {
+    const empty = { points: [] as MapPoint[], route: [] as [number, number][], km: 0, kmBefore: 0, kmAfter: 0, legMids: [] as [number, number][], legKm: [] as number[], legIds: [] as string[] }
     if (geo.length === 0) return empty
     const beforeOrder = geo.map((_, i) => i) // already time-sorted upstream
     const afterOrder = bestOrder(studio, geo)
@@ -152,12 +163,17 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
     ordered.forEach((g, n) => pts.push({ lat: g.lat, lng: g.lng, label: g.name, time: times[n] ?? g.time, order: n + 1 }))
 
     const seq = [...(studio ? [studio] : []), ...ordered, ...(studio ? [studio] : [])]
+    // Label each seq position: 'S' for the studio, otherwise the visit number.
+    const seqLabels = seq.map((_, idx) =>
+      (studio && (idx === 0 || idx === seq.length - 1)) ? 'S' : String(studio ? idx : idx + 1))
     const routeCoords = seq.map((p) => [p.lat, p.lng] as [number, number])
     const mids: [number, number][] = []
     const kmPer: number[] = []
-    for (let i = 1; i < seq.length; i++) {
-      mids.push([(seq[i - 1].lat + seq[i].lat) / 2, (seq[i - 1].lng + seq[i].lng) / 2])
-      kmPer.push(haversineKm(seq[i - 1], seq[i]))
+    const ids: string[] = []
+    for (let i = 0; i < seq.length - 1; i++) {
+      mids.push([(seq[i].lat + seq[i + 1].lat) / 2, (seq[i].lng + seq[i + 1].lng) / 2])
+      kmPer.push(haversineKm(seq[i], seq[i + 1]))
+      ids.push(`${seqLabels[i]}-${seqLabels[i + 1]}`)
     }
     return {
       points: pts,
@@ -167,6 +183,7 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
       kmAfter: tripKm(studio, afterOrder.map((i) => geo[i])),
       legMids: mids,
       legKm: kmPer,
+      legIds: ids,
     }
   }, [geo, studio, mode, t])
 
@@ -192,7 +209,7 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
   const legs = legMids.map((mid, i) => {
     const secs = routeData?.durations?.[i]
     const minutes = secs != null ? Math.max(1, Math.round(secs / 60)) : Math.max(1, Math.round(legKm[i] / 25 * 60))
-    return { mid, minutes }
+    return { mid, minutes, id: legIds[i] ?? '' }
   })
 
   return (
@@ -215,7 +232,7 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
           <p className="py-10 text-center text-sm text-muted-foreground">{t('map.empty')}</p>
         ) : (
           <>
-            <DayMapCanvas points={points} route={drawnRoute} legs={legs} />
+            <DayMapCanvas points={points} route={drawnRoute} legs={legs.map((l) => ({ mid: l.mid, label: l.id }))} />
             <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <Route className="h-3.5 w-3.5" /> {t('map.distance', { km: km.toFixed(1) })}
               {mode === 'after' && kmBefore > kmAfter + 0.05 && (
@@ -227,6 +244,26 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
               {mode === 'before' && <span className="text-muted-foreground">· {t('map.beforeHint', { km: kmAfter.toFixed(1) })}</span>}
               {!studio && <span>· {t('map.noStudio')}</span>}
             </p>
+            {legs.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                {legs.map((l, i) => (
+                  <span key={i}><span className="font-semibold text-primary">{l.id}</span> {l.minutes} min</span>
+                ))}
+              </div>
+            )}
+            <div className="mt-3">
+              <Button size="sm" onClick={optimizeDay} disabled={!businessId}>
+                <Wand2 className="mr-1.5 h-4 w-4" /> {t('map.optimizeDay')}
+              </Button>
+            </div>
+            <OptimizeDialog
+              businessId={businessId}
+              dateFrom={date}
+              dateTo={date}
+              open={optimizeOpen}
+              onOpenChange={setOptimizeOpen}
+              showTrigger={false}
+            />
           </>
         )}
       </CardContent>
