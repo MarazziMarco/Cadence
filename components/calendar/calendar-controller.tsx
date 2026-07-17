@@ -244,7 +244,7 @@ export function useResponsiveCalendarLayout() {
   return layout
 }
 
-export function CalendarController() {
+export function CalendarController({ onSelectedDateChange }: { onSelectedDateChange?: (date: string) => void } = {}) {
   const { business } = useWorkspace()
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
@@ -274,6 +274,9 @@ export function CalendarController() {
   const lastAppointmentTriggerIdRef = useRef<string | null>(null)
   const responsiveLayout = useResponsiveCalendarLayout()
   const isDesktop = responsiveLayout === 'desktop'
+
+  // Report the selected day upward so the day map below can follow it.
+  useEffect(() => { onSelectedDateChange?.(state.selectedDate) }, [state.selectedDate, onSelectedDateChange])
   const supportedView: SupportedCalendarView = isSupportedCalendarView(state.view)
     ? state.view
     : 'day'

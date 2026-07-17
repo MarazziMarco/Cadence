@@ -28,11 +28,19 @@ export async function POST(request: Request) {
       headers: { Authorization: key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ coordinates: capped.map(([lat, lng]) => [lng, lat]) }),
     })
-    if (!res.ok) return Response.json({ geometry: null, reason: `ors-${res.status}` })
+    if (!res.ok) return Response.json({ geometry: null, durations: null, reason: `ors-${res.status}` })
     const geojson = await res.json()
-    const line = geojson?.features?.[0]?.geometry?.coordinates as [number, number][] | undefined
-    if (!line) return Response.json({ geometry: null, reason: 'no-geometry' })
-    return Response.json({ geometry: line.map(([lng, lat]) => [lat, lng]) })
+    const feature = geojson?.features?.[0]
+    const line = feature?.geometry?.coordinates as [number, number][] | undefined
+    if (!line) return Response.json({ geometry: null, durations: null, reason: 'no-geometry' })
+    // Per-leg driving time (seconds) between consecutive waypoints.
+    const durations = (feature?.properties?.segments ?? [])
+      .map((s: any) => Number(s?.duration))
+      .filter((n: number) => Number.isFinite(n))
+    return Response.json({
+      geometry: line.map(([lng, lat]) => [lat, lng]),
+      durations: durations.length ? durations : null,
+    })
   } catch {
     return Response.json({ geometry: null, reason: 'fetch-failed' })
   }

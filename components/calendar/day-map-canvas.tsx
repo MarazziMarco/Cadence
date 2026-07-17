@@ -29,11 +29,26 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 }
 
+export interface RouteLeg {
+  mid: [number, number]
+  minutes: number
+}
+
+// Small travel-time pill sitting on the middle of an arc.
+function legIcon(minutes: number): L.DivIcon {
+  return L.divIcon({
+    className: '',
+    html: `<div style="white-space:nowrap;padding:1px 6px;border-radius:9999px;background:#fff;color:#2563eb;font-size:11px;font-weight:700;border:1px solid #2563eb;box-shadow:0 1px 3px rgba(0,0,0,.25)">${minutes} min</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  })
+}
+
 // Raw Leaflet (not react-leaflet): the map is created once with an explicit
 // cleanup (map.remove()), which is robust to React 18 StrictMode / Fast Refresh
 // double-mounts — react-leaflet's MapContainer instead threw "Map container is
 // already initialized" on the reused <div>.
-export default function DayMapCanvas({ points, route }: { points: MapPoint[]; route: [number, number][] }) {
+export default function DayMapCanvas({ points, route, legs = [] }: { points: MapPoint[]; route: [number, number][]; legs?: RouteLeg[] }) {
   const elRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layerRef = useRef<L.LayerGroup | null>(null)
@@ -64,6 +79,9 @@ export default function DayMapCanvas({ points, route }: { points: MapPoint[]; ro
     if (route.length >= 2) {
       L.polyline(route, { color: '#2563eb', weight: 4, opacity: 0.85 }).addTo(layer)
     }
+    for (const leg of legs) {
+      L.marker(leg.mid, { icon: legIcon(leg.minutes), interactive: false, keyboard: false }).addTo(layer)
+    }
     for (const p of points) {
       L.marker([p.lat, p.lng], { icon: pin(p) })
         .addTo(layer)
@@ -78,7 +96,7 @@ export default function DayMapCanvas({ points, route }: { points: MapPoint[]; ro
         maxZoom: 15,
       })
     }
-  }, [points, route])
+  }, [points, route, legs])
 
   return <div ref={elRef} style={{ height: 360, width: '100%', borderRadius: 12 }} />
 }

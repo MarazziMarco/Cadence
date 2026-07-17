@@ -560,6 +560,9 @@ const en: Dict = {
   'map.studio': 'Studio',
   'map.distance': '{km} km total',
   'map.noStudio': 'studio location not set',
+  'map.saved': 'saves {km} km vs current order',
+  'map.noGain': 'same distance as current order',
+  'map.beforeHint': 'optimized: {km} km',
 }
 
 const it: Dict = {
@@ -1092,6 +1095,9 @@ const it: Dict = {
   'map.studio': 'Studio',
   'map.distance': '{km} km totali',
   'map.noStudio': 'posizione studio non impostata',
+  'map.saved': 'risparmia {km} km sull\u2019ordine attuale',
+  'map.noGain': 'stessa distanza dell\u2019ordine attuale',
+  'map.beforeHint': 'ottimizzato: {km} km',
 }
 
 const es: Dict = {
@@ -1624,6 +1630,9 @@ const es: Dict = {
   'map.studio': 'Estudio',
   'map.distance': '{km} km en total',
   'map.noStudio': 'ubicación del estudio no configurada',
+  'map.saved': 'ahorra {km} km frente al orden actual',
+  'map.noGain': 'misma distancia que el orden actual',
+  'map.beforeHint': 'optimizado: {km} km',
 }
 
 export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }

@@ -34,24 +34,74 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
   return 2 * R * Math.asin(Math.sqrt(s))
 }
 
-// Nearest-neighbour order starting from the studio (a light geographic proxy for
-// the "route-optimized" order).
-function nearestOrder(start: { lat: number; lng: number }, stops: { lat: number; lng: number; i: number }[]): number[] {
-  const remaining = [...stops]
-  const order: number[] = []
-  let cur = start
-  while (remaining.length) {
-    let best = 0
-    let bestD = Infinity
-    for (let k = 0; k < remaining.length; k++) {
-      const d = haversineKm(cur, remaining[k])
-      if (d < bestD) { bestD = d; best = k }
-    }
-    const next = remaining.splice(best, 1)[0]
-    order.push(next.i)
-    cur = next
+type LL = { lat: number; lng: number }
+
+// Total length of studio -> stops (in order) -> studio (open path if no studio).
+function tripKm(studio: LL | null, stops: LL[]): number {
+  const seq = studio ? [studio, ...stops, studio] : stops
+  let total = 0
+  for (let i = 1; i < seq.length; i++) total += haversineKm(seq[i - 1], seq[i])
+  return total
+}
+
+function permutations<T>(arr: T[]): T[][] {
+  if (arr.length <= 1) return [arr]
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i++) {
+    const rest = [...arr.slice(0, i), ...arr.slice(i + 1)]
+    for (const p of permutations(rest)) out.push([arr[i], ...p])
   }
-  return order
+  return out
+}
+
+// 2-opt local search (removes crossings) for larger stop counts.
+function twoOpt(studio: LL | null, order: number[], pts: LL[]): number[] {
+  let best = order
+  let bestD = tripKm(studio, best.map((i) => pts[i]))
+  let improved = true
+  while (improved) {
+    improved = false
+    for (let i = 0; i < best.length - 1; i++) {
+      for (let k = i + 1; k < best.length; k++) {
+        const cand = [...best.slice(0, i), ...best.slice(i, k + 1).reverse(), ...best.slice(k + 1)]
+        const d = tripKm(studio, cand.map((j) => pts[j]))
+        if (d < bestD - 1e-9) { best = cand; bestD = d; improved = true }
+      }
+    }
+  }
+  return best
+}
+
+// Shortest visiting order. Exact (all permutations) for few stops, else
+// nearest-neighbour seeded 2-opt. Guarantees distance <= the current order.
+function bestOrder(studio: LL | null, pts: LL[]): number[] {
+  const n = pts.length
+  const idx = pts.map((_, i) => i)
+  if (n <= 2) return idx
+  if (n <= 8) {
+    let best = idx
+    let bestD = Infinity
+    for (const p of permutations(idx)) {
+      const d = tripKm(studio, p.map((i) => pts[i]))
+      if (d < bestD) { bestD = d; best = p }
+    }
+    return best
+  }
+  // nearest-neighbour seed
+  const start = studio ?? pts[0]
+  const remaining = idx.slice()
+  const seed: number[] = []
+  let cur: LL = start
+  while (remaining.length) {
+    let b = 0, bd = Infinity
+    for (let k = 0; k < remaining.length; k++) {
+      const d = haversineKm(cur, pts[remaining[k]])
+      if (d < bd) { bd = d; b = k }
+    }
+    const j = remaining.splice(b, 1)[0]
+    seed.push(j); cur = pts[j]
+  }
+  return twoOpt(studio, seed, pts)
 }
 
 export function DayMap({ businessId, date }: { businessId: string; date: string }) {
@@ -86,33 +136,42 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
     ? { lat: Number(settings.location_latitude), lng: Number(settings.location_longitude) }
     : null
 
-  const { points, route, km } = useMemo(() => {
-    if (geo.length === 0) return { points: [] as MapPoint[], route: [] as [number, number][], km: 0 }
-    const idx = geo.map((_, i) => i)
-    const order = mode === 'before'
-      ? idx // already time-sorted upstream
-      : studio
-        ? nearestOrder(studio, geo.map((g, i) => ({ ...g, i })))
-        : idx
+  const { points, route, km, kmBefore, kmAfter, legMids, legKm } = useMemo(() => {
+    const empty = { points: [] as MapPoint[], route: [] as [number, number][], km: 0, kmBefore: 0, kmAfter: 0, legMids: [] as [number, number][], legKm: [] as number[] }
+    if (geo.length === 0) return empty
+    const beforeOrder = geo.map((_, i) => i) // already time-sorted upstream
+    const afterOrder = bestOrder(studio, geo)
+    const order = mode === 'before' ? beforeOrder : afterOrder
     const ordered = order.map((i) => geo[i])
+    // The day keeps its time slots; on the optimized order they are reassigned to
+    // the new visiting sequence, so labels show the times AFTER optimization.
+    const times = geo.map((g) => g.time)
 
     const pts: MapPoint[] = []
     if (studio) pts.push({ lat: studio.lat, lng: studio.lng, label: t('map.studio'), studio: true })
-    ordered.forEach((g, n) => pts.push({ lat: g.lat, lng: g.lng, label: g.name, time: g.time, order: n + 1 }))
+    ordered.forEach((g, n) => pts.push({ lat: g.lat, lng: g.lng, label: g.name, time: times[n] ?? g.time, order: n + 1 }))
 
-    const seq = [
-      ...(studio ? [studio] : []),
-      ...ordered,
-      ...(studio ? [studio] : []),
-    ]
+    const seq = [...(studio ? [studio] : []), ...ordered, ...(studio ? [studio] : [])]
     const routeCoords = seq.map((p) => [p.lat, p.lng] as [number, number])
-    let total = 0
-    for (let i = 1; i < seq.length; i++) total += haversineKm(seq[i - 1], seq[i])
-    return { points: pts, route: routeCoords, km: total }
+    const mids: [number, number][] = []
+    const kmPer: number[] = []
+    for (let i = 1; i < seq.length; i++) {
+      mids.push([(seq[i - 1].lat + seq[i].lat) / 2, (seq[i - 1].lng + seq[i].lng) / 2])
+      kmPer.push(haversineKm(seq[i - 1], seq[i]))
+    }
+    return {
+      points: pts,
+      route: routeCoords,
+      km: kmPer.reduce((a, b) => a + b, 0),
+      kmBefore: tripKm(studio, beforeOrder.map((i) => geo[i])),
+      kmAfter: tripKm(studio, afterOrder.map((i) => geo[i])),
+      legMids: mids,
+      legKm: kmPer,
+    }
   }, [geo, studio, mode, t])
 
-  // Ask the server for the real road geometry (ORS); fall back to straight lines.
-  const { data: roadGeometry } = useQuery({
+  // Ask the server for the real road geometry + per-leg travel time (ORS).
+  const { data: routeData } = useQuery({
     queryKey: ['route-geom', route],
     enabled: route.length >= 2,
     staleTime: 5 * 60_000,
@@ -122,15 +181,24 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
         body: JSON.stringify({ coords: route }),
       })
       const json = await res.json().catch(() => null)
-      return (json?.geometry as [number, number][] | null) ?? null
+      return {
+        geometry: (json?.geometry as [number, number][] | null) ?? null,
+        durations: (json?.durations as number[] | null) ?? null,
+      }
     },
   })
-  const drawnRoute = roadGeometry && roadGeometry.length >= 2 ? roadGeometry : route
+  const drawnRoute = routeData?.geometry && routeData.geometry.length >= 2 ? routeData.geometry : route
+  // Per-leg minutes: real ORS driving time, else estimate at ~25 km/h city speed.
+  const legs = legMids.map((mid, i) => {
+    const secs = routeData?.durations?.[i]
+    const minutes = secs != null ? Math.max(1, Math.round(secs / 60)) : Math.max(1, Math.round(legKm[i] / 25 * 60))
+    return { mid, minutes }
+  })
 
   return (
     <Card className="mt-6 shadow-sm">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-        <CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4 text-primary" /> {t('map.title')}</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4 text-primary" /> {t('map.title')} <span className="font-normal text-muted-foreground">· {date}</span></CardTitle>
         {geo.length > 0 && (
           <div className="inline-flex rounded-lg border border-border p-0.5">
             {(['before', 'after'] as const).map((m) => (
@@ -147,9 +215,16 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
           <p className="py-10 text-center text-sm text-muted-foreground">{t('map.empty')}</p>
         ) : (
           <>
-            <DayMapCanvas points={points} route={drawnRoute} />
-            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <DayMapCanvas points={points} route={drawnRoute} legs={legs} />
+            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <Route className="h-3.5 w-3.5" /> {t('map.distance', { km: km.toFixed(1) })}
+              {mode === 'after' && kmBefore > kmAfter + 0.05 && (
+                <span className="font-medium text-success">· {t('map.saved', { km: (kmBefore - kmAfter).toFixed(1) })}</span>
+              )}
+              {mode === 'after' && kmBefore <= kmAfter + 0.05 && (
+                <span>· {t('map.noGain')}</span>
+              )}
+              {mode === 'before' && <span className="text-muted-foreground">· {t('map.beforeHint', { km: kmAfter.toFixed(1) })}</span>}
               {!studio && <span>· {t('map.noStudio')}</span>}
             </p>
           </>
