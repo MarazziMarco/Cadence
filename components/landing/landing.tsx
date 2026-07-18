@@ -9,6 +9,7 @@ import {
   BarChart3,
   Bot,
   Clock,
+  MessageSquare,
   Mic,
   PlayCircle,
   ShieldCheck,
@@ -42,13 +43,19 @@ const PHONE_CARD_CONFIG = [
     copyIndex: 0,
     icon: Clock,
     zoomImage: '/landing/mobile-calendar-optimizer.png',
-    position: '-right-4 top-14 sm:-right-28 xl:-right-36',
+    position: '-right-2 top-10 sm:-right-8 xl:-right-12 2xl:-right-28',
+  },
+  {
+    copyIndex: 1,
+    icon: MessageSquare,
+    zoomImage: undefined,
+    position: '-right-2 top-1/2 sm:-right-8 xl:-right-12 2xl:-right-28',
   },
   {
     copyIndex: 2,
     icon: Mic,
     zoomImage: '/landing/mobile-calendar-voice.png',
-    position: '-left-2 bottom-20 sm:-left-28 xl:-left-36',
+    position: '-right-2 bottom-14 sm:-right-8 xl:-right-12 2xl:-right-28',
   },
 ] as const
 

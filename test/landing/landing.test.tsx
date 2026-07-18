@@ -81,13 +81,15 @@ describe('Landing localization and story integration', () => {
     expect(calendar).not.toHaveClass('h-full', 'object-cover')
   })
 
-  it('links two floating messages to real optimizer and voice zooms', () => {
+  it('keeps three floating messages to the right with optimizer and voice zooms', () => {
     render(<Landing />)
 
     const cards = screen.getAllByTestId('phone-floating-card')
-    expect(cards).toHaveLength(2)
-    expect(cards[0]).toHaveClass('sm:-right-28', 'xl:-right-36')
-    expect(cards[1]).toHaveClass('sm:-left-28', 'xl:-left-36')
+    expect(cards).toHaveLength(3)
+    for (const card of cards) {
+      expect(card).toHaveClass('sm:-right-8', 'xl:-right-12', '2xl:-right-28')
+      expect(card.className).not.toContain('-left-')
+    }
 
     const zooms = screen.getAllByTestId('phone-floating-zoom')
     expect(zooms.map((image) => image.getAttribute('src'))).toEqual([
