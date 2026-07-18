@@ -12,7 +12,15 @@ import { Button } from '@/components/ui/button'
 export const DEMO_EMAIL = 'test@cadence.com'
 export const DEMO_PASSWORD = 'Cadence!'
 
-export function DemoLogin() {
+export function DemoLogin({
+  buttonLabel = 'Try the full app (demo login)',
+  credentialsLabel = 'or log in with',
+  errorMessage = 'Could not open the demo account',
+}: {
+  buttonLabel?: string
+  credentialsLabel?: string
+  errorMessage?: string
+}) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
@@ -27,18 +35,18 @@ export function DemoLogin() {
       router.push('/dashboard')
       router.refresh()
     } catch (e: any) {
-      toast.error(e?.message || 'Could not open the demo account')
+      toast.error(e?.message || errorMessage)
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex flex-col items-center gap-1.5 sm:items-start">
-      <Button size="lg" variant="secondary" className="h-12 gap-2 px-7 text-base" onClick={enter} disabled={loading}>
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} Try the full app (demo login)
+    <div className="flex w-full max-w-sm flex-col items-center gap-1.5 sm:w-auto sm:max-w-none sm:items-start">
+      <Button size="lg" variant="secondary" className="h-auto min-h-12 w-full gap-2 whitespace-normal px-4 text-center text-base sm:h-12 sm:w-auto sm:whitespace-nowrap sm:px-7" onClick={enter} disabled={loading}>
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} {buttonLabel}
       </Button>
       <p className="text-xs text-muted-foreground">
-        or log in with <span className="font-medium text-foreground">{DEMO_EMAIL}</span> / <span className="font-medium text-foreground">{DEMO_PASSWORD}</span>
+        {credentialsLabel} <span className="font-medium text-foreground">{DEMO_EMAIL}</span> / <span className="font-medium text-foreground">{DEMO_PASSWORD}</span>
       </p>
     </div>
   )

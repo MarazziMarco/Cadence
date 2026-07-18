@@ -44,6 +44,7 @@ interface MobileDayCalendarProps extends CalendarRendererProps {
   onOptimize?(): void
   optimizeButtonRef?: Ref<HTMLButtonElement>
   onDensityChange(density: number): void
+  onNavigate?(direction: -1 | 1): void
   view?: CalendarView
   onViewChange?(view: CalendarView): void
 }
@@ -182,6 +183,7 @@ export function MobileDayCalendar({
   onOptimize,
   optimizeButtonRef,
   onDensityChange,
+  onNavigate,
   view = 'day',
   onViewChange = ignoreViewChange,
 }: MobileDayCalendarProps) {
@@ -332,6 +334,7 @@ export function MobileDayCalendar({
           view={view}
           enabledViews={['day', 'week', 'month', 'agenda']}
           onToday={handleToday}
+          onNavigate={onNavigate}
           onViewChange={onViewChange}
           onOptimize={onOptimize}
           optimizeButtonRef={optimizeButtonRef}

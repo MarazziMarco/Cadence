@@ -1121,6 +1121,7 @@ export function CalendarController({ onSelectedDateChange }: { onSelectedDateCha
                 selectedDate={state.selectedDate}
                 onSelectDate={handleSelectDate}
                 onSelectAppointment={handleSelectAppointment}
+                onNavigate={navigate}
                 onViewChange={handleViewChange}
                 onOptimize={businessId ? handleOpenOptimizer : undefined}
                 optimizeButtonRef={mobileOptimizeButtonRef}
@@ -1135,6 +1136,7 @@ export function CalendarController({ onSelectedDateChange }: { onSelectedDateCha
                   || configQuery.isPlaceholderData
                 }
                 onDensityChange={handleDensityChange}
+                onNavigate={navigate}
                 onViewChange={handleViewChange}
                 onOptimize={businessId ? handleOpenOptimizer : undefined}
                 optimizeButtonRef={mobileOptimizeButtonRef}
@@ -1153,6 +1155,7 @@ export function CalendarController({ onSelectedDateChange }: { onSelectedDateCha
                 onOptimize={businessId ? handleOpenOptimizer : undefined}
                 optimizeButtonRef={mobileOptimizeButtonRef}
                 onDensityChange={handleDensityChange}
+                onNavigate={navigate}
                 view={timelineView}
                 onViewChange={handleViewChange}
               />

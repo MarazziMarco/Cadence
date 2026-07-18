@@ -71,6 +71,7 @@ vi.mock('@/components/calendar/mobile-day-calendar', () => ({
     onSelectDate(date: string): void
     onSelectAppointment(id: string): void
     onCreateAt(date: string, startMinute: number): void
+    onNavigate?(direction: -1 | 1): void
     onOptimize?(): void
     optimizeButtonRef?: React.Ref<HTMLButtonElement>
   }) => (
@@ -91,6 +92,7 @@ vi.mock('@/components/calendar/mobile-day-calendar', () => ({
       <button onClick={() => props.onSelectDate('2026-07-18')}>
         Next mobile date
       </button>
+      <button onClick={() => props.onNavigate?.(1)}>Next range</button>
       <button ref={props.optimizeButtonRef} onClick={props.onOptimize}>
         Open mobile optimizer
       </button>
@@ -99,8 +101,17 @@ vi.mock('@/components/calendar/mobile-day-calendar', () => ({
 }))
 
 vi.mock('@/components/calendar/mobile-week-time-grid', () => ({
-  MobileWeekTimeGrid: () => (
-    <div data-testid="calendar-renderer" data-view="week" />
+  MobileWeekTimeGrid: (props: {
+    selectedDate: string
+    onNavigate?(direction: -1 | 1): void
+  }) => (
+    <div
+      data-testid="calendar-renderer"
+      data-date={props.selectedDate}
+      data-view="week"
+    >
+      <button onClick={() => props.onNavigate?.(1)}>Next range</button>
+    </div>
   ),
 }))
 
@@ -111,8 +122,17 @@ vi.mock('@/components/calendar/mobile-week-timeline', () => ({
 }))
 
 vi.mock('@/components/calendar/mobile-month-calendar', () => ({
-  MobileMonthCalendar: () => (
-    <div data-testid="calendar-renderer" data-view="month" />
+  MobileMonthCalendar: (props: {
+    selectedDate: string
+    onNavigateMonth?(direction: -1 | 1): void
+  }) => (
+    <div
+      data-testid="calendar-renderer"
+      data-date={props.selectedDate}
+      data-view="month"
+    >
+      <button onClick={() => props.onNavigateMonth?.(1)}>Next range</button>
+    </div>
   ),
 }))
 
@@ -390,6 +410,39 @@ describe('CalendarController', () => {
       })
     },
   )
+
+  it.each([
+    ['day', '2026-07-18'],
+    ['week', '2026-07-24'],
+    ['month', '2026-08-01'],
+  ])(
+    'moves the mobile %s view by its contextual range',
+    async (storedView, expectedDate) => {
+      localStorage.setItem('cadence.calendar.view', storedView)
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderController()
+
+      const renderer = await screen.findByTestId('calendar-renderer')
+      await user.click(screen.getByRole('button', { name: 'Next range' }))
+
+      await waitFor(() => {
+        expect(renderer).toHaveAttribute('data-date', expectedDate)
+      })
+    },
+  )
+
+  it('creates an appointment on the date reached through mobile navigation', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderController()
+
+    await screen.findByTestId('calendar-renderer')
+    await user.click(screen.getByRole('button', { name: 'Next range' }))
+    await user.click(screen.getByRole('button', { name: 'Create at 10' }))
+
+    expect(screen.getByTestId('appointment-dialog')).toHaveTextContent(
+      '2026-07-18-10:00',
+    )
+  })
 
   it('prefetches adjacent ranges and owns calendar overlays and waiting state', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })

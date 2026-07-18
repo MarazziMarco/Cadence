@@ -47,6 +47,7 @@ interface MobileWeekTimeGridProps {
   onMove(request: MoveIntent): void
   onResize(request: ResizeIntent): void
   onDensityChange(density: number): void
+  onNavigate?(direction: -1 | 1): void
   onViewChange(view: CalendarView): void
   onOptimize?(): void
   optimizeButtonRef?: Ref<HTMLButtonElement>
@@ -108,6 +109,7 @@ export function MobileWeekTimeGrid({
   onCreateAt,
   onMove,
   onDensityChange,
+  onNavigate,
   onViewChange,
   onOptimize,
   optimizeButtonRef,
@@ -221,6 +223,7 @@ export function MobileWeekTimeGrid({
         view="week"
         enabledViews={['day', 'week', 'month', 'agenda']}
         onToday={() => onSelectDate(today)}
+        onNavigate={onNavigate}
         onViewChange={onViewChange}
         onOptimize={onOptimize}
         optimizeButtonRef={optimizeButtonRef}

@@ -22,6 +22,7 @@ interface MobileWeekTimelineProps {
   selectedDate: string
   onSelectDate(date: string): void
   onSelectAppointment(id: string): void
+  onNavigate?(direction: -1 | 1): void
   onViewChange(view: CalendarView): void
   onOptimize?(): void
   optimizeButtonRef?: Ref<HTMLButtonElement>
@@ -42,6 +43,7 @@ export function MobileWeekTimeline({
   selectedDate,
   onSelectDate,
   onSelectAppointment,
+  onNavigate,
   onViewChange,
   onOptimize,
   optimizeButtonRef,
@@ -64,6 +66,7 @@ export function MobileWeekTimeline({
         view="week"
         enabledViews={['day', 'week', 'month', 'agenda']}
         onToday={() => onSelectDate(businessToday(config.timezone))}
+        onNavigate={onNavigate}
         onViewChange={onViewChange}
         onOptimize={onOptimize}
         optimizeButtonRef={optimizeButtonRef}

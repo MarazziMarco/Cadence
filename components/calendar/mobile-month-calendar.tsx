@@ -117,6 +117,7 @@ export function MobileMonthCalendar({
         view="month"
         enabledViews={['day', 'week', 'month', 'agenda']}
         onToday={() => onSelectDate(today)}
+        onNavigate={onNavigateMonth}
         onViewChange={onViewChange}
         onOptimize={onOptimize}
         optimizeButtonRef={optimizeButtonRef}
