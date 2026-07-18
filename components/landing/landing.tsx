@@ -9,7 +9,6 @@ import {
   BarChart3,
   Bot,
   Clock,
-  MessageSquare,
   Mic,
   PlayCircle,
   ShieldCheck,
@@ -38,21 +37,31 @@ const FEATURE_ICONS = {
   insights: BarChart3,
   business: Sparkles,
 } as const
-const PHONE_ICONS = [Clock, MessageSquare, Mic] as const
-const PHONE_POSITIONS = [
-  '-right-4 top-14 sm:-right-28 xl:-right-36',
-  '-right-2 bottom-24 sm:-right-28 xl:-right-36',
-  '-left-2 top-1/3 sm:-left-28 xl:-left-36',
+const PHONE_CARD_CONFIG = [
+  {
+    copyIndex: 0,
+    icon: Clock,
+    zoomImage: '/landing/mobile-calendar-optimizer.png',
+    position: '-right-4 top-14 sm:-right-28 xl:-right-36',
+  },
+  {
+    copyIndex: 2,
+    icon: Mic,
+    zoomImage: '/landing/mobile-calendar-voice.png',
+    position: '-left-2 bottom-20 sm:-left-28 xl:-left-36',
+  },
 ] as const
 
 export function Landing() {
   const [locale, setLocale] = useState<LandingLocale>('en')
   const copy = LANDING_COPY[locale]
-  const phoneCards = copy.phone.cards.map((card, index) => ({
-    ...card,
-    icon: PHONE_ICONS[index] ?? Mic,
-    position: PHONE_POSITIONS[index] ?? '-right-4 top-14',
-    delay: 0.1 + index * 0.15,
+  const phoneCards = PHONE_CARD_CONFIG.map((config, index) => ({
+    ...copy.phone.cards[config.copyIndex],
+    icon: config.icon,
+    zoomImage: config.zoomImage,
+    zoomAlt: '',
+    position: config.position,
+    delay: 0.1 + index * 0.2,
   }))
 
   useEffect(() => {
@@ -124,6 +133,7 @@ export function Landing() {
               alt={copy.phone.alt}
               placeholder={copy.phone.placeholder}
               cards={phoneCards}
+              className="origin-center transition-transform lg:scale-[0.72] xl:scale-[0.82] 2xl:scale-100"
             />
           </motion.div>
         </div>

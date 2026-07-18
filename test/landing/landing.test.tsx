@@ -81,14 +81,29 @@ describe('Landing localization and story integration', () => {
     expect(calendar).not.toHaveClass('h-full', 'object-cover')
   })
 
-  it('keeps the floating messages outside the hero phone', () => {
+  it('links two floating messages to real optimizer and voice zooms', () => {
     render(<Landing />)
 
     const cards = screen.getAllByTestId('phone-floating-card')
-    expect(cards).toHaveLength(3)
+    expect(cards).toHaveLength(2)
     expect(cards[0]).toHaveClass('sm:-right-28', 'xl:-right-36')
-    expect(cards[1]).toHaveClass('sm:-right-28', 'xl:-right-36')
-    expect(cards[2]).toHaveClass('sm:-left-28', 'xl:-left-36')
+    expect(cards[1]).toHaveClass('sm:-left-28', 'xl:-left-36')
+
+    const zooms = screen.getAllByTestId('phone-floating-zoom')
+    expect(zooms.map((image) => image.getAttribute('src'))).toEqual([
+      '/landing/mobile-calendar-optimizer.png',
+      '/landing/mobile-calendar-voice.png',
+    ])
+  })
+
+  it('scales the complete hero phone composition down on compact desktops', () => {
+    render(<Landing />)
+
+    expect(screen.getByTestId('hero-phone-showcase')).toHaveClass(
+      'lg:scale-[0.72]',
+      'xl:scale-[0.82]',
+      '2xl:scale-100',
+    )
   })
 
   it('switches the entire landing to Italian and restores that choice', async () => {

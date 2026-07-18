@@ -14,6 +14,7 @@ import { ThemeToggle } from './theme-toggle'
 import { NAV_SECTIONS } from '@/lib/brand'
 import { navKey, normalizeLocale, translate } from '@/lib/i18n'
 import { WorkspaceProvider, type WorkspaceBusiness } from '@/lib/workspace-context'
+import { speechLang, useSpeech } from '@/lib/voice/use-speech'
 import type { AppointmentEditorPresentation } from '@/components/calendar/appointment-dialog'
 
 const AppointmentDialog = dynamic(
@@ -53,13 +54,47 @@ export function AppShell({ user, business, children }: { user: { email: string; 
   const nk = titleHref ? navKey(titleHref) : null
   const title = nk ? translate(locale, nk) : 'Cadence'
 
-  // Quick-create modals triggered from the bottom-nav "+". A key bump remounts
-  // the dialog so it always opens with fresh state.
+  // Quick-create flows triggered from the bottom nav. Voice starts listening
+  // immediately and mounts its dialog only after transcription (or as fallback).
   const [quick, setQuick] = useState<QuickKind | null>(null)
   const [quickKey, setQuickKey] = useState(0)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const {
+    supported: voiceSupported,
+    listening: voiceListening,
+    start: startVoice,
+    stop: stopVoice,
+  } = useSpeech(speechLang(business?.language))
   const [appointmentPresentation, setAppointmentPresentation] =
     useState<AppointmentEditorPresentation>('dialog')
   const openQuick = (kind: QuickKind) => {
+    if (kind === 'voice') {
+      if (voiceListening) {
+        stopVoice()
+        return
+      }
+
+      setVoiceTranscript('')
+      if (!voiceSupported) {
+        setQuickKey((k) => k + 1)
+        setQuick('voice')
+        return
+      }
+
+      startVoice(
+        (transcript) => {
+          setVoiceTranscript(transcript)
+          setQuickKey((k) => k + 1)
+          setQuick('voice')
+        },
+        () => {
+          setQuickKey((k) => k + 1)
+          setQuick('voice')
+        },
+      )
+      return
+    }
+
     setQuickKey((k) => k + 1)
     if (kind === 'appointment') {
       setAppointmentPresentation(
@@ -109,10 +144,13 @@ export function AppShell({ user, business, children }: { user: { email: string; 
         <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 z-40 h-24 backdrop-blur-md [mask-image:linear-gradient(to_top,black_40%,transparent)] lg:hidden" />
 
         {/* Native mobile bottom navigation (hidden on desktop) */}
-        <BottomNav onQuickCreate={openQuick} />
+        <BottomNav
+          onQuickCreate={openQuick}
+          voiceListening={voiceListening}
+        />
       </div>
 
-      {/* Quick-create modals — opened from the bottom-nav "+" */}
+      {/* Quick-create dialogs, including the post-transcription voice confirmation. */}
       {businessId && quick === 'appointment' ? (
         <AppointmentDialog
           key={`appt-${quickKey}`}
@@ -134,7 +172,10 @@ export function AppShell({ user, business, children }: { user: { email: string; 
         <Dialog open onOpenChange={(open) => { if (!open) setQuick(null) }}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader><DialogTitle>{translate(locale, 'create.byVoice')}</DialogTitle></DialogHeader>
-              <VoiceAppointment />
+              <VoiceAppointment
+                key={`voice-${quickKey}`}
+                initialTranscript={voiceTranscript || undefined}
+              />
             </DialogContent>
         </Dialog>
       ) : null}

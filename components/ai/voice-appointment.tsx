@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Mic, MicOff, Loader2, CalendarPlus, Sparkles } from 'lucide-react'
@@ -105,19 +105,23 @@ async function applyAvailability(pid: string, patch: AvailabilityPatch, workingH
 // Voice-driven appointment creation. Browser Web Speech API for transcription
 // (free, native), then a local rule parser (no paid AI). Degrades gracefully:
 // unsupported browsers or denied mic permission fall back to typed text.
-export function VoiceAppointment() {
+export function VoiceAppointment({
+  initialTranscript,
+}: {
+  initialTranscript?: string
+}) {
   const { business } = useWorkspace()
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
   const t = STR[business?.language === 'it' ? 'it' : 'en']
   const { t: tr } = useT()
 
-  const { data: patients = [] } = useQuery({ queryKey: ['patients-select', businessId], queryFn: () => listPatientsForSelect(businessId), enabled: !!businessId })
-  const { data: services = [] } = useQuery({ queryKey: ['services', businessId], queryFn: () => listServices(businessId), enabled: !!businessId })
+  const { data: patients = [], isFetched: patientsFetched } = useQuery({ queryKey: ['patients-select', businessId], queryFn: () => listPatientsForSelect(businessId), enabled: !!businessId })
+  const { data: services = [], isFetched: servicesFetched } = useQuery({ queryKey: ['services', businessId], queryFn: () => listServices(businessId), enabled: !!businessId })
   const { data: workingHours = [] } = useQuery({ queryKey: ['working-hours', businessId], queryFn: () => listWorkingHours(businessId), enabled: !!businessId })
 
   const { supported, listening, start, stop } = useSpeech(speechLang(business?.language))
-  const [transcript, setTranscript] = useState('')
+  const [transcript, setTranscript] = useState(initialTranscript ?? '')
   const [parsed, setParsed] = useState<ParsedAppt | null>(null)
   const [selectedId, setSelectedId] = useState('')
   const [newName, setNewName] = useState('')
@@ -127,6 +131,8 @@ export function VoiceAppointment() {
   const [location, setLocation] = useState<AppointmentLocationValue>(emptyLocation())
   const [avail, setAvail] = useState<AvailabilityPatch | null>(null)
   const [creating, setCreating] = useState(false)
+  const initialApplied = useRef(false)
+  const confirmationOnly = !!initialTranscript
 
   function applyParse(text: string) {
     const p = parseAppointment(text, patients as any, services as any)
@@ -145,6 +151,19 @@ export function VoiceAppointment() {
     setTranscript(''); setParsed(null); setSelectedId(''); setNewName(''); setAmbiguousIds([])
     setClientAddr(''); setUpdateClientAddr(false); setLocation(emptyLocation()); setAvail(null)
   }
+
+  useEffect(() => {
+    if (
+      !initialTranscript ||
+      initialApplied.current ||
+      !patientsFetched ||
+      !servicesFetched
+    ) return
+
+    initialApplied.current = true
+    setTranscript(initialTranscript)
+    applyParse(initialTranscript)
+  }, [initialTranscript, patientsFetched, servicesFetched, patients, services])
 
   function toggleMic() {
     if (listening) { stop(); return }
@@ -218,36 +237,45 @@ export function VoiceAppointment() {
   return (
     <Card className="shadow-sm">
       <CardContent className="p-5">
-        <div className="mb-1 flex items-center gap-2 text-sm font-medium"><Mic className="h-4 w-4 text-primary" /> {t.title}</div>
-        <p className="mb-4 text-sm text-muted-foreground">{t.desc}</p>
+        {!confirmationOnly ? (
+          <>
+            <div className="mb-1 flex items-center gap-2 text-sm font-medium"><Mic className="h-4 w-4 text-primary" /> {t.title}</div>
+            <p className="mb-4 text-sm text-muted-foreground">{t.desc}</p>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {supported ? (
-            <Button type="button" variant={listening ? 'destructive' : 'default'} onClick={toggleMic}>
-              {listening ? <><MicOff className="mr-2 h-4 w-4" /> {t.stop}</> : <><Mic className="mr-2 h-4 w-4" /> {t.speak}</>}
-            </Button>
-          ) : (
-            <Badge variant="secondary">{t.unavailable}</Badge>
-          )}
-          {listening && <span className="flex items-center gap-1.5 text-sm text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-destructive" /> {t.listening}</span>}
-        </div>
-
-        <div className="mt-4 space-y-2">
-          <Label>{t.text} {supported ? t.textHint : ''}</Label>
-          <div className="flex gap-2">
-            <Textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={2} placeholder={t.placeholder} />
-            <Button type="button" variant="outline" data-testid="voice-parse" aria-label="Parse text" onClick={() => applyParse(transcript)} disabled={!transcript.trim()}><Sparkles className="h-4 w-4" /></Button>
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t.examples}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {t.exampleList.map((ex) => (
-                <button key={ex} type="button" onClick={() => { setTranscript(ex); applyParse(ex) }}
-                  className="rounded-md border border-border bg-card px-2.5 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">{ex}</button>
-              ))}
+            <div className="flex flex-wrap items-center gap-3">
+              {supported ? (
+                <Button type="button" variant={listening ? 'destructive' : 'default'} onClick={toggleMic}>
+                  {listening ? <><MicOff className="mr-2 h-4 w-4" /> {t.stop}</> : <><Mic className="mr-2 h-4 w-4" /> {t.speak}</>}
+                </Button>
+              ) : (
+                <Badge variant="secondary">{t.unavailable}</Badge>
+              )}
+              {listening && <span className="flex items-center gap-1.5 text-sm text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-destructive" /> {t.listening}</span>}
             </div>
+
+            <div className="mt-4 space-y-2">
+              <Label>{t.text} {supported ? t.textHint : ''}</Label>
+              <div className="flex gap-2">
+                <Textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={2} placeholder={t.placeholder} />
+                <Button type="button" variant="outline" data-testid="voice-parse" aria-label="Parse text" onClick={() => applyParse(transcript)} disabled={!transcript.trim()}><Sparkles className="h-4 w-4" /></Button>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t.examples}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {t.exampleList.map((ex) => (
+                    <button key={ex} type="button" onClick={() => { setTranscript(ex); applyParse(ex) }}
+                      className="rounded-md border border-border bg-card px-2.5 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">{ex}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <Label>{t.text}</Label>
+            <Textarea value={transcript} readOnly rows={2} />
           </div>
-        </div>
+        )}
 
         {parsed && (
           <div className="mt-4 space-y-3 rounded-lg border border-border p-3">

@@ -53,7 +53,7 @@ vi.mock("@/components/calendar/appointment-location-fields", () => ({
 
 import { VoiceAppointment } from "@/components/ai/voice-appointment";
 
-function renderVoice() {
+function renderVoice(initialTranscript?: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // Seed the cache so useQuery returns data synchronously on first render.
   client.setQueryData(["patients-select", "b1"], PATIENTS);
@@ -61,7 +61,7 @@ function renderVoice() {
   client.setQueryData(["working-hours", "b1"], []);
   return render(
     <QueryClientProvider client={client}>
-      <VoiceAppointment />
+      <VoiceAppointment initialTranscript={initialTranscript} />
     </QueryClientProvider>,
   );
 }
@@ -76,6 +76,15 @@ async function parse(text: string) {
 
 describe("VoiceAppointment — voice resolution preview", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("opens directly on the parsed confirmation for an external transcript", async () => {
+    renderVoice("Giulia on Friday at 10 checkup");
+
+    expect(await screen.findByDisplayValue("Giulia on Friday at 10 checkup")).toBeInTheDocument();
+    expect(await screen.findByText("Giulia Verdi")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create appointment" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Speak" })).not.toBeInTheDocument();
+  });
 
   it("pre-fills a new-client name and disables nothing when the name is unknown", async () => {
     renderVoice();

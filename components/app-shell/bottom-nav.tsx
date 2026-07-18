@@ -18,7 +18,13 @@ const RIGHT = [
   { href: '/scheduler', icon: Wand2 },
 ]
 
-export function BottomNav({ onQuickCreate }: { onQuickCreate: (kind: QuickKind) => void }) {
+export function BottomNav({
+  onQuickCreate,
+  voiceListening = false,
+}: {
+  onQuickCreate: (kind: QuickKind) => void
+  voiceListening?: boolean
+}) {
   const pathname = usePathname()
   const { t } = useT()
 
@@ -53,8 +59,14 @@ export function BottomNav({ onQuickCreate }: { onQuickCreate: (kind: QuickKind) 
         <button
           type="button"
           aria-label={t('create.speak')}
+          aria-pressed={voiceListening}
           onClick={() => onQuickCreate('voice')}
-          className="-mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-background transition-transform duration-200 active:scale-90"
+          className={cn(
+            '-mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-primary-foreground shadow-lg ring-4 ring-background transition-all duration-200 active:scale-90',
+            voiceListening
+              ? 'animate-pulse bg-destructive shadow-destructive/30'
+              : 'bg-primary shadow-primary/30',
+          )}
         >
           <Mic className="h-6 w-6" />
         </button>

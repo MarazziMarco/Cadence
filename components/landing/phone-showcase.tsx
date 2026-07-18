@@ -87,6 +87,8 @@ export function PhoneFrame({
 
 export type FloatCardSpec = {
   icon: LucideIcon
+  zoomImage?: string
+  zoomAlt?: string
   title: string
   meta?: string
   /** classi di posizionamento assoluto rispetto al wrapper, es. '-right-6 top-16' */
@@ -95,7 +97,15 @@ export type FloatCardSpec = {
   delay?: number
 }
 
-function FloatCard({ icon: Icon, title, meta, position, delay = 0 }: FloatCardSpec) {
+function FloatCard({
+  icon: Icon,
+  zoomImage,
+  zoomAlt = '',
+  title,
+  meta,
+  position,
+  delay = 0,
+}: FloatCardSpec) {
   const reduce = useReducedMotion()
   return (
     <motion.div
@@ -114,9 +124,18 @@ function FloatCard({ icon: Icon, title, meta, position, delay = 0 }: FloatCardSp
           'shadow-lg backdrop-blur-md',
         )}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
-        </div>
+        {zoomImage ? (
+          <img
+            data-testid="phone-floating-zoom"
+            src={zoomImage}
+            alt={zoomAlt}
+            className="h-14 w-14 shrink-0 rounded-xl object-cover shadow-sm"
+          />
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Icon className="h-5 w-5" />
+          </div>
+        )}
         <div className="min-w-0">
           <p className="whitespace-nowrap text-sm font-semibold leading-tight">{title}</p>
           {meta && <p className="whitespace-nowrap text-xs text-muted-foreground">{meta}</p>}
@@ -168,7 +187,10 @@ export function PhoneShowcase({
   className?: string
 }) {
   return (
-    <div className={cn('relative mx-auto w-fit px-10 py-6 sm:px-16', className)}>
+    <div
+      data-testid="hero-phone-showcase"
+      className={cn('relative mx-auto w-fit px-10 py-6 sm:px-16', className)}
+    >
       <PhoneFrame
         screenshot={screenshot}
         alt={alt}
