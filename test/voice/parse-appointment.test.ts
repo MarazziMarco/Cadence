@@ -45,6 +45,14 @@ describe("parseAppointment — patient resolution", () => {
     expect(r.patient).toEqual({ kind: "new", proposedName: "John Doe" });
   });
 
+  it("keeps Italian greetings and morning qualifiers out of a new client name", () => {
+    const r = parse("Ciao Francesco domani alle 10 di mattina");
+
+    expect(r.patient).toEqual({ kind: "new", proposedName: "Francesco" });
+    expect(r.date).toBe("2026-07-16");
+    expect(r.time).toBe("10:00");
+  });
+
   it("flags duplicate first names as ambiguous", () => {
     const r = parse("Marco domani");
     expect(r.patient.kind).toBe("ambiguous");

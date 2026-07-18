@@ -144,6 +144,28 @@ function resolveDate(residual: string, today: Date): [string | null, string] {
 }
 
 // ---- time ------------------------------------------------------------------
+const DAY_PART = /(?:\b(?:di|del|della|la|al|nel|in the)\s+)?\b(mattina|mattino|morning|pomeriggio|afternoon|sera|evening)\b/i
+
+function consumeDayPart(
+  residual: string,
+  residualWithoutTime: string,
+  hour: number,
+): [number, string] {
+  const part = residual.match(DAY_PART)
+  if (!part) return [hour, residualWithoutTime]
+
+  const label = part[1].toLowerCase()
+  const isMorning = ['mattina', 'mattino', 'morning'].includes(label)
+  const adjustedHour = isMorning
+    ? (hour === 12 ? 0 : hour)
+    : (hour < 12 ? hour + 12 : hour)
+  const [, next] = strip(
+    residualWithoutTime,
+    new RegExp(escapeRe(part[0]), 'i'),
+  )
+  return [adjustedHour, next]
+}
+
 function resolveTime(residual: string): [string | null, string] {
   let m = residual.match(/(?:alle|ore|at)?\s*(\d{1,2})[:.](\d{2})\s*(am|pm)?/i)
   if (m) {
@@ -151,7 +173,9 @@ function resolveTime(residual: string): [string | null, string] {
     if (/pm/i.test(m[3] || '') && h < 12) h += 12
     if (/am/i.test(m[3] || '') && h === 12) h = 0
     if (h >= 0 && h <= 23 && min >= 0 && min <= 59) {
-      const [, next] = strip(residual, new RegExp(escapeRe(m[0]), 'i'))
+      const [, withoutTime] = strip(residual, new RegExp(escapeRe(m[0]), 'i'))
+      const [adjustedHour, next] = consumeDayPart(residual, withoutTime, h)
+      h = adjustedHour
       return [`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`, next]
     }
   }
@@ -161,7 +185,9 @@ function resolveTime(residual: string): [string | null, string] {
     if (/pm/i.test(m[2] || '') && h < 12) h += 12
     if (/am/i.test(m[2] || '') && h === 12) h = 0
     if (h >= 0 && h <= 23) {
-      const [, next] = strip(residual, new RegExp(escapeRe(m[0]), 'i'))
+      const [, withoutTime] = strip(residual, new RegExp(escapeRe(m[0]), 'i'))
+      const [adjustedHour, next] = consumeDayPart(residual, withoutTime, h)
+      h = adjustedHour
       return [`${String(h).padStart(2, '0')}:00`, next]
     }
   }
@@ -297,9 +323,10 @@ const NAME_FILLER = new Set([
   'appuntamento', 'con', 'per', 'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'una', 'uno',
   'di', 'da', 'a', 'in', 'e', 'ed', 'del', 'della', 'dello', 'nuovo', 'nuova', 'cliente',
   'signor', 'signora', 'sig', 'prenota', 'prenotare', 'fissa', 'metti',
+  'ciao', 'salve', 'buongiorno', 'buonasera', 'vorrei', 'voglio', 'favore',
   // EN
   'appointment', 'with', 'for', 'the', 'an', 'at', 'of', 'to', 'and', 'new', 'client',
-  'mr', 'mrs', 'ms', 'on', 'book', 'schedule', 'add',
+  'mr', 'mrs', 'ms', 'on', 'book', 'schedule', 'add', 'hello', 'hi', 'hey', 'please',
 ])
 
 function titleCase(s: string): string {

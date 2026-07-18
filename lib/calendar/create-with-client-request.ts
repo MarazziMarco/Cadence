@@ -44,7 +44,7 @@ export const CreateWithClientRequestSchema = z.object({
   businessId: z.string().uuid(),
   patient: z.union([ExistingPatientSchema, NewPatientSchema]),
   appointment: AppointmentValuesSchema,
-  idempotencyKey: z.string().min(1).max(200),
+  idempotencyKey: z.string().uuid(),
   confirmWarnings: z.array(z.string()).optional(),
 }).strict()
 
