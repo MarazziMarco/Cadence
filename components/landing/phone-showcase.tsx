@@ -39,7 +39,7 @@ export function PhoneFrame({
     <div
       className={cn(
         // scocca
-        'relative aspect-[9/19.5] w-full max-w-[300px] rounded-[48px] border border-black/60',
+        'relative w-full max-w-[300px] rounded-[48px] border border-black/60',
         'bg-[#0c0e14] p-[10px] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.45)]',
         className,
       )}
@@ -52,13 +52,18 @@ export function PhoneFrame({
       <div className="absolute -right-[2px] top-[24%] h-16 w-[3px] rounded-r bg-black/70" />
 
       {/* schermo */}
-      <div className="relative h-full w-full overflow-hidden rounded-[38px] bg-background">
+      <div
+        className={cn(
+          'relative w-full overflow-hidden rounded-[38px] bg-background',
+          !screenshot && 'aspect-[9/19.5]',
+        )}
+      >
         {screenshot ? (
           <img
             src={screenshot}
             alt={alt}
             loading="lazy"
-            className="h-full w-full object-cover object-top"
+            className="h-auto w-full object-contain"
           />
         ) : (
           /* placeholder finché non carichi la screenshot */
@@ -94,6 +99,7 @@ function FloatCard({ icon: Icon, title, meta, position, delay = 0 }: FloatCardSp
   const reduce = useReducedMotion()
   return (
     <motion.div
+      data-testid="phone-floating-card"
       initial={{ opacity: 0, y: 14, scale: 0.95 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, margin: '-60px' }}

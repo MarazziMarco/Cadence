@@ -14,6 +14,10 @@ const assets = [
   '/landing/route.webp',
   '/landing/waiting-list.webp',
   '/landing/personal-algorithm.webp',
+  '/landing/mobile-calendar.png',
+  '/landing/mobile-clients.png',
+  '/landing/mobile-voice.png',
+  '/landing/mobile-scheduler.png',
 ]
 
 test('all Emergent-sensitive public assets resolve', async ({ request }) => {

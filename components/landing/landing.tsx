@@ -40,9 +40,9 @@ const FEATURE_ICONS = {
 } as const
 const PHONE_ICONS = [Clock, MessageSquare, Mic] as const
 const PHONE_POSITIONS = [
-  '-right-4 top-14 sm:-right-14',
-  '-right-2 bottom-24 sm:-right-10',
-  '-left-2 top-1/3 sm:-left-12',
+  '-right-4 top-14 sm:-right-28 xl:-right-36',
+  '-right-2 bottom-24 sm:-right-28 xl:-right-36',
+  '-left-2 top-1/3 sm:-left-28 xl:-left-36',
 ] as const
 
 export function Landing() {
@@ -117,12 +117,10 @@ export function Landing() {
             </motion.div>
           </div>
 
-          {/* Telefono con card flottanti — metti qui la tua screenshot mobile:
-              <PhoneShowcase screenshot="/landing/m-dashboard.png" />
-              Senza screenshot mostra il placeholder elegante. */}
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.2 }}
             className="hidden justify-center lg:flex">
             <PhoneShowcase
+              screenshot="/landing/mobile-calendar.png"
               alt={copy.phone.alt}
               placeholder={copy.phone.placeholder}
               cards={phoneCards}
@@ -154,9 +152,6 @@ export function Landing() {
         </div>
       </section>
 
-      {/* Works as an app — fila di telefoni.
-          Quando hai le screenshot mobili, sostituisci gli undefined:
-          <PhoneRow screenshots={['/landing/m-calendar.png', '/landing/m-dashboard.png', '/landing/m-optimize.png']} /> */}
       <section className="container pt-24 sm:pt-28">
         <div className="mx-auto mb-10 max-w-2xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm text-muted-foreground shadow-sm">
@@ -168,7 +163,11 @@ export function Landing() {
           </p>
         </div>
         <PhoneRow
-          screenshots={[undefined, undefined, undefined]}
+          screenshots={[
+            '/landing/mobile-clients.png',
+            '/landing/mobile-voice.png',
+            '/landing/mobile-scheduler.png',
+          ]}
           alt={copy.phone.alt}
           placeholder={copy.phone.placeholder}
         />

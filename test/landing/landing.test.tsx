@@ -63,6 +63,34 @@ describe('Landing localization and story integration', () => {
     expect(screen.getByTestId('landing-root')).not.toHaveClass('overflow-x-hidden')
   })
 
+  it('shows the selected real mobile product screenshots', () => {
+    render(<Landing />)
+
+    const images = screen.getAllByRole('img')
+    expect(images.map((image) => image.getAttribute('src'))).toEqual(expect.arrayContaining([
+      '/landing/mobile-calendar.png',
+      '/landing/mobile-clients.png',
+      '/landing/mobile-voice.png',
+      '/landing/mobile-scheduler.png',
+    ]))
+
+    const calendar = images.find(
+      (image) => image.getAttribute('src') === '/landing/mobile-calendar.png',
+    )
+    expect(calendar).toHaveClass('h-auto', 'w-full', 'object-contain')
+    expect(calendar).not.toHaveClass('h-full', 'object-cover')
+  })
+
+  it('keeps the floating messages outside the hero phone', () => {
+    render(<Landing />)
+
+    const cards = screen.getAllByTestId('phone-floating-card')
+    expect(cards).toHaveLength(3)
+    expect(cards[0]).toHaveClass('sm:-right-28', 'xl:-right-36')
+    expect(cards[1]).toHaveClass('sm:-right-28', 'xl:-right-36')
+    expect(cards[2]).toHaveClass('sm:-left-28', 'xl:-left-36')
+  })
+
   it('switches the entire landing to Italian and restores that choice', async () => {
     const user = userEvent.setup()
     const first = render(<Landing />)
