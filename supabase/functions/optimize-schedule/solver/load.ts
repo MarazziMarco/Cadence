@@ -12,6 +12,7 @@ import type {
   Mode,
   Patient,
   PatientAvailability,
+  PoolPlan,
   PatientException,
   Service,
   Settings,
@@ -38,6 +39,27 @@ function parseAdvanceFor(notes: unknown): string | null {
   try {
     const j = JSON.parse(notes);
     return typeof j?.advance_for === "string" ? j.advance_for : null;
+  } catch {
+    return null;
+  }
+}
+
+// Pool plans store {"pool":{sessions_total,max_per_week,gap_hours}} in notes
+// (spec §7, no schema change). Missing/invalid → not a pool plan.
+function parsePool(notes: unknown): PoolPlan | null {
+  if (typeof notes !== "string" || !notes) return null;
+  try {
+    const p = JSON.parse(notes)?.pool;
+    if (!p) return null;
+    const sessions = Math.floor(Number(p.sessions_total));
+    if (!Number.isFinite(sessions) || sessions < 1) return null;
+    const maxWeek = Math.floor(Number(p.max_per_week));
+    const gap = Number(p.gap_hours);
+    return {
+      sessions_total: sessions,
+      max_per_week: Number.isFinite(maxWeek) && maxWeek > 0 ? maxWeek : 0,
+      gap_hours: Number.isFinite(gap) && gap > 0 ? gap : 0,
+    };
   } catch {
     return null;
   }
@@ -184,6 +206,7 @@ export async function loadInput(
     preferred_duration_minutes: w.preferred_duration_minutes ?? null,
     flexible: bool(w.flexible, true),
     advance_for: parseAdvanceFor(w.notes),
+    pool: parsePool(w.notes),
   }));
 
   // --- patients referenced by appts or waiting list ---

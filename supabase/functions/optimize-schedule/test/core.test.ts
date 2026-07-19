@@ -561,6 +561,73 @@ Deno.test("FASE 2 (§4): a movable appointment slides later to hug a late anchor
   assertEquals(a.start, toMin("10:30"));
 });
 
+Deno.test("FASE 3 (§9 fixture b): a pool plan places its sittings respecting the 48h gap", async () => {
+  const input = await routedBase();
+  input.appointments = [];
+  input.context.date_from = "2026-07-13"; // Mon
+  input.context.date_to = "2026-07-17"; // Fri
+  input.context.settings.allow_waiting_list = true;
+  input.waiting_list = [{
+    id: "pool-1",
+    patient_id: "pat-pool",
+    preferred_service_id: null,
+    priority: "normal",
+    earliest_date: "2026-07-13",
+    latest_date: "2026-07-17",
+    preferred_weekdays: null,
+    earliest_time: null,
+    latest_time: null,
+    preferred_duration_minutes: 60,
+    flexible: true,
+    pool: { sessions_total: 2, max_per_week: 2, gap_hours: 48 },
+  }];
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const creates = result.output.changes.filter(
+    (c) => c.kind === "create" && c.patient_id === "pat-pool",
+  );
+  assertEquals(creates.length, 2, "both sittings should be planned");
+  const ms = creates
+    .map((c) => Date.parse(`${c.new_date}T${c.new_start_time}Z`))
+    .sort((a, b) => a - b);
+  assert(
+    ms[1] - ms[0] >= 48 * 3_600_000,
+    `sittings must be ≥48h apart, got ${(ms[1] - ms[0]) / 3_600_000}h`,
+  );
+});
+
+Deno.test("FASE 3 (§7): max_per_week caps a pool plan and leaves the rest in the pool", async () => {
+  const input = await routedBase();
+  input.appointments = [];
+  input.context.date_from = "2026-07-13"; // Mon
+  input.context.date_to = "2026-07-17"; // Fri (single ISO week)
+  input.context.settings.allow_waiting_list = true;
+  input.waiting_list = [{
+    id: "pool-cap",
+    patient_id: "pat-cap",
+    preferred_service_id: null,
+    priority: "normal",
+    earliest_date: "2026-07-13",
+    latest_date: "2026-07-17",
+    preferred_weekdays: null,
+    earliest_time: null,
+    latest_time: null,
+    preferred_duration_minutes: 60,
+    flexible: true,
+    pool: { sessions_total: 2, max_per_week: 1, gap_hours: 0 },
+  }];
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const creates = result.output.changes.filter(
+    (c) => c.kind === "create" && c.patient_id === "pat-cap",
+  );
+  // Only one sitting fits the single week (max_per_week=1); the other stays in
+  // the pool — explicit partial success.
+  assertEquals(creates.length, 1);
+});
+
 Deno.test("routing results stay deterministic for a fixed candidate budget", async () => {
   const first = await routedBase();
   first.context.settings.max_solver_seconds = 30;

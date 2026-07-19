@@ -1210,6 +1210,7 @@ export function runSolver(input: SolverInput): SolverResult {
     const days = dateRange(input.context.date_from, input.context.date_to);
     for (const entry of wl) {
       if (entry.advance_for) continue; // advance entries move an existing appt (pre-pass), never create
+      if (entry.pool) continue; // pool plans are placed by the dedicated pool phase
       const { service, dur, price } = wlServiceAndDur(input, entry);
       let placed = false;
       for (const date of days) {
@@ -1249,6 +1250,107 @@ export function runSolver(input: SolverInput): SolverResult {
           }
           slots.pop();
         }
+      }
+    }
+  }
+
+  // Phase 3b — pool "to plan" insertion (spec §7). Multi-session plans placed by
+  // regret-2 insertion: each round, for every plan compute the best and 2nd-best
+  // feasible sitting and insert the plan with the largest regret (ΔC₂ − ΔC₁), so
+  // the plan that would suffer most from waiting goes first. Each sitting honours
+  // patient availability, max_per_week and the minimum gap to the plan's already
+  // placed sittings. Unplaceable sittings simply stay in the pool (partial
+  // success); creates flow through the normal output contract (appointment_id
+  // null).
+  if (S.allow_waiting_list) {
+    const plans = input.waiting_list.filter((e) => e.pool && !e.advance_for);
+    if (plans.length > 0) {
+      const days = dateRange(input.context.date_from, input.context.date_to);
+      const remaining = new Map(plans.map((p) => [p.id, p.pool!.sessions_total]));
+      const placedMs = new Map<string, number[]>(plans.map((p) => [p.id, []]));
+      const placedWeek = new Map<string, Map<string, number>>(
+        plans.map((p) => [p.id, new Map()]),
+      );
+
+      interface Ins { date: string; start: number; deltaC: number; probe: Slot }
+      const options = (entry: SolverInput["waiting_list"][number]): Ins[] => {
+        const plan = entry.pool!;
+        const mine = placedMs.get(entry.id)!;
+        const week = placedWeek.get(entry.id)!;
+        const { service, dur, price } = wlServiceAndDur(input, entry);
+        const found: Ins[] = [];
+        for (const date of days) {
+          if (!wlDateAllowed(entry, date)) continue;
+          if (
+            plan.max_per_week > 0 &&
+            (week.get(mondayKey(date)) ?? 0) >= plan.max_per_week
+          ) continue;
+          const probe: Slot = {
+            id: `pool:${entry.id}:${mine.length}`,
+            patient_id: entry.patient_id,
+            service,
+            date,
+            start: 0,
+            dur,
+            price,
+            bufBefore: service ? service.buffer_before_minutes : 0,
+            bufAfter: service ? service.buffer_after_minutes : 0,
+            movable: false,
+            created: true,
+            manual_override: false,
+            location_key: studioLocationKey(input),
+            wlPriority: entry.priority,
+          };
+          for (const cand of candidateStarts(input, slots, probe, date)) {
+            if (!wlTimeOk(entry, cand, dur)) continue;
+            const ms = dateTimeMs(date, cand);
+            if (
+              plan.gap_hours > 0 &&
+              mine.some((m) => Math.abs(ms - m) < plan.gap_hours * 3_600_000)
+            ) continue;
+            if (!feasibleAt(input, slots, probe, date, cand)) continue;
+            if (!serviceConstraintsOk(input, service, slots, date, cand)) continue;
+            probe.start = cand;
+            slots.push(probe);
+            const c2 = cost();
+            const ok = c2.idle <= baselineIdle &&
+              findHardViolation(input, slots) === null &&
+              budgetsOk(input, slots, origin);
+            slots.pop();
+            if (ok) {
+              found.push({ date, start: cand, deltaC: c2.C - cur.C, probe: { ...probe } });
+            }
+          }
+        }
+        found.sort((a, b) =>
+          a.deltaC - b.deltaC || a.date.localeCompare(b.date) || a.start - b.start
+        );
+        return found;
+      };
+
+      for (;;) {
+        let pick: { ins: Ins; regret: number; id: string } | null = null;
+        for (const entry of plans) {
+          if ((remaining.get(entry.id) ?? 0) <= 0) continue;
+          const opts = options(entry);
+          if (opts.length === 0) continue;
+          const regret = (opts[1]?.deltaC ?? opts[0].deltaC + 1_000_000) -
+            opts[0].deltaC;
+          if (
+            !pick || regret > pick.regret ||
+            (regret === pick.regret && opts[0].deltaC < pick.ins.deltaC)
+          ) {
+            pick = { ins: opts[0], regret, id: entry.id };
+          }
+        }
+        if (!pick) break;
+        const p = pick.ins.probe;
+        slots.push(p);
+        cur = cost();
+        remaining.set(pick.id, (remaining.get(pick.id) ?? 0) - 1);
+        placedMs.get(pick.id)!.push(dateTimeMs(p.date, p.start));
+        const wk = placedWeek.get(pick.id)!;
+        wk.set(mondayKey(p.date), (wk.get(mondayKey(p.date)) ?? 0) + 1);
       }
     }
   }

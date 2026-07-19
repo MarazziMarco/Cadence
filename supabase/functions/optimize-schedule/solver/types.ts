@@ -153,6 +153,18 @@ export interface WaitingListEntry {
   // When set, this entry is an existing appointment asking to be moved up into an
   // earlier freed slot (not a brand-new booking). Holds that appointment's id.
   advance_for?: string | null;
+  // Pool "to plan" config (spec §7), stored in the waiting_list.notes JSON (no
+  // schema change). When present the entry is a multi-session plan: the solver
+  // inserts up to `sessions_total` sittings, at most `max_per_week` in any ISO
+  // week, at least `gap_hours` apart, within [earliest_date, latest_date] and
+  // patient_availability.
+  pool?: PoolPlan | null;
+}
+
+export interface PoolPlan {
+  sessions_total: number; // S — total sittings to place
+  max_per_week: number; // M — max sittings per ISO week (0 = unlimited)
+  gap_hours: number; // G — minimum hours between two consecutive sittings
 }
 
 export interface SolverInput {
