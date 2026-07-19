@@ -63,6 +63,9 @@ export function SchedulerClient() {
   const [maxCrossWeekDays, setMaxCrossWeekDays] = useState(7)
   const [travelWeight, setTravelWeight] = useState(1) // metadata.W_TRAVEL
   const [unlimitedMoves, setUnlimitedMoves] = useState(true) // budgets 0 = unlimited
+  const [startAddress, setStartAddress] = useState('') // metadata.start_location
+  const [endAddress, setEndAddress] = useState('') // metadata.end_location
+  const [edgeBusy, setEdgeBusy] = useState<'' | 'start' | 'end'>('')
 
   const [fpOpen, setFpOpen] = useState(false)
   const [fpKind, setFpKind] = useState<FreePeriodKind>('day')
@@ -91,6 +94,8 @@ export function SchedulerClient() {
         ))
         setTravelWeight(Math.min(3, Math.max(0, Number(s.metadata?.W_TRAVEL ?? 1))))
         setUnlimitedMoves(Number(s.max_daily_moves ?? 0) === 0)
+        setStartAddress(s.metadata?.start_location?.address ?? '')
+        setEndAddress(s.metadata?.end_location?.address ?? '')
       })
       .catch(() => {})
   }, [businessId])
@@ -106,6 +111,24 @@ export function SchedulerClient() {
     setUnlimitedMoves(unlimited)
     // 0 = unlimited (solver treats 0 as no cap); limited restores sensible caps.
     persist(unlimited ? { max_patient_moves: 0, max_daily_moves: 0 } : { max_patient_moves: 2, max_daily_moves: 5 })
+  }
+  // Geocode a day start/end address and store its coordinates in metadata (the
+  // EF reads start_location/end_location; empty clears it → defaults to studio).
+  const applyEdge = async (which: 'start' | 'end', address: string) => {
+    const metaKey = which === 'start' ? 'start_location' : 'end_location'
+    const addr = address.trim()
+    if (!addr) { saveAlgorithmMetadata(businessId, { [metaKey]: null }).catch(() => {}); return }
+    setEdgeBusy(which)
+    try {
+      const res = await fetch('/api/geocode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ address: addr }) })
+      const j = await res.json()
+      if (typeof j?.latitude === 'number' && typeof j?.longitude === 'number') {
+        await saveAlgorithmMetadata(businessId, { [metaKey]: { latitude: j.latitude, longitude: j.longitude, address: addr } })
+        toast.success(t('sched.edgeSaved'))
+      } else {
+        toast.error(t('sched.edgeFailed'))
+      }
+    } catch { toast.error(t('sched.edgeFailed')) } finally { setEdgeBusy('') }
   }
   const openFree = (kind: FreePeriodKind) => { setFpKind(kind); setFpOpen(true) }
   const changeCrossWeek = (v: boolean) => {
@@ -247,6 +270,21 @@ export function SchedulerClient() {
                 <p className="text-xs text-muted-foreground">{t('sched.unlimitedMovesHint')}</p>
               </div>
               <Switch checked={unlimitedMoves} onCheckedChange={changeMoveFreedom} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('sched.startPoint')}</Label>
+              <p className="text-xs text-muted-foreground">{t('sched.edgeHint')}</p>
+              <div className="flex gap-2">
+                <Input value={startAddress} onChange={(e) => setStartAddress(e.target.value)} placeholder={t('sched.edgeStudioPlaceholder')} />
+                <Button variant="outline" onClick={() => applyEdge('start', startAddress)} disabled={edgeBusy === 'start'}>{edgeBusy === 'start' ? <Loader2 className="h-4 w-4 animate-spin" /> : t('sched.edgeSet')}</Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('sched.endPoint')}</Label>
+              <div className="flex gap-2">
+                <Input value={endAddress} onChange={(e) => setEndAddress(e.target.value)} placeholder={t('sched.edgeStudioPlaceholder')} />
+                <Button variant="outline" onClick={() => applyEdge('end', endAddress)} disabled={edgeBusy === 'end'}>{edgeBusy === 'end' ? <Loader2 className="h-4 w-4 animate-spin" /> : t('sched.edgeSet')}</Button>
+              </div>
             </div>
           </div>
 
