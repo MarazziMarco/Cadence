@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useEffect, useMemo, useRef } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import {
   addBusinessDays,
@@ -43,12 +44,27 @@ function MobileDateStripComponent({
     pendingFocusDateRef.current = null
   }, [days, selectedDate])
 
+  // Page the strip a whole week at a time so far-off days are reachable from the
+  // phone day view without stepping one day per tap (the toolbar arrows step by
+  // the current view: 1 day in day view). Keeps the selected weekday.
+  const pageWeek = (direction: -1 | 1) =>
+    onSelectDate(addBusinessDays(selectedDate, direction * 7))
+
   return (
     <nav
       aria-label={t('cal.dateStrip')}
-      className="overflow-x-auto overscroll-x-contain border-b border-border bg-background px-2 pb-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex items-center gap-1 border-b border-border bg-background px-1 pb-2"
     >
-      <div className="flex w-max min-w-full items-center justify-between gap-1">
+      <button
+        type="button"
+        aria-label={t('cal.prevWeek')}
+        className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={() => pageWeek(-1)}
+      >
+        <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+      </button>
+      <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex w-max min-w-full items-center justify-between gap-1">
         {days.map((date) => {
           const isSelected = date === selectedDate
           const isToday = date === today
@@ -104,7 +120,16 @@ function MobileDateStripComponent({
             </button>
           )
         })}
+        </div>
       </div>
+      <button
+        type="button"
+        aria-label={t('cal.nextWeek')}
+        className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={() => pageWeek(1)}
+      >
+        <ChevronRight className="h-5 w-5" aria-hidden="true" />
+      </button>
     </nav>
   )
 }

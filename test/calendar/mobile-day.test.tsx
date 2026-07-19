@@ -272,7 +272,12 @@ describe('MobileDayCalendar', () => {
 
     expect(root.className).not.toContain('min-w-')
     expect(root.className).not.toContain('overflow-x-auto')
-    expect(strip).toHaveClass('overflow-x-auto')
+    // Horizontal scrolling is confined to the scrollable window inside the strip
+    // nav (the nav itself now also holds the week-paging arrows).
+    expect(strip.className).not.toContain('overflow-x-auto')
+    expect(
+      strip.querySelector('[class*="overflow-x-auto"]'),
+    ).not.toBeNull()
     expect(container.querySelector('[class*="min-w-[880px]"]')).toBeNull()
   })
 
