@@ -61,6 +61,8 @@ export function SchedulerClient() {
   const [prioritizeAdvance, setPrioritizeAdvance] = useState(true)
   const [allowCrossWeek, setAllowCrossWeek] = useState(false)
   const [maxCrossWeekDays, setMaxCrossWeekDays] = useState(7)
+  const [travelWeight, setTravelWeight] = useState(1) // metadata.W_TRAVEL
+  const [unlimitedMoves, setUnlimitedMoves] = useState(true) // budgets 0 = unlimited
 
   const [fpOpen, setFpOpen] = useState(false)
   const [fpKind, setFpKind] = useState<FreePeriodKind>('day')
@@ -87,6 +89,8 @@ export function SchedulerClient() {
           31,
           Math.max(1, Number(s.metadata?.MAX_CROSS_WEEK_DAYS ?? 7)),
         ))
+        setTravelWeight(Math.min(3, Math.max(0, Number(s.metadata?.W_TRAVEL ?? 1))))
+        setUnlimitedMoves(Number(s.max_daily_moves ?? 0) === 0)
       })
       .catch(() => {})
   }, [businessId])
@@ -97,6 +101,12 @@ export function SchedulerClient() {
   const changeVips = (v: boolean) => { setProtectVips(v); persist({ weight_vip: v ? 100 : 0 }) }
   const changePreferred = (v: boolean) => { setRespectPreferred(v); persist({ weight_patient_preference: v ? 5 : 0 }) }
   const changeAdvance = (v: boolean) => { setPrioritizeAdvance(v); saveAlgorithmMetadata(businessId, { PRIORITIZE_ADVANCE: v }).catch(() => {}) }
+  const changeTravelWeight = (v: number) => { setTravelWeight(v); saveAlgorithmMetadata(businessId, { W_TRAVEL: v }).catch(() => {}) }
+  const changeMoveFreedom = (unlimited: boolean) => {
+    setUnlimitedMoves(unlimited)
+    // 0 = unlimited (solver treats 0 as no cap); limited restores sensible caps.
+    persist(unlimited ? { max_patient_moves: 0, max_daily_moves: 0 } : { max_patient_moves: 2, max_daily_moves: 5 })
+  }
   const openFree = (kind: FreePeriodKind) => { setFpKind(kind); setFpOpen(true) }
   const changeCrossWeek = (v: boolean) => {
     setAllowCrossWeek(v)
@@ -213,6 +223,30 @@ export function SchedulerClient() {
                   <p className="mt-0.5 text-xs text-muted-foreground">{t('sched.mode.' + m.value + '.desc')}</p>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Travel weight + move freedom (spec §4) */}
+          <div className="space-y-4 border-t border-border pt-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t('sched.travelWeight')}</Label>
+                <span className="text-sm font-semibold tabular-nums">{travelWeight.toFixed(1)}×</span>
+              </div>
+              <input
+                type="range" min={0} max={3} step={0.1} value={travelWeight}
+                onChange={(e) => changeTravelWeight(Number(e.target.value))}
+                className="w-full accent-primary"
+                aria-label={t('sched.travelWeight')}
+              />
+              <p className="text-xs text-muted-foreground">{t('sched.travelWeightHint')}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>{t('sched.unlimitedMoves')}</Label>
+                <p className="text-xs text-muted-foreground">{t('sched.unlimitedMovesHint')}</p>
+              </div>
+              <Switch checked={unlimitedMoves} onCheckedChange={changeMoveFreedom} />
             </div>
           </div>
 
