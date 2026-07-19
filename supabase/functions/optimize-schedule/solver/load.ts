@@ -73,8 +73,8 @@ export async function loadInput(
     weight_manual_lock: num(settingsRow.weight_manual_lock, 1000),
     weight_waiting_list: num(settingsRow.weight_waiting_list, 4),
     weight_free_slots: num(settingsRow.weight_free_slots, 2),
-    max_patient_moves: num(settingsRow.max_patient_moves, 2),
-    max_daily_moves: num(settingsRow.max_daily_moves, 5),
+    max_patient_moves: num(settingsRow.max_patient_moves, 0), // 0 = unlimited (spec §2)
+    max_daily_moves: num(settingsRow.max_daily_moves, 0), // 0 = unlimited (spec §2)
     max_solver_seconds: num(settingsRow.max_solver_seconds, 30),
     allow_split_days: bool(settingsRow.allow_split_days, true),
     allow_waiting_list: bool(settingsRow.allow_waiting_list, true),

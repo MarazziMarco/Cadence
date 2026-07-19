@@ -504,6 +504,35 @@ Deno.test("routing keeps the successor boundary available for waiting-list inser
   assertEquals(create.new_start_time, "10:10:00");
 });
 
+Deno.test("FASE 2 (§9 fixture a): the solver reorders two clients to cut travel", async () => {
+  // The "map vs solver" case that failed before FASE 2: time-sorted order is
+  // a→b, but geography makes b→a much cheaper. With travel in the objective and
+  // the exact per-day DP, the solver must reorder so b is visited first.
+  const input = await routedBase();
+  input.appointments[0].start_time = "09:00"; // a
+  input.appointments[0].end_time = "09:30";
+  input.appointments[1].start_time = "11:30"; // b
+  input.appointments[1].end_time = "12:00";
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  // studio→a→b→studio = 30+5+30 = 65 ; studio→b→a→studio = 5+5+5 = 15
+  setLeg(input, "studio", "patient-a", 30);
+  setLeg(input, "studio", "patient-b", 5);
+  setLeg(input, "patient-a", "patient-b", 5);
+  setLeg(input, "patient-b", "patient-a", 5);
+  setLeg(input, "patient-a", "studio", 5);
+  setLeg(input, "patient-b", "studio", 30);
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const a = result.slots.find((s) => s.id === "appt-1")!;
+  const b = result.slots.find((s) => s.id === "appt-2")!;
+  assert(
+    b.start < a.start,
+    `expected b reordered before a to cut travel, got a@${a.start} b@${b.start}`,
+  );
+});
+
 Deno.test("routing results stay deterministic for a fixed candidate budget", async () => {
   const first = await routedBase();
   first.context.settings.max_solver_seconds = 30;

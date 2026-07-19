@@ -30,7 +30,7 @@ import {
 import { explainCreate, explainMove } from "./explain.ts";
 
 // ---- tuning defaults -----------------------------------------------------
-const DEF_MOVE_BASE = 15;
+const DEF_MOVE_BASE = 0; // spec §2: w_moves default 0 — moves are free by default
 const DEF_PRICE_UNIT = 10;
 const DEF_MIN_IDLE_GAP = 5;
 const DEF_W_TRAVEL = 1.0; // spec §2: 1 min driving = 1 min idle
@@ -584,8 +584,11 @@ function budgetsOk(
       perDay.set(s.date, (perDay.get(s.date) ?? 0) + 1);
     }
   }
-  for (const v of perPatient.values()) if (v > S.max_patient_moves) return false;
-  for (const v of perDay.values()) if (v > S.max_daily_moves) return false;
+  // 0 = unlimited (spec §2/§54: move budgets are unlimited by default, still
+  // configurable). A positive limit is enforced.
+  const pMax = S.max_patient_moves, dMax = S.max_daily_moves;
+  for (const v of perPatient.values()) if (pMax > 0 && v > pMax) return false;
+  for (const v of perDay.values()) if (dMax > 0 && v > dMax) return false;
   return true;
 }
 
@@ -1133,10 +1136,13 @@ export function runSolver(input: SolverInput): SolverResult {
     }
   }
 
-  // Contextual month runs may consider cross-day moves. Isolated month runs
-  // stay inside the appointment's Monday-Sunday bucket; explicitly enabled
-  // runs may move no farther than max_cross_week_days.
-  if (input.context.scope_kind === "month") {
+  // Cross-day RELOCATE (spec §5): try moving each movable appointment to another
+  // day in the range, accepted only on strict improvement. With travel in the
+  // objective this is what makes geographic clustering emerge on its own (two
+  // clients in the same area drift into the same day). existingDateAllowed keeps
+  // month runs inside their week bucket (unless cross-week is enabled) and does
+  // not restrict week/day runs, which stay within their own range anyway.
+  {
     const days = dateRange(input.context.date_from, input.context.date_to);
     for (const s of slots.filter((slot) => slot.movable)) {
       const original = origin.get(s.id);
