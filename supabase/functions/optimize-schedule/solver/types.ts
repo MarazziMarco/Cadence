@@ -6,7 +6,6 @@
 import type { TravelMatrix } from "../routing/matrix.ts";
 
 export type Mode = "conservative" | "balanced" | "aggressive";
-export type OptimizationStrategy = "balanced" | "smart_route";
 export type Priority = "low" | "normal" | "high";
 export type Weekday =
   | "monday"
@@ -22,12 +21,14 @@ export interface Tuning {
   MOVE_BASE?: number; // default 15 — generic disturbance per move
   PRICE_UNIT?: number; // default 10 — normalizes revenue into points
   MIN_IDLE_GAP?: number; // default 5 — minimum gap (min) counted as idle
+  W_TRAVEL?: number; // default 1.0 — weight of a travel minute in the cost (spec §2)
   PRIORITIZE_ADVANCE?: boolean; // default true — pull "move me up" clients into freed slots first
   ADVANCE_MIN_DAYS?: number; // default 3 — only advance if the new slot is >= this many days earlier
-  OPTIMIZATION_STRATEGY?: OptimizationStrategy;
-  WALK_MAX_MINUTES?: number;
-  UNKNOWN_STUDIO_LEG_MINUTES?: number;
-  SMART_ROUTE_MIN_SAVING_MINUTES?: number;
+  WALK_MAX_MINUTES?: number; // routing prep (matrix.ts): max minutes to prefer walking
+  UNKNOWN_STUDIO_LEG_MINUTES?: number; // routing prep fallback for an unknown studio leg
+  // Day start/end points (spec §1): geocoded coordinates; absent → studio.
+  start_location?: { latitude: number; longitude: number } | null;
+  end_location?: { latitude: number; longitude: number } | null;
 }
 
 /** One active algorithm_settings row (§2 context.settings). */
@@ -166,14 +167,14 @@ export interface SolverInput {
   waiting_list: WaitingListEntry[];
   studio_location_key: string;
   travel_matrix: TravelMatrix;
-  strategy: OptimizationStrategy;
-  route_thresholds: RouteThresholds;
-}
-
-export interface RouteThresholds {
-  walk_max_minutes: number;
-  unknown_studio_leg_minutes: number;
-  smart_route_min_saving_minutes: number;
+  // Coordinates per location_key, for the haversine travel fallback (spec §3)
+  // and the day's edge legs. Populated by prepareRoutingInput; fixtures may
+  // supply it directly. Absent entries fall back to a constant estimate.
+  location_coords?: Record<string, { latitude: number; longitude: number }>;
+  // Optional day start/end points (spec §1, algorithm_settings.metadata
+  // start_location / end_location). Default: studio.
+  start_location_key?: string;
+  end_location_key?: string;
 }
 
 // ---- Output (§7) ---------------------------------------------------------

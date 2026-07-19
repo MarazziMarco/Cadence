@@ -33,9 +33,6 @@ export type AppointmentLocationMode = (typeof APPOINTMENT_LOCATION_MODES)[number
 export const BUSINESS_LOCATION_SOURCES = ['device_geolocation'] as const
 export type BusinessLocationSource = (typeof BUSINESS_LOCATION_SOURCES)[number]
 
-export const OPTIMIZATION_STRATEGIES = ['balanced', 'smart_route'] as const
-export type OptimizationStrategy = (typeof OPTIMIZATION_STRATEGIES)[number]
-
 export const OPTIMIZATION_GOALS = ['optimize', 'free_period'] as const
 export type OptimizationGoal = (typeof OPTIMIZATION_GOALS)[number]
 

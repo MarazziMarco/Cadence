@@ -33,6 +33,10 @@ import { explainCreate, explainMove } from "./explain.ts";
 const DEF_MOVE_BASE = 15;
 const DEF_PRICE_UNIT = 10;
 const DEF_MIN_IDLE_GAP = 5;
+const DEF_W_TRAVEL = 1.0; // spec §2: 1 min driving = 1 min idle
+// Last-resort per-leg estimate (minutes) when neither an ORS leg nor
+// coordinates exist — keeps a day feasible instead of freezing it (spec §3).
+const DEF_UNKNOWN_TRAVEL = 15;
 
 const MODE_MULT: Record<Mode, number> = {
   conservative: 2.0,
@@ -73,19 +77,70 @@ function studioLocationKey(input: SolverInput): string {
   return input.studio_location_key ?? "studio:unknown";
 }
 
-function travelMinutes(
+function startLocationKey(input: SolverInput): string {
+  return input.start_location_key ?? studioLocationKey(input);
+}
+
+function endLocationKey(input: SolverInput): string {
+  return input.end_location_key ?? studioLocationKey(input);
+}
+
+function coordOf(
+  input: SolverInput,
+  key: string,
+): { lat: number; lng: number } | null {
+  const c = input.location_coords?.[key];
+  if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
+    return { lat: c.latitude, lng: c.longitude };
+  }
+  return null;
+}
+
+function haversineKm(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+
+/**
+ * Travel time (minutes) between two location keys. NEVER null (spec §3
+ * fallback): a missing/unverifiable ORS leg is estimated from the haversine
+ * distance (×1.3 detour factor / 30 km/h), and when even coordinates are
+ * missing we fall back to a small constant so a day is never frozen.
+ *   - `t = 0` when both ends are the same key (two studio appts, spec §1).
+ *   - `estimated: true` marks any value not backed by a verifiable ORS leg.
+ */
+function travelLeg(
   input: SolverInput,
   from: string,
   to: string,
-): number | null {
-  if (from.startsWith("unresolved:") || to.startsWith("unresolved:")) {
-    return null;
-  }
+): { minutes: number; estimated: boolean } {
+  if (from === to) return { minutes: 0, estimated: false };
   const leg = input.travel_matrix?.[from]?.[to];
   if (leg?.verifiable && Number.isFinite(leg.seconds) && leg.seconds >= 0) {
-    return Math.ceil(leg.seconds / 60);
+    return { minutes: Math.ceil(leg.seconds / 60), estimated: false };
   }
-  return from === to && from.startsWith("studio:") ? 0 : null;
+  const a = coordOf(input, from);
+  const b = coordOf(input, to);
+  if (a && b) {
+    const km = haversineKm(a, b);
+    return {
+      minutes: Math.max(1, Math.round((km * 1.3) / 30 * 60)),
+      estimated: true,
+    };
+  }
+  return { minutes: DEF_UNKNOWN_TRAVEL, estimated: true };
+}
+
+function travelMinutes(input: SolverInput, from: string, to: string): number {
+  return travelLeg(input, from, to).minutes;
 }
 
 function routeViolationForDay(
@@ -100,16 +155,11 @@ function routeViolationForDay(
     .sort((a, b) => occStart(a) - occStart(b) || a.id.localeCompare(b.id));
   if (ordered.length === 0) return null;
 
-  const studio = studioLocationKey(input);
-  const first = ordered[0];
-  const firstTravel = travelMinutes(input, studio, first.location_key);
-  if (firstTravel === null) {
-    return `first travel unavailable ${studio}/${first.location_key} on ${date}`;
-  }
-  if (wins[0].start + firstTravel > occStart(first)) {
-    return `insufficient first travel before ${first.id} on ${date}`;
-  }
-
+  // Edge legs (studio -> first, last -> studio) are cost-only, NOT hard
+  // constraints (spec §3.6): the day never has to "wait" for the drive from
+  // home. Only transitions between consecutive same-day appointments must be
+  // physically feasible. Travel is never null (haversine fallback), so a
+  // missing ORS leg never freezes a day.
   for (let i = 1; i < ordered.length; i++) {
     const previous = ordered[i - 1];
     const next = ordered[i];
@@ -118,21 +168,9 @@ function routeViolationForDay(
       previous.location_key,
       next.location_key,
     );
-    if (travel === null) {
-      return `travel unavailable ${previous.id}/${next.id} on ${date}`;
-    }
     if (occEnd(previous) + travel > occStart(next)) {
       return `insufficient travel ${previous.id}/${next.id} on ${date}`;
     }
-  }
-
-  const last = ordered[ordered.length - 1];
-  const lastTravel = travelMinutes(input, last.location_key, studio);
-  if (lastTravel === null) {
-    return `last travel unavailable ${last.location_key}/${studio} on ${date}`;
-  }
-  if (occEnd(last) + lastTravel > wins[wins.length - 1].end) {
-    return `insufficient last travel after ${last.id} on ${date}`;
   }
   return null;
 }
@@ -167,6 +205,7 @@ function tuning(settings: Settings) {
     MOVE_BASE: m.MOVE_BASE ?? DEF_MOVE_BASE,
     PRICE_UNIT: m.PRICE_UNIT ?? DEF_PRICE_UNIT,
     MIN_IDLE_GAP: m.MIN_IDLE_GAP ?? DEF_MIN_IDLE_GAP,
+    W_TRAVEL: m.W_TRAVEL ?? DEF_W_TRAVEL,
     PRIORITIZE_ADVANCE: m.PRIORITIZE_ADVANCE ?? true,
     ADVANCE_MIN_DAYS: m.ADVANCE_MIN_DAYS ?? 3,
   };
@@ -277,38 +316,23 @@ function candidateStarts(
 ): number[] {
   const wins = capacityWindows(date, input.working_hours, input.holidays);
   const set = new Set<number>();
-  const studio = studioLocationKey(input);
+  const startLoc = startLocationKey(input);
+  const endLoc = endLocationKey(input);
   for (const w of wins) {
     set.add(w.start + slot.bufBefore);
     set.add(w.end - slot.dur - slot.bufAfter);
-    const firstTravel = travelMinutes(input, studio, slot.location_key);
-    if (firstTravel !== null) {
-      set.add(w.start + firstTravel + slot.bufBefore);
-    }
-    const lastTravel = travelMinutes(input, slot.location_key, studio);
-    if (lastTravel !== null) {
-      set.add(w.end - lastTravel - slot.dur - slot.bufAfter);
-    }
+    const firstTravel = travelMinutes(input, startLoc, slot.location_key);
+    set.add(w.start + firstTravel + slot.bufBefore);
+    const lastTravel = travelMinutes(input, slot.location_key, endLoc);
+    set.add(w.end - lastTravel - slot.dur - slot.bufAfter);
     for (const o of slots) {
       if (o === slot || o.date !== date) continue;
-      const afterTravel = travelMinutes(
-        input,
-        o.location_key,
-        slot.location_key,
-      );
-      if (afterTravel !== null) {
-        const after = occEnd(o) + afterTravel + slot.bufBefore;
-        if (after >= w.start && after + slot.dur <= w.end) set.add(after);
-      }
-      const beforeTravel = travelMinutes(
-        input,
-        slot.location_key,
-        o.location_key,
-      );
-      if (beforeTravel !== null) {
-        const before = occStart(o) - beforeTravel - slot.dur - slot.bufAfter;
-        if (before >= w.start && before + slot.dur <= w.end) set.add(before);
-      }
+      const afterTravel = travelMinutes(input, o.location_key, slot.location_key);
+      const after = occEnd(o) + afterTravel + slot.bufBefore;
+      if (after >= w.start && after + slot.dur <= w.end) set.add(after);
+      const beforeTravel = travelMinutes(input, slot.location_key, o.location_key);
+      const before = occStart(o) - beforeTravel - slot.dur - slot.bufAfter;
+      if (before >= w.start && before + slot.dur <= w.end) set.add(before);
     }
   }
   const av = availFor(input, slot.patient_id, date);
@@ -372,7 +396,6 @@ function dayIdleAndGaps(
       inDay[i - 1].location_key,
       inDay[i].location_key,
     );
-    if (travel === null) continue;
     const closed = Math.max(0, to - from - open);
     const travelDuringOpen = Math.max(0, travel - closed);
     const net = Math.max(0, open - travelDuringOpen);
@@ -398,11 +421,43 @@ function idleAndGaps(
   return { idle, gapCount };
 }
 
+// ---- travel term (spec §1: Travel(d) = L_start->σ1 + Σ t_ij + σn->L_end) ---
+
+function dayTravel(input: SolverInput, slots: Slot[], date: string): number {
+  const wins = capacityWindows(date, input.working_hours, input.holidays);
+  if (wins.length === 0) return 0;
+  const inDay = slots
+    .filter((s) =>
+      s.date === date && windowIndex(s.start, s.start + s.dur, wins) >= 0
+    )
+    .sort((a, b) => occStart(a) - occStart(b) || a.id.localeCompare(b.id));
+  if (inDay.length === 0) return 0;
+  let t = travelMinutes(input, startLocationKey(input), inDay[0].location_key);
+  for (let i = 1; i < inDay.length; i++) {
+    t += travelMinutes(input, inDay[i - 1].location_key, inDay[i].location_key);
+  }
+  t += travelMinutes(
+    input,
+    inDay[inDay.length - 1].location_key,
+    endLocationKey(input),
+  );
+  return t;
+}
+
+function totalTravel(input: SolverInput, slots: Slot[]): number {
+  let t = 0;
+  for (const date of dateRange(input.context.date_from, input.context.date_to)) {
+    t += dayTravel(input, slots, date);
+  }
+  return t;
+}
+
 // ---- objective C(S) ------------------------------------------------------
 
 interface CostBreakdown {
   C: number;
   idle: number;
+  travel: number;
   gapCount: number;
   moved: number;
   vipMoved: number;
@@ -416,11 +471,17 @@ function totalCost(
   origin: Map<string, Origin>,
   patientMap: Map<string, Patient>,
   baselineGapCount: number,
-  K: { MOVE_BASE: number; PRICE_UNIT: number; MIN_IDLE_GAP: number },
+  K: {
+    MOVE_BASE: number;
+    PRICE_UNIT: number;
+    MIN_IDLE_GAP: number;
+    W_TRAVEL: number;
+  },
 ): CostBreakdown {
   const S = input.context.settings;
   const mult = MODE_MULT[input.context.mode];
   const im = idleAndGaps(input, slots, K.MIN_IDLE_GAP);
+  const travel = totalTravel(input, slots);
 
   let movePen = 0, moved = 0, vipMoved = 0, placed = 0, createdRev = 0;
   for (const s of slots) {
@@ -448,6 +509,7 @@ function totalCost(
   const gapCons = Math.max(0, baselineGapCount - im.gapCount);
 
   const C = S.weight_idle_time * im.idle +
+    K.W_TRAVEL * travel +
     mult * movePen +
     S.weight_patient_preference * pref +
     S.weight_continuity * cont -
@@ -458,6 +520,7 @@ function totalCost(
   return {
     C,
     idle: im.idle,
+    travel,
     gapCount: im.gapCount,
     moved,
     vipMoved,

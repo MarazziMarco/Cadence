@@ -159,6 +159,8 @@ Deno.serve(async (req: Request) => {
         1,
         365,
       ),
+      startLocation: edgeLocation(metadata.start_location),
+      endLocation: edgeLocation(metadata.end_location),
     });
     // Free-a-day / free-an-afternoon: evacuate the excluded period instead of a
     // full optimization. The result is an exact plan (apply all-or-nothing).
@@ -214,6 +216,21 @@ Deno.serve(async (req: Request) => {
     return json({ error: message }, 500);
   }
 });
+
+// Day start/end point from algorithm_settings.metadata: an object with finite
+// {latitude, longitude} (geocoded like appointment addresses). Anything else →
+// null (the solver then defaults the edge point to the studio). Spec §1.
+function edgeLocation(
+  raw: unknown,
+): { latitude: number; longitude: number } | null {
+  const p = raw as { latitude?: unknown; longitude?: unknown } | null;
+  const lat = Number(p?.latitude);
+  const lng = Number(p?.longitude);
+  if (p && Number.isFinite(lat) && Number.isFinite(lng)) {
+    return { latitude: lat, longitude: lng };
+  }
+  return null;
+}
 
 function numberSetting(
   metadata: object,

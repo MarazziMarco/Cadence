@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query'
 import { MapPin, Route, Wand2, Navigation } from 'lucide-react'
 import { listAppointments } from '@/lib/api/appointments'
 import { getBusinessSettings } from '@/lib/api/working-hours'
-import { saveAlgorithmMetadata } from '@/lib/api/scheduler'
 import { useT } from '@/lib/i18n/use-t'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -137,17 +136,10 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
   const [mode, setMode] = useState<'before' | 'after'>('after')
   const [optimizeOpen, setOptimizeOpen] = useState(false)
 
-  // Real optimization for this day (session + travel + idle + constraints), then
-  // the apply preview + messages.
-  async function optimizeDay() {
-    try { await saveAlgorithmMetadata(businessId, { OPTIMIZATION_STRATEGY: 'smart_route' }) } catch {}
-    setOptimizeOpen(true)
-  }
-
-  // Route-first: also lower the reroute threshold so it reorders even for small
-  // travel savings (what the map shows). Same preview + apply + messages.
-  async function optimizeRoute() {
-    try { await saveAlgorithmMetadata(businessId, { OPTIMIZATION_STRATEGY: 'smart_route', SMART_ROUTE_MIN_SAVING_MINUTES: 1 }) } catch {}
+  // Opens the real optimizer for this day. The solver now minimises travel as
+  // part of its objective (spec §2), so there is no separate "route" mode — a
+  // single optimize covers session + travel + idle + constraints.
+  function optimizeDay() {
     setOptimizeOpen(true)
   }
 
@@ -299,9 +291,6 @@ export function DayMap({ businessId, date }: { businessId: string; date: string 
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" onClick={optimizeDay} disabled={!businessId}>
                 <Wand2 className="mr-1.5 h-4 w-4" /> {t('map.optimizeDay')}
-              </Button>
-              <Button size="sm" variant="secondary" onClick={optimizeRoute} disabled={!businessId}>
-                <Route className="mr-1.5 h-4 w-4" /> {t('map.optimizeRoute')}
               </Button>
               {route.length >= 2 && (
                 <>

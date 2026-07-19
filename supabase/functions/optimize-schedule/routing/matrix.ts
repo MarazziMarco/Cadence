@@ -42,6 +42,10 @@ export interface RoutingConfig {
   unknownStudioLegMinutes: number;
   plausibleWalkingMeters: number;
   cacheTtlDays: number;
+  // Day start/end points (spec §1), read from algorithm_settings.metadata by
+  // the caller. Absent → studio.
+  startLocation?: { latitude: number; longitude: number } | null;
+  endLocation?: { latitude: number; longitude: number } | null;
 }
 
 export interface PreparedTravelMatrix {
@@ -627,6 +631,14 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
     appointment.id
   );
   if (appointmentIds.length === 0) {
+    const coords: Record<string, { latitude: number; longitude: number }> = {};
+    if (studio.latitude !== null && studio.longitude !== null) {
+      coords[studio.key] = {
+        latitude: studio.latitude,
+        longitude: studio.longitude,
+      };
+    }
+    const edge = edgeLocations(config, studio.key, coords);
     return {
       ...input,
       appointments: [],
@@ -641,6 +653,9 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
           },
         },
       },
+      location_coords: coords,
+      start_location_key: edge.startKey,
+      end_location_key: edge.endKey,
     };
   }
 
@@ -743,6 +758,25 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
     provider: dependencies.provider ?? createOpenRouteServiceProvider(),
     config,
   });
+
+  // Coordinates per location_key, for the solver's haversine travel fallback
+  // and edge legs (spec §1/§3).
+  const location_coords: Record<
+    string,
+    { latitude: number; longitude: number }
+  > = {};
+  for (const loc of [prepared.studioLocation, ...prepared.locations]) {
+    if (loc.latitude !== null && loc.longitude !== null) {
+      location_coords[loc.key] = {
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+      };
+    }
+  }
+  // Day start/end points (spec §1): algorithm_settings.metadata.start_location /
+  // end_location carry geocoded coordinates; absent → studio.
+  const edge = edgeLocations(config, prepared.studioLocation.key, location_coords);
+
   return {
     ...input,
     appointments: input.appointments.map((appointment) => ({
@@ -751,5 +785,35 @@ export async function prepareRoutingInput<T extends RoutingInputShape>(
     })),
     studio_location_key: prepared.studioLocation.key,
     travel_matrix: prepared.matrix,
+    location_coords,
+    start_location_key: edge.startKey,
+    end_location_key: edge.endKey,
+  };
+}
+
+/**
+ * Resolves the day's start/end location keys from
+ * algorithm_settings.metadata.{start_location,end_location}. Each entry, when it
+ * carries finite coordinates, is registered under a synthetic key and its
+ * coordinates merged into `coords`. Missing/invalid → the studio key.
+ */
+function edgeLocations(
+  config: RoutingConfig,
+  studioKey: string,
+  coords: Record<string, { latitude: number; longitude: number }>,
+): { startKey: string; endKey: string } {
+  const resolve = (
+    raw: { latitude: number; longitude: number } | null | undefined,
+    key: string,
+  ): string => {
+    if (raw && Number.isFinite(raw.latitude) && Number.isFinite(raw.longitude)) {
+      coords[key] = { latitude: raw.latitude, longitude: raw.longitude };
+      return key;
+    }
+    return studioKey;
+  };
+  return {
+    startKey: resolve(config.startLocation, "start:custom"),
+    endKey: resolve(config.endLocation, "end:custom"),
   };
 }

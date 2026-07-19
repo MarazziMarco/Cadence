@@ -20,7 +20,6 @@ import { HistoryClient } from '@/components/history/history-client'
 import { OptimizePreview } from '@/components/calendar/optimize-preview'
 import { FreePeriodDialog } from '@/components/calendar/free-period-dialog'
 import type { FreePeriodKind } from '@/lib/api/scheduler'
-import { OPTIMIZATION_STRATEGIES } from '@/lib/types/db'
 import { CalendarX2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -63,7 +62,6 @@ export function SchedulerClient() {
   const [allowCrossWeek, setAllowCrossWeek] = useState(false)
   const [maxCrossWeekDays, setMaxCrossWeekDays] = useState(7)
 
-  const [strategy, setStrategy] = useState<string>('balanced')
   const [fpOpen, setFpOpen] = useState(false)
   const [fpKind, setFpKind] = useState<FreePeriodKind>('day')
 
@@ -84,7 +82,6 @@ export function SchedulerClient() {
         setProtectVips((s.weight_vip ?? 100) > 0)
         setRespectPreferred((s.weight_patient_preference ?? 5) > 0)
         setPrioritizeAdvance((s.metadata?.PRIORITIZE_ADVANCE ?? true) !== false)
-        setStrategy(s.metadata?.OPTIMIZATION_STRATEGY === 'smart_route' ? 'smart_route' : 'balanced')
         setAllowCrossWeek(s.metadata?.ALLOW_CROSS_WEEK === true)
         setMaxCrossWeekDays(Math.min(
           31,
@@ -100,7 +97,6 @@ export function SchedulerClient() {
   const changeVips = (v: boolean) => { setProtectVips(v); persist({ weight_vip: v ? 100 : 0 }) }
   const changePreferred = (v: boolean) => { setRespectPreferred(v); persist({ weight_patient_preference: v ? 5 : 0 }) }
   const changeAdvance = (v: boolean) => { setPrioritizeAdvance(v); saveAlgorithmMetadata(businessId, { PRIORITIZE_ADVANCE: v }).catch(() => {}) }
-  const changeStrategy = (v: string) => { setStrategy(v); saveAlgorithmMetadata(businessId, { OPTIMIZATION_STRATEGY: v }).catch(() => {}) }
   const openFree = (kind: FreePeriodKind) => { setFpKind(kind); setFpOpen(true) }
   const changeCrossWeek = (v: boolean) => {
     setAllowCrossWeek(v)
@@ -204,20 +200,6 @@ export function SchedulerClient() {
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => openFree('day')} disabled={!businessId}><CalendarX2 className="mr-1.5 h-4 w-4" /> {t('fp.freeDay')}</Button>
             <Button variant="outline" size="sm" onClick={() => openFree('afternoon')} disabled={!businessId}><CalendarX2 className="mr-1.5 h-4 w-4" /> {t('fp.freeAfternoon')}</Button>
-          </div>
-
-          {/* Route strategy */}
-          <div className="space-y-2 border-t border-border pt-4">
-            <Label>{t('route.settings')}</Label>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {OPTIMIZATION_STRATEGIES.map((s) => (
-                <button key={s} onClick={() => changeStrategy(s)}
-                  className={cn('rounded-xl border p-3 text-left transition-colors', strategy === s ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent')}>
-                  <p className={cn('text-sm font-semibold', strategy === s && 'text-primary')}>{t('route.' + s)}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t('route.' + s + 'Desc')}</p>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Mode */}

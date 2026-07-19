@@ -10,7 +10,6 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.74.0";
 import type {
   Mode,
-  OptimizationStrategy,
   Patient,
   PatientAvailability,
   PatientException,
@@ -85,10 +84,6 @@ export async function loadInput(
     metadata: settingsRow.metadata ?? {},
   };
   const mode: Mode = args.mode ?? settingsRow.optimization_mode ?? "balanced";
-  const strategy: OptimizationStrategy =
-    settings.metadata?.OPTIMIZATION_STRATEGY === "smart_route"
-      ? "smart_route"
-      : "balanced";
 
   // --- working_hours (7 rows) ---
   const { data: whRows, error: whErr } = await supabase
@@ -264,18 +259,6 @@ export async function loadInput(
     waiting_list,
     studio_location_key: "studio:unknown",
     travel_matrix: {},
-    strategy,
-    route_thresholds: {
-      walk_max_minutes: num(settings.metadata?.WALK_MAX_MINUTES, 9),
-      unknown_studio_leg_minutes: num(
-        settings.metadata?.UNKNOWN_STUDIO_LEG_MINUTES,
-        20,
-      ),
-      smart_route_min_saving_minutes: num(
-        settings.metadata?.SMART_ROUTE_MIN_SAVING_MINUTES,
-        10,
-      ),
-    },
   };
 }
 
