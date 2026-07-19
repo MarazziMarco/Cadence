@@ -628,6 +628,88 @@ Deno.test("FASE 3 (§7): max_per_week caps a pool plan and leaves the rest in th
   assertEquals(creates.length, 1);
 });
 
+Deno.test("FASE 1/4 (§9 fixture d): changing L_start changes the visiting order", async () => {
+  // Two movable clients. With the day starting at the studio (near a) the
+  // optimum visits a first; starting from home (near b) flips it to b first —
+  // the edge leg L_start→first is counted in Travel and steers the sequence.
+  const build = async (startKey: string | undefined) => {
+    const input = await routedBase();
+    input.appointments[0].start_time = "09:00"; // a
+    input.appointments[0].end_time = "09:30";
+    input.appointments[1].start_time = "11:30"; // b
+    input.appointments[1].end_time = "12:00";
+    setLocation(input, "appt-1", "patient-a");
+    setLocation(input, "appt-2", "patient-b");
+    setLeg(input, "studio", "patient-a", 1);
+    setLeg(input, "studio", "patient-b", 60);
+    setLeg(input, "home", "patient-a", 60);
+    setLeg(input, "home", "patient-b", 1);
+    setLeg(input, "patient-a", "patient-b", 10);
+    setLeg(input, "patient-b", "patient-a", 10);
+    setLeg(input, "patient-a", "studio", 1);
+    setLeg(input, "patient-b", "studio", 1);
+    if (startKey) input.start_location_key = startKey;
+    return runSolver(input);
+  };
+
+  const fromStudio = await build(undefined);
+  const a1 = fromStudio.slots.find((s) => s.id === "appt-1")!;
+  const b1 = fromStudio.slots.find((s) => s.id === "appt-2")!;
+  assert(a1.start < b1.start, "from the studio, a should be visited first");
+
+  const fromHome = await build("home");
+  const a2 = fromHome.slots.find((s) => s.id === "appt-1")!;
+  const b2 = fromHome.slots.find((s) => s.id === "appt-2")!;
+  assert(b2.start < a2.start, "from home, b should be visited first");
+});
+
+Deno.test("FASE 1 (§9 fixture f): consecutive studio appointments travel in 0 (no phantom cost)", async () => {
+  // Two studio appointments scheduled back-to-back (09:30 == 09:30). If a studio
+  // studio leg cost anything, the adjacency would be infeasible. It stays valid,
+  // proving t = 0 between two studio appointments.
+  const input = await routedBase();
+  input.appointments[0].start_time = "09:00";
+  input.appointments[0].end_time = "09:30";
+  input.appointments[1].start_time = "09:30";
+  input.appointments[1].end_time = "10:00";
+  // No setLocation → both default to the studio key.
+  lockAll(input);
+  assertEquals(findHardViolation(input, runSolver(input).slots), null);
+});
+
+Deno.test("FASE 2 (§9 fixture e): the DP finds a hand-built 3-stop optimum", async () => {
+  // Time-sorted order is a→b→c but geography makes a→c→b far cheaper (10 vs 105).
+  // The exact per-day DP must find the a→c→b sequence.
+  const input = await routedBase();
+  const third = structuredClone(input.appointments[1]);
+  third.id = "appt-3";
+  third.patient_id = "patient-c";
+  third.start_time = "11:00";
+  third.end_time = "11:30";
+  input.appointments[0].start_time = "09:00"; // a
+  input.appointments[0].end_time = "09:30";
+  input.appointments[1].start_time = "10:00"; // b
+  input.appointments[1].end_time = "10:30";
+  input.appointments.push(third); // c
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  setLocation(input, "appt-3", "patient-c");
+  setLeg(input, "studio", "patient-a", 0);
+  setLeg(input, "patient-a", "patient-c", 5);
+  setLeg(input, "patient-c", "patient-b", 5);
+  setLeg(input, "patient-b", "studio", 0);
+  setLeg(input, "patient-a", "patient-b", 50);
+  setLeg(input, "patient-b", "patient-c", 50);
+  setLeg(input, "patient-c", "patient-a", 5);
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const a = result.slots.find((s) => s.id === "appt-1")!;
+  const b = result.slots.find((s) => s.id === "appt-2")!;
+  const c = result.slots.find((s) => s.id === "appt-3")!;
+  assert(a.start < c.start && c.start < b.start, "expected order a → c → b");
+});
+
 Deno.test("routing results stay deterministic for a fixed candidate budget", async () => {
   const first = await routedBase();
   first.context.settings.max_solver_seconds = 30;
