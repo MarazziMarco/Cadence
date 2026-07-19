@@ -1009,6 +1009,32 @@ function bestDayOrder(
     return idle;
   };
 
+  // Backward gap-closing (spec §4): from the last to the first, delay each
+  // movable appointment to hug its successor (occEnd + travel == successor
+  // occStart), staying inside its window/availability. This converts internal
+  // idle into uncounted free time before the first appointment (e.g. a client
+  // free from 09:00 whose successor is only available at 11:00 slides later so
+  // the gap disappears). The last appointment has no successor and is never
+  // delayed — delaying it would only create idle.
+  const backwardClose = (order: number[], starts: number[]) => {
+    for (let p = order.length - 2; p >= 0; p--) {
+      const i = order[p], k = order[p + 1];
+      const s = day[i];
+      if (!s.movable) continue;
+      let latest = starts[k] - day[k].bufBefore - tt(i, k) - s.bufAfter - s.dur;
+      const wi = windowIndex(starts[i], starts[i] + s.dur, wins);
+      if (wi >= 0) latest = Math.min(latest, wins[wi].end - s.dur);
+      const a = av[i];
+      if (a && a.length) {
+        const aw = a.find((w) =>
+          starts[i] >= w.start && starts[i] + s.dur <= w.end
+        );
+        if (aw) latest = Math.min(latest, aw.end - s.dur);
+      }
+      if (latest > starts[i]) starts[i] = latest;
+    }
+  };
+
   const full = (1 << n) - 1;
   let bestCost = Infinity;
   let bestStarts: number[] | null = null;
@@ -1017,7 +1043,13 @@ function bestDayOrder(
     if (!arr) continue;
     for (const lab of arr) {
       const starts = new Array<number>(n).fill(0);
-      for (let p: DpLabel | null = lab; p; p = p.parent) starts[p.jIdx] = p.start;
+      const order: number[] = [];
+      for (let p: DpLabel | null = lab; p; p = p.parent) {
+        starts[p.jIdx] = p.start;
+        order.push(p.jIdx);
+      }
+      order.reverse(); // parent walk is last→first
+      backwardClose(order, starts);
       const travel = lab.travel +
         travelMinutes(input, day[j].location_key, endKey);
       const cost = K.W_TRAVEL * travel + S.weight_idle_time * measureIdle(starts);

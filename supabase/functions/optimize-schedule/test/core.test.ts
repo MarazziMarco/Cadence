@@ -533,6 +533,34 @@ Deno.test("FASE 2 (§9 fixture a): the solver reorders two clients to cut travel
   );
 });
 
+Deno.test("FASE 2 (§4): a movable appointment slides later to hug a late anchor, closing idle", async () => {
+  // a is free from the morning; b is pinned at 11:00. Left-justify puts a at
+  // 09:00, leaving a 90' gap that pulling-earlier cannot remove. The backward
+  // gap-closing pass must delay a to hug b (a ends exactly when b starts).
+  const input = await routedBase();
+  input.appointments[0].start_time = "09:00"; // a, movable
+  input.appointments[0].end_time = "09:30";
+  input.appointments[1].start_time = "11:00"; // b, locked anchor
+  input.appointments[1].end_time = "11:30";
+  input.appointments[1].locked = true;
+  setLocation(input, "appt-1", "patient-a");
+  setLocation(input, "appt-2", "patient-b");
+  // Travel breaks the tie so the order a→b (b last) is the unique optimum;
+  // otherwise b→a would be an equal-cost placement of a after b.
+  setLeg(input, "studio", "patient-a", 0);
+  setLeg(input, "studio", "patient-b", 0);
+  setLeg(input, "patient-a", "patient-b", 0);
+  setLeg(input, "patient-b", "patient-a", 60);
+  setLeg(input, "patient-a", "studio", 0);
+  setLeg(input, "patient-b", "studio", 0);
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const a = result.slots.find((s) => s.id === "appt-1")!;
+  // hug b: occEnd(a) == occStart(b) == 11:00, travel 0 → a starts 10:30 (630).
+  assertEquals(a.start, toMin("10:30"));
+});
+
 Deno.test("routing results stay deterministic for a fixed candidate budget", async () => {
   const first = await routedBase();
   first.context.settings.max_solver_seconds = 30;
