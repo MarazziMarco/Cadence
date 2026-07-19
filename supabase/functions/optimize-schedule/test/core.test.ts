@@ -444,14 +444,10 @@ Deno.test("routing candidates compact to predecessor end plus travel", async () 
   assertEquals(move.new_start_time, "09:50:00");
 });
 
-// TODO(Fase 2): RIABILITARE questo test. Aspettativa = 14:00. È il CRITERIO DI
-// ACCETTAZIONE della rifinitura esatta per giorno (spec §6, DP su sottoinsiemi).
-// In Fase 1 il termine di viaggio è nell'obiettivo ma la ricerca locale greedy
-// (solo MOVE, first-improvement) porta appt-2 a 11:45 (Travel 35), peggiore del
-// vero ottimo del giorno 14:00 (Travel 30). La Fase 2 (2-OPT + DP §6) deve far
-// tornare questo giorno a 14:00; quando è verde con new_start_time "14:00:00",
-// togliere .ignore.
-Deno.test.ignore("routing preserves an afternoon window boundary when lunch absorbs predecessor travel", async () => {
+// Re-enabled in FASE 2: the exact per-day DP (spec §6) restores the true day
+// optimum (Travel 30 at 14:00) that the greedy local search missed (11:45,
+// Travel 35). This is the acceptance criterion for the refinement.
+Deno.test("routing preserves an afternoon window boundary when lunch absorbs predecessor travel", async () => {
   const input = await routedBase();
   input.appointments[0].start_time = "12:30";
   input.appointments[0].end_time = "13:00";

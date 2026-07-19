@@ -877,6 +877,166 @@ export interface SolverResult {
   idleAfter: number;
 }
 
+// ---- exact per-day refinement (spec §6: Held-Karp over subsets) ----------
+
+const EXACT_DAY_MAX = 13; // days larger than this keep the local search only
+
+interface DpLabel {
+  jIdx: number; // appointment index this label ends at
+  finish: number; // occEnd of the last appointment (start + dur + bufAfter)
+  travel: number; // cumulative travel minutes incl. the L_start edge leg
+  start: number; // chosen start of the last appointment
+  parent: DpLabel | null;
+}
+
+/**
+ * Optimal same-day sequence via Held-Karp over subsets with Pareto (finish,
+ * travel) labels (spec §6). Returns the new start times for the movable slots
+ * of the day's optimal order when it strictly beats the current arrangement on
+ * (w_idle·Idle + w_travel·Travel); null otherwise. Locked slots stay at their
+ * fixed times. Feasibility per transition: window + availability + occStart ≥
+ * occEnd_prev + travel. n<2 or n>EXACT_DAY_MAX → null (local search suffices).
+ */
+function bestDayOrder(
+  input: SolverInput,
+  slots: Slot[],
+  date: string,
+  K: { MIN_IDLE_GAP: number; W_TRAVEL: number },
+): Array<{ slot: Slot; start: number }> | null {
+  const day = slots
+    .filter((s) => s.date === date)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const n = day.length;
+  if (n < 2 || n > EXACT_DAY_MAX) return null;
+  const wins = capacityWindows(date, input.working_hours, input.holidays);
+  if (wins.length === 0) return null;
+
+  const S = input.context.settings;
+  const av = day.map((s) => availFor(input, s.patient_id, date));
+  const startKey = startLocationKey(input);
+  const endKey = endLocationKey(input);
+  const tt = (fromIdx: number, toIdx: number) =>
+    travelMinutes(input, day[fromIdx].location_key, day[toIdx].location_key);
+  const occEndAt = (i: number, start: number) =>
+    start + day[i].dur + day[i].bufAfter;
+
+  // Earliest feasible start for appt i with occStart ≥ minOccStart. Body
+  // [start, start+dur] must sit in a single window and within availability;
+  // buffers may extend into closures (matches feasibleAt). Locked appts keep
+  // their fixed start (feasible only if it respects the incoming leg).
+  const earliest = (i: number, minOccStart: number): number | null => {
+    const s = day[i];
+    if (!s.movable) {
+      return s.start - s.bufBefore >= minOccStart ? s.start : null;
+    }
+    let best: number | null = null;
+    const avs = av[i];
+    const windows = avs && avs.length ? avs : [null];
+    for (const w of wins) {
+      for (const a of windows) {
+        let start = Math.max(w.start, minOccStart + s.bufBefore);
+        if (a) start = Math.max(start, a.start);
+        if (start < w.start) continue;
+        if (start + s.dur > w.end) continue;
+        if (a && start + s.dur > a.end) continue;
+        if (best === null || start < best) best = start;
+      }
+    }
+    return best;
+  };
+
+  const labels = new Map<number, DpLabel[]>(); // key = mask*n + j
+  const keyOf = (mask: number, j: number) => mask * n + j;
+  const NEG = -1_000_000;
+
+  const addLabel = (mask: number, lab: DpLabel) => {
+    const k = keyOf(mask, lab.jIdx);
+    const arr = labels.get(k);
+    if (!arr) { labels.set(k, [lab]); return; }
+    for (const e of arr) {
+      if (e.finish <= lab.finish && e.travel <= lab.travel) return; // dominated
+    }
+    const kept = arr.filter(
+      (e) => !(lab.finish <= e.finish && lab.travel <= e.travel),
+    );
+    kept.push(lab);
+    labels.set(k, kept);
+  };
+
+  for (let j = 0; j < n; j++) {
+    const start = earliest(j, NEG);
+    if (start === null) continue;
+    addLabel(1 << j, {
+      jIdx: j,
+      finish: occEndAt(j, start),
+      travel: travelMinutes(input, startKey, day[j].location_key),
+      start,
+      parent: null,
+    });
+  }
+
+  for (let mask = 1; mask < (1 << n); mask++) {
+    for (let j = 0; j < n; j++) {
+      if (!(mask & (1 << j))) continue;
+      const arr = labels.get(keyOf(mask, j));
+      if (!arr) continue;
+      for (const lab of arr) {
+        for (let k = 0; k < n; k++) {
+          if (mask & (1 << k)) continue;
+          const start = earliest(k, lab.finish + tt(j, k));
+          if (start === null) continue;
+          addLabel(mask | (1 << k), {
+            jIdx: k,
+            finish: occEndAt(k, start),
+            travel: lab.travel + tt(j, k),
+            start,
+            parent: lab,
+          });
+        }
+      }
+    }
+  }
+
+  // Measure day idle for a candidate assignment (mutate + restore).
+  const saved = day.map((s) => s.start);
+  const measureIdle = (starts: number[]): number => {
+    for (let i = 0; i < n; i++) day[i].start = starts[i];
+    const idle = dayIdle(input, slots, date, K.MIN_IDLE_GAP);
+    for (let i = 0; i < n; i++) day[i].start = saved[i];
+    return idle;
+  };
+
+  const full = (1 << n) - 1;
+  let bestCost = Infinity;
+  let bestStarts: number[] | null = null;
+  for (let j = 0; j < n; j++) {
+    const arr = labels.get(keyOf(full, j));
+    if (!arr) continue;
+    for (const lab of arr) {
+      const starts = new Array<number>(n).fill(0);
+      for (let p: DpLabel | null = lab; p; p = p.parent) starts[p.jIdx] = p.start;
+      const travel = lab.travel +
+        travelMinutes(input, day[j].location_key, endKey);
+      const cost = K.W_TRAVEL * travel + S.weight_idle_time * measureIdle(starts);
+      if (cost < bestCost - 1e-9) { bestCost = cost; bestStarts = starts; }
+    }
+  }
+  if (!bestStarts) return null;
+
+  const curTravel = dayTravel(input, slots, date);
+  const curIdle = dayIdle(input, slots, date, K.MIN_IDLE_GAP);
+  const curCost = K.W_TRAVEL * curTravel + S.weight_idle_time * curIdle;
+  if (bestCost >= curCost - 1e-9) return null; // no strict improvement
+
+  const out: Array<{ slot: Slot; start: number }> = [];
+  for (let i = 0; i < n; i++) {
+    if (day[i].movable && day[i].start !== bestStarts[i]) {
+      out.push({ slot: day[i], start: bestStarts[i] });
+    }
+  }
+  return out.length ? out : null;
+}
+
 /** Full solve returning internals; solveCore() wraps this for the DB layer. */
 export function runSolver(input: SolverInput): SolverResult {
   const t0 = Date.now();
@@ -1076,6 +1236,24 @@ export function runSolver(input: SolverInput): SolverResult {
       } else {
         s.start = prevStart;
       }
+    }
+  }
+
+  // Phase 5 — exact per-day refinement (spec §6). For each day (n ≤ 13) solve
+  // the optimal visiting order + times by Held-Karp DP and adopt it only if it
+  // lowers the global objective without raising idle above baseline or breaking
+  // budgets/hard constraints. This is what makes the solver actually reorder a
+  // day to cut travel; the local search alone never changes the sequence.
+  for (const date of dateRange(input.context.date_from, input.context.date_to)) {
+    const proposal = bestDayOrder(input, slots, date, K);
+    if (!proposal) continue;
+    const prev = proposal.map((p) => ({ slot: p.slot, start: p.slot.start }));
+    for (const p of proposal) p.slot.start = p.start;
+    const c2 = cost();
+    if (accept(c2)) {
+      cur = c2;
+    } else {
+      for (const p of prev) p.slot.start = p.start;
     }
   }
 
