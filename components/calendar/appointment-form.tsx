@@ -116,14 +116,18 @@ export function AppointmentForm({
   const [formError, setFormError] = useState<string | null>(null)
   const availabilityEditedRef = useRef(false)
 
+  const initialSnapshotRef = useRef('')
+
   const setFormDirty = useCallback((nextDirty: boolean) => {
     onDirtyChange?.(nextDirty)
   }, [onDirtyChange])
 
+  // "Dirty" = a field actually differs from the values the form opened with, not
+  // merely that a change event fired (controlled inputs emit those on mount). So
+  // opening the form and closing it without editing never warns about discarding.
   const markDirty = useCallback(() => {
     setFormError(null)
-    setFormDirty(true)
-  }, [setFormDirty])
+  }, [])
 
   const { data: patients = [] } = useQuery({
     queryKey: ['patients-select', businessId],
@@ -178,6 +182,17 @@ export function AppointmentForm({
     availabilityEditedRef.current = false
     setAdvanceUp(false)
     setFormError(null)
+    initialSnapshotRef.current = JSON.stringify({
+      patientId: appointment?.patient_id ?? defaultPatientId ?? '',
+      newClient: '',
+      serviceId: appointment?.service_id ?? defaultServiceId ?? 'none',
+      date: appointment?.appointment_date ?? defaultDate
+        ?? businessToday(business?.timezone || 'UTC'),
+      start: appointment?.start_time.slice(0, 5) ?? defaultStart ?? '09:00',
+      duration: String(appointment?.duration_minutes ?? defaultDurationMinutes
+        ?? business?.default_appointment_duration ?? 30),
+      advanceUp: false,
+    })
     setFormDirty(false)
   }, [
     appointment,
@@ -201,6 +216,19 @@ export function AppointmentForm({
       setWeeklyAvailability(savedWeeklyAvailability)
     }
   }, [patientId, savedWeeklyAvailability, showAvailability])
+
+  // Recompute dirty from the current values vs the opening snapshot (plus an
+  // explicit availability edit). Runs after state updates, so it reflects real
+  // edits rather than change events.
+  useEffect(() => {
+    const current = JSON.stringify({
+      patientId, newClient, serviceId, date, start, duration, advanceUp,
+    })
+    setFormDirty(current !== initialSnapshotRef.current || availabilityEditedRef.current)
+  }, [
+    patientId, newClient, serviceId, date, start, duration, advanceUp,
+    weeklyAvailability, setFormDirty,
+  ])
 
   function applyVoice(text: string) {
     const result = parseAppointment(text, patients as any, services as any)
@@ -396,7 +424,6 @@ export function AppointmentForm({
   return (
     <form
       className={className}
-      onChangeCapture={markDirty}
       onSubmit={(event) => {
         event.preventDefault()
         const startMinute = timeToMin(`${start}:00`)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { CalendarController } from './calendar-controller'
 import { DayRouteMap, type CalendarViewLike } from './day-route-map'
 import { useWorkspace } from '@/lib/workspace-context'
@@ -19,12 +19,19 @@ export function CalendarClient() {
   const [view, setView] = useState<CalendarViewLike>('week')
   const [range, setRange] = useState({ from: todayStr(), to: todayStr() })
 
+  // Stable callbacks: the controller reports upward via effects, so passing new
+  // closures each render would re-fire those effects and loop.
+  const onViewChange = useCallback((v: string) => setView(v as CalendarViewLike), [])
+  const onVisibleRangeChange = useCallback((from: string, to: string) => {
+    setRange((prev) => (prev.from === from && prev.to === to ? prev : { from, to }))
+  }, [])
+
   return (
     <div className="space-y-6">
       <CalendarController
         onSelectedDateChange={setDay}
-        onViewChange={(v) => setView(v as CalendarViewLike)}
-        onVisibleRangeChange={(from, to) => setRange({ from, to })}
+        onViewChange={onViewChange}
+        onVisibleRangeChange={onVisibleRangeChange}
       />
       {businessId && (
         <DayRouteMap
