@@ -1,3 +1,5 @@
+import { EXTENDED_DICTIONARIES } from './extended-dictionaries'
+
 // Flat dotted-key dictionaries for en / it / es. Keep keys grouped by area.
 // Missing keys fall back to English (see lib/i18n/index.ts). Placeholders use
 // {name} syntax and are filled by translate(locale, key, vars).
@@ -587,6 +589,8 @@ const en: Dict = {
   'map.noGain': 'same distance as current order',
   'map.beforeHint': 'optimized: {km} km',
   'map.optimizeDay': 'Optimize this day',
+  'map.showCurrent': 'Current',
+  'map.showOptimized': 'Optimized',
   'map.optimizeRoute': 'Optimize following the best route',
   'map.savedTime': '~{min} min',
   'map.openGoogle': 'Open in Google Maps',
@@ -796,7 +800,7 @@ const it: Dict = {
   'sched.startPoint': 'Punto di partenza',
   'sched.endPoint': 'Punto di arrivo',
   'sched.edgeHint': 'Dove inizia e finisce la giornata (es. casa). Vuoto = studio.',
-  'sched.edgeStudioPlaceholder': 'Studio (default)',
+  'sched.edgeStudioPlaceholder': 'Studio (predefinito)',
   'sched.edgeSet': 'Imposta',
   'sched.edgeSaved': 'Posizione salvata',
   'sched.edgeFailed': 'Indirizzo non trovato',
@@ -1150,6 +1154,8 @@ const it: Dict = {
   'map.noGain': 'stessa distanza dell\u2019ordine attuale',
   'map.beforeHint': 'ottimizzato: {km} km',
   'map.optimizeDay': 'Ottimizza questo giorno',
+  'map.showCurrent': 'Attuale',
+  'map.showOptimized': 'Ottimizzato',
   'map.optimizeRoute': 'Ottimizza seguendo la strada migliore',
   'map.savedTime': '~{min} min',
   'map.openGoogle': 'Apri in Google Maps',
@@ -1713,10 +1719,16 @@ const es: Dict = {
   'map.noGain': 'misma distancia que el orden actual',
   'map.beforeHint': 'optimizado: {km} km',
   'map.optimizeDay': 'Optimizar este día',
+  'map.showCurrent': 'Actual',
+  'map.showOptimized': 'Optimizado',
   'map.optimizeRoute': 'Optimizar siguiendo la mejor ruta',
   'map.savedTime': '~{min} min',
   'map.openGoogle': 'Abrir en Google Maps',
   'map.openApple': 'Abrir en Apple Maps',
 }
 
-export const DICTS: Record<'en' | 'it' | 'es', Dict> = { en, it, es }
+export const DICTS: Record<'en' | 'it' | 'es', Dict> = {
+  en: { ...en, ...EXTENDED_DICTIONARIES.en },
+  it: { ...it, ...EXTENDED_DICTIONARIES.it },
+  es: { ...es, ...EXTENDED_DICTIONARIES.es },
+}

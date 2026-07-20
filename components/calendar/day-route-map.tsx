@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useQuery } from '@tanstack/react-query'
-import { MapPin, Route, Navigation } from 'lucide-react'
+import { MapPin, Route, Navigation, Wand2 } from 'lucide-react'
 import { listAppointments } from '@/lib/api/appointments'
 import { getBusinessSettings } from '@/lib/api/working-hours'
 import { getAlgorithmSettings } from '@/lib/api/scheduler'
@@ -12,9 +12,10 @@ import { useT } from '@/lib/i18n/use-t'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { OptimizeDialog } from './optimize-dialog'
 import type { MapPoint } from './day-map-canvas'
 import {
-  type LL, bestOrder, haversineKm, seqCoords, tripKm,
+  type LL, bestOrder, haversineKm, tripKm,
   googleMapsHref, appleMapsHref,
 } from './route-utils'
 
@@ -120,6 +121,9 @@ export function DayRouteMap({
   // Week view keeps its own chip selection; reset it when the week changes.
   const [pickedDay, setPickedDay] = useState('')
   useEffect(() => { setPickedDay('') }, [rangeFrom, rangeTo, view])
+  // Show the optimized visiting order (default) or the current time-sorted order.
+  const [optimized, setOptimized] = useState(true)
+  const [optimizeOpen, setOptimizeOpen] = useState(false)
 
   // The single day X the map draws, per view.
   const day = view === 'week'
@@ -142,7 +146,9 @@ export function DayRouteMap({
   const { points, route, km, legMids, legKm, legIds } = useMemo(() => {
     const empty = { points: [] as MapPoint[], route: [] as [number, number][], km: 0, legMids: [] as [number, number][], legKm: [] as number[], legIds: [] as string[] }
     if (geo.length === 0) return empty
-    const order = bestOrder(start, end, geo)
+    const order = optimized
+      ? bestOrder(start, end, geo)
+      : geo.map((_, i) => i) // current order = time-sorted (as scheduled)
     const ordered = order.map((i) => geo[i])
 
     const pts: MapPoint[] = []
@@ -170,7 +176,7 @@ export function DayRouteMap({
       km: tripKm(start, end, ordered),
       legMids: mids, legKm: kmPer, legIds: ids,
     }
-  }, [geo, start, end, t])
+  }, [geo, start, end, t, optimized])
 
   async function fetchRoute(coords: [number, number][]) {
     const res = await fetch('/api/route', {
@@ -208,10 +214,29 @@ export function DayRouteMap({
   return (
     <Card className="mt-6 shadow-sm">
       <CardHeader className="gap-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MapPin className="h-4 w-4 text-primary" /> {t('map.title')}
-          {day && <span className="font-normal text-muted-foreground">· {day}</span>}
-        </CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <MapPin className="h-4 w-4 text-primary" /> {t('map.title')}
+            {day && <span className="font-normal text-muted-foreground">· {day}</span>}
+          </CardTitle>
+          {geo.length > 0 && (
+            <div className="inline-flex rounded-lg border border-border p-0.5">
+              {([['current', false], ['optimized', true]] as const).map(([key, val]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setOptimized(val)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                    optimized === val ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {t(key === 'current' ? 'map.showCurrent' : 'map.showOptimized')}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {view === 'week' && weekDays.length > 0 && (
           <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {weekDays.map((d) => (
@@ -248,23 +273,38 @@ export function DayRouteMap({
                 ))}
               </div>
             )}
-            {route.length >= 2 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button asChild size="sm" variant="outline">
-                  <a href={googleMapsHref(route)} target="_blank" rel="noopener noreferrer">
-                    <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openGoogle')}
-                  </a>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <a href={appleMapsHref(route)} target="_blank" rel="noopener noreferrer">
-                    <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openApple')}
-                  </a>
-                </Button>
-              </div>
-            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setOptimizeOpen(true)} disabled={!businessId || !day}>
+                <Wand2 className="mr-1.5 h-4 w-4" /> {t('map.optimizeDay')}
+              </Button>
+              {route.length >= 2 && (
+                <>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={googleMapsHref(route)} target="_blank" rel="noopener noreferrer">
+                      <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openGoogle')}
+                    </a>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={appleMapsHref(route)} target="_blank" rel="noopener noreferrer">
+                      <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openApple')}
+                    </a>
+                  </Button>
+                </>
+              )}
+            </div>
           </>
         )}
       </CardContent>
+      {day && (
+        <OptimizeDialog
+          businessId={businessId}
+          dateFrom={day}
+          dateTo={day}
+          open={optimizeOpen}
+          onOpenChange={setOptimizeOpen}
+          showTrigger={false}
+        />
+      )}
     </Card>
   )
 }
