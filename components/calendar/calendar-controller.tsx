@@ -1097,7 +1097,7 @@ export function CalendarController({ onSelectedDateChange, onViewChange, onVisib
                   showToolbar={false}
                 />
               ) : (
-                <DesktopWeekCalendar {...rendererProps} view={timelineView} />
+                <DesktopWeekCalendar {...rendererProps} view={timelineView} onDensityChange={handleDensityChange} />
               )}
             </>
           ) : responsiveLayout === 'phone' && rendererView === 'agenda' ? (

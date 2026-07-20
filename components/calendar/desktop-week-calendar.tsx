@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   fmtTime,
@@ -17,6 +17,7 @@ import {
 } from '@/lib/calendar/date'
 import type { MoveIntent, ResizeIntent } from '@/lib/calendar/types'
 import { allocateOverlapLanes } from '@/lib/calendar/overlap-lanes'
+import { clampDensity } from '@/lib/calendar/geometry'
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
 import { cn } from '@/lib/utils'
@@ -42,6 +43,7 @@ export interface CalendarRendererProps {
 
 export interface DesktopWeekCalendarProps extends CalendarRendererProps {
   view: 'day' | 'week'
+  onDensityChange?(density: number): void
 }
 
 interface DragPreview {
@@ -64,9 +66,26 @@ export function DesktopWeekCalendar(props: DesktopWeekCalendarProps) {
     onSelectAppointment,
     onCreateAt,
     onMove,
+    onDensityChange,
     view,
   } = props
   const { t, locale } = useT()
+  // Zoom the timeline by scrolling / two-finger over the hour gutter (desktop).
+  // A native non-passive listener so preventDefault can stop the page scroll.
+  const gutterRef = useRef<HTMLDivElement>(null)
+  const densityRef = useRef(density)
+  densityRef.current = density
+  useEffect(() => {
+    const el = gutterRef.current
+    if (!el || !onDensityChange) return
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const factor = event.ctrlKey ? 0.6 : 0.3 // trackpad pinch sends ctrlKey
+      onDensityChange(clampDensity(densityRef.current - event.deltaY * factor))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [onDensityChange])
   const dateLocale = bcp47(locale)
   const slotInterval = config.slotIntervalMinutes
   const days = useMemo(
@@ -258,7 +277,11 @@ export function DesktopWeekCalendar(props: DesktopWeekCalendarProps) {
           </div>
 
           <div className="flex sm:max-h-[calc(100vh-16rem)] sm:overflow-y-auto">
-            <div className="w-14 shrink-0">
+            <div
+              ref={gutterRef}
+              className="w-14 shrink-0 cursor-ns-resize"
+              title={t('cal.zoomHint')}
+            >
               {HOURS.map((hour) => (
                 <div key={hour} className="relative" style={{ height: density }}>
                   <span className="absolute -top-2 right-2 text-[10px] text-muted-foreground">
