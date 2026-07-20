@@ -16,6 +16,7 @@ import {
   weekRange,
 } from '@/lib/calendar/date'
 import type { MoveIntent, ResizeIntent } from '@/lib/calendar/types'
+import { allocateOverlapLanes } from '@/lib/calendar/overlap-lanes'
 import { bcp47 } from '@/lib/i18n'
 import { useT } from '@/lib/i18n/use-t'
 import { cn } from '@/lib/utils'
@@ -310,16 +311,15 @@ export function DesktopWeekCalendar(props: DesktopWeekCalendarProps) {
                     style={{ height: density }}
                   />
                 ))}
-                {(appointmentsByDay.get(date) ?? []).map((appointment) => {
-                  const top = (
-                    (timeToMin(appointment.start_time) - START_HOUR * 60)
-                    / 60
-                    * density
-                  )
-                  const height = Math.max(
-                    30,
-                    appointment.duration_minutes / 60 * density - 3,
-                  )
+                {allocateOverlapLanes((appointmentsByDay.get(date) ?? []).map((appointment) => ({
+                  appointment,
+                  id: appointment.id,
+                  top: (timeToMin(appointment.start_time) - START_HOUR * 60) / 60 * density,
+                  height: Math.max(30, appointment.duration_minutes / 60 * density - 3),
+                }))).map((layout) => {
+                  const appointment = layout.appointment
+                  const top = layout.top
+                  const height = layout.height
                   const color = (
                     appointment.color
                     || appointment.services?.color
@@ -355,13 +355,16 @@ export function DesktopWeekCalendar(props: DesktopWeekCalendarProps) {
                         }
                       }}
                       className={cn(
-                        'absolute left-1 right-1 cursor-grab select-none overflow-hidden rounded-md border-l-2 px-2 py-1.5 text-left shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing',
+                        'absolute cursor-grab select-none overflow-hidden rounded-md border-l-2 px-2 py-1.5 text-left shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing',
                         grabbed
                           && 'z-40 scale-[1.03] opacity-90 shadow-lg ring-2 ring-primary',
                       )}
                       style={{
                         top,
                         height,
+                        // Split the column so overlapping appointments sit side by side.
+                        left: `calc(${layout.leftPercent}% + 2px)`,
+                        width: `calc(${layout.widthPercent}% - 4px)`,
                         backgroundColor: `${color}1f`,
                         borderColor: color,
                         touchAction: 'none',
