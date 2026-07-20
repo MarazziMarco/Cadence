@@ -244,7 +244,11 @@ export function useResponsiveCalendarLayout() {
   return layout
 }
 
-export function CalendarController({ onSelectedDateChange }: { onSelectedDateChange?: (date: string) => void } = {}) {
+export function CalendarController({ onSelectedDateChange, onViewChange, onVisibleRangeChange }: {
+  onSelectedDateChange?: (date: string) => void
+  onViewChange?: (view: string) => void
+  onVisibleRangeChange?: (from: string, to: string) => void
+} = {}) {
   const { business } = useWorkspace()
   const { t, locale } = useT()
   const dateLocale = bcp47(locale)
@@ -307,6 +311,12 @@ export function CalendarController({ onSelectedDateChange }: { onSelectedDateCha
     },
     [rangeView, responsiveLayout, state.selectedDate],
   )
+  // Report the effective view + visible range upward so the day-route map can
+  // pick which day to draw (day view follows the date, week view shows chips).
+  useEffect(() => { onViewChange?.(rangeView) }, [rangeView, onViewChange])
+  useEffect(() => {
+    onVisibleRangeChange?.(range.from, range.to)
+  }, [range.from, range.to, onVisibleRangeChange])
   const previousRange = useMemo(
     () => {
       if (responsiveLayout === 'three-day') {

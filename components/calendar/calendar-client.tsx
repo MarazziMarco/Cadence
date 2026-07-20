@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { CalendarController } from './calendar-controller'
-import { DayMap } from './day-map'
+import { DayRouteMap, type CalendarViewLike } from './day-route-map'
 import { useWorkspace } from '@/lib/workspace-context'
 
 function todayStr() {
@@ -13,13 +13,28 @@ function todayStr() {
 export function CalendarClient() {
   const { business } = useWorkspace()
   const businessId = business?.id ?? ''
-  // The map below follows the day currently selected in the calendar.
+  // The day-route map below follows the calendar: the selected day (day/month
+  // views) or a chip within the visible week (week view).
   const [day, setDay] = useState(todayStr())
+  const [view, setView] = useState<CalendarViewLike>('week')
+  const [range, setRange] = useState({ from: todayStr(), to: todayStr() })
 
   return (
     <div className="space-y-6">
-      <CalendarController onSelectedDateChange={setDay} />
-      {businessId && <DayMap businessId={businessId} date={day} />}
+      <CalendarController
+        onSelectedDateChange={setDay}
+        onViewChange={(v) => setView(v as CalendarViewLike)}
+        onVisibleRangeChange={(from, to) => setRange({ from, to })}
+      />
+      {businessId && (
+        <DayRouteMap
+          businessId={businessId}
+          view={view}
+          selectedDate={day}
+          rangeFrom={range.from}
+          rangeTo={range.to}
+        />
+      )}
     </div>
   )
 }
