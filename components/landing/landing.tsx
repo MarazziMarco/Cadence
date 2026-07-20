@@ -29,8 +29,9 @@ import {
 } from '@/components/landing/landing-copy'
 import { LandingLanguageSwitcher } from '@/components/landing/landing-language-switcher'
 import { ProductStory } from '@/components/landing/product-story'
+import { PUBLIC_LOCALE_STORAGE_KEY } from '@/lib/i18n/use-public-t'
+import { translate } from '@/lib/i18n'
 
-const LANDING_LOCALE_STORAGE_KEY = 'cadence-landing-locale'
 const FEATURE_ICONS = {
   optimize: Wand2,
   language: Bot,
@@ -72,7 +73,7 @@ export function Landing() {
   }))
 
   useEffect(() => {
-    const stored = localStorage.getItem(LANDING_LOCALE_STORAGE_KEY)
+    const stored = localStorage.getItem(PUBLIC_LOCALE_STORAGE_KEY)
     if (isLandingLocale(stored)) setLocale(stored)
   }, [])
 
@@ -82,7 +83,7 @@ export function Landing() {
 
   function changeLocale(nextLocale: LandingLocale) {
     setLocale(nextLocale)
-    localStorage.setItem(LANDING_LOCALE_STORAGE_KEY, nextLocale)
+    localStorage.setItem(PUBLIC_LOCALE_STORAGE_KEY, nextLocale)
   }
 
   return (
@@ -95,7 +96,7 @@ export function Landing() {
               locale={locale}
               onChange={changeLocale}
             />
-            <span className="hidden sm:inline-flex"><ThemeToggle /></span>
+            <span className="hidden sm:inline-flex"><ThemeToggle label={translate(locale, 'account.toggleTheme')} /></span>
             <Link href="/demo" className="hidden sm:inline-flex"><Button variant="ghost" className="gap-1.5"><PlayCircle className="h-4 w-4" /> {copy.header.demo}</Button></Link>
             <Link href="/login" className="hidden sm:inline-flex"><Button variant="ghost">{copy.header.login}</Button></Link>
             <Link href="/signup"><Button>{copy.header.started}</Button></Link>
@@ -217,7 +218,7 @@ export function Landing() {
               <Link href="/privacy" className="transition-colors hover:text-foreground">{copy.footer.privacy}</Link>
               <a href="mailto:marazzi.marco@yahoo.com" className="transition-colors hover:text-foreground">{copy.footer.contact}</a>
             </nav>
-            <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Cadence — {copy.footer.credit}</p>
+            <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Cadence</p>
           </div>
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
