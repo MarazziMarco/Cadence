@@ -58,6 +58,8 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
       invalidateCalendarAppointments(qc, businessId)
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['schedule-health'] })
+      qc.invalidateQueries({ queryKey: ['waiting'] })
+      qc.invalidateQueries({ queryKey: ['pool-planned', businessId] })
     },
     onError: (e: any) => toast.error(e.message || t('hist.undoFailed')),
   })

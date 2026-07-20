@@ -125,6 +125,7 @@ export function ContextualOptimizeDialog({
       invalidateCalendarAppointments(queryClient, businessId)
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       void queryClient.invalidateQueries({ queryKey: ['waiting'] })
+      void queryClient.invalidateQueries({ queryKey: ['pool-planned', businessId] })
       void queryClient.invalidateQueries({ queryKey: ['optimizations'] })
       setAppliedChanges(selected.map((change) => ({
         ...change,

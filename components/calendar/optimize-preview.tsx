@@ -60,6 +60,7 @@ export function OptimizePreview({ businessId, run, changes, onApplied, exact = f
       invalidateCalendarAppointments(qc, businessId)
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['waiting'] })
+      qc.invalidateQueries({ queryKey: ['pool-planned', businessId] })
       qc.invalidateQueries({ queryKey: ['schedule-health'] })
       qc.invalidateQueries({ queryKey: ['optimizations'] })
       setAppliedChanges(selected.map((change) => ({
