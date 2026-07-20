@@ -143,7 +143,18 @@ export async function resetDemo(env = loadEnv()) {
     afternoon_start: i < 5 ? '14:00' : null, afternoon_end: i < 5 ? '18:00' : null,
   })))
 
-  await sb.from('algorithm_settings').insert({ business_id: businessId })
+  // Day starts from the practitioner's home and ends back at the studio (spec
+  // §1/§4 edge legs). Travel weight left at the 1.0 default; moves unlimited.
+  const HOME = { address: 'Via Padova 100, Milano', latitude: 45.4980, longitude: 9.2320 }
+  await sb.from('algorithm_settings').insert({
+    business_id: businessId,
+    max_patient_moves: 0, max_daily_moves: 0, // unlimited (spec §2)
+    metadata: {
+      W_TRAVEL: 1,
+      start_location: HOME,
+      end_location: { address: STUDIO.address, latitude: STUDIO.lat, longitude: STUDIO.lng },
+    },
+  })
 
   // Services
   const { data: svcs } = await sb.from('services').insert(
@@ -200,6 +211,28 @@ export async function resetDemo(env = loadEnv()) {
       earliest_date: ymd(today), latest_date: ymd(latest), flexible: true, active: true,
       notes: JSON.stringify({ advance_for: far.id }),
     })
+  }
+
+  // Two pool "to plan" entries (spec §7): the optimizer books their sittings
+  // across the range, respecting max/week and the minimum gap.
+  const in21 = new Date(today); in21.setDate(in21.getDate() + 21)
+  const poolSvc = svcs[0]
+  const poolPatients = (pats ?? []).slice(0, 2)
+  if (poolPatients.length === 2 && poolSvc) {
+    await sb.from('waiting_list').insert([
+      {
+        business_id: businessId, patient_id: poolPatients[0].id, preferred_service_id: poolSvc.id,
+        preferred_duration_minutes: poolSvc.duration_minutes, priority: 'normal',
+        earliest_date: ymd(today), latest_date: ymd(in21), flexible: true, active: true,
+        notes: JSON.stringify({ pool: { sessions_total: 4, max_per_week: 2, gap_hours: 48 } }),
+      },
+      {
+        business_id: businessId, patient_id: poolPatients[1].id, preferred_service_id: poolSvc.id,
+        preferred_duration_minutes: poolSvc.duration_minutes, priority: 'high',
+        earliest_date: ymd(today), latest_date: ymd(in21), flexible: true, active: true,
+        notes: JSON.stringify({ pool: { sessions_total: 2, max_per_week: 1, gap_hours: 72 } }),
+      },
+    ])
   }
 
   return { businessId, appointments: appts.length, patients: NAMES.length, services: SERVICES.length }
