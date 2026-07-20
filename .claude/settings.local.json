@@ -94,7 +94,10 @@
       "Bash(rtk next *)",
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('supabase-js', \\(p.dependencies||{}\\)['@supabase/supabase-js']\\); console.log\\('tsx', \\(p.devDependencies||{}\\).tsx||\\(p.dependencies||{}\\).tsx\\); console.log\\('dotenv', \\(p.dependencies||{}\\).dotenv||\\(p.devDependencies||{}\\).dotenv\\); console.log\\('scripts', JSON.stringify\\(p.scripts\\)\\)\")",
       "Bash(node scripts/seed-demo.mjs)",
-      "Bash(grep -iE \"\\\\.\\(png|jpg|jpeg|webp|svg|gif\\)$\")"
+      "Bash(grep -iE \"\\\\.\\(png|jpg|jpeg|webp|svg|gif\\)$\")",
+      "Bash(awk '/^## God Nodes/,/^## Suggested Questions/' graphify-out/GRAPH_REPORT.md)",
+      "Bash(npx vitest *)",
+      "Bash(rtk vitest *)"
     ]
   }
 }
