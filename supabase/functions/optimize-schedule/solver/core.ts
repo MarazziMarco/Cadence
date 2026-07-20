@@ -884,6 +884,77 @@ export interface SolverResult {
 
 const EXACT_DAY_MAX = 13; // days larger than this keep the local search only
 
+// Earliest feasible start for `slot` on `date` with occStart ≥ minOccStart. Body
+// [start, start+dur] must sit in one window and within availability; buffers may
+// extend into closures (matches feasibleAt). Locked slots keep their fixed start.
+function earliestStart(
+  slot: Slot,
+  minOccStart: number,
+  wins: Window[],
+  av: AvailWindow[] | null,
+): number | null {
+  if (!slot.movable) {
+    return slot.start - slot.bufBefore >= minOccStart ? slot.start : null;
+  }
+  let best: number | null = null;
+  const windows = av && av.length ? av : [null];
+  for (const w of wins) {
+    for (const a of windows) {
+      let start = Math.max(w.start, minOccStart + slot.bufBefore);
+      if (a) start = Math.max(start, a.start);
+      if (start < w.start || start + slot.dur > w.end) continue;
+      if (a && start + slot.dur > a.end) continue;
+      if (best === null || start < best) best = start;
+    }
+  }
+  return best;
+}
+
+/**
+ * Left-justify (forward) + backward gap-close a fixed order of a day's slots
+ * (spec §4). Returns the new start per slot in `order` (locked slots keep their
+ * fixed start), or null if the order is infeasible.
+ */
+function retimeOrder(
+  input: SolverInput,
+  date: string,
+  order: Slot[],
+): number[] | null {
+  const wins = capacityWindows(date, input.working_hours, input.holidays);
+  if (wins.length === 0) return null;
+  const n = order.length;
+  const av = order.map((s) => availFor(input, s.patient_id, date));
+  const starts = new Array<number>(n).fill(0);
+  let prevOccEnd = -1_000_000;
+  for (let i = 0; i < n; i++) {
+    const travel = i === 0
+      ? 0
+      : travelMinutes(input, order[i - 1].location_key, order[i].location_key);
+    const st = earliestStart(order[i], prevOccEnd + travel, wins, av[i]);
+    if (st === null) return null;
+    starts[i] = st;
+    prevOccEnd = st + order[i].dur + order[i].bufAfter;
+  }
+  for (let p = n - 2; p >= 0; p--) {
+    const s = order[p];
+    if (!s.movable) continue;
+    const k = order[p + 1];
+    let latest = starts[p + 1] - k.bufBefore -
+      travelMinutes(input, s.location_key, k.location_key) - s.bufAfter - s.dur;
+    const wi = windowIndex(starts[p], starts[p] + s.dur, wins);
+    if (wi >= 0) latest = Math.min(latest, wins[wi].end - s.dur);
+    const a = av[p];
+    if (a && a.length) {
+      const aw = a.find((w) =>
+        starts[p] >= w.start && starts[p] + s.dur <= w.end
+      );
+      if (aw) latest = Math.min(latest, aw.end - s.dur);
+    }
+    if (latest > starts[p]) starts[p] = latest;
+  }
+  return starts;
+}
+
 interface DpLabel {
   jIdx: number; // appointment index this label ends at
   finish: number; // occEnd of the last appointment (start + dur + bufAfter)
@@ -1394,6 +1465,48 @@ export function runSolver(input: SolverInput): SolverResult {
       cur = c2;
     } else {
       for (const p of prev) p.slot.start = p.start;
+    }
+  }
+
+  // Phase 5b — 2-OPT + SWAP for large days (spec §5). The exact DP is skipped
+  // above EXACT_DAY_MAX, so those days get local reordering instead: reverse a
+  // contiguous segment (2-OPT) or exchange two appointments (SWAP), re-time the
+  // candidate order (§4) and keep it only on a strictly better, valid schedule.
+  {
+    const deadline = t0 + Math.min(S.max_solver_seconds, 30) * 1000;
+    for (const date of dateRange(input.context.date_from, input.context.date_to)) {
+      const size = slots.filter((s) => s.date === date).length;
+      if (size <= EXACT_DAY_MAX) continue; // ≤13 already exact via the DP
+      let improved = true;
+      while (improved && Date.now() < deadline) {
+        improved = false;
+        const day = slots
+          .filter((s) => s.date === date)
+          .sort((a, b) => occStart(a) - occStart(b) || a.id.localeCompare(b.id));
+        const n = day.length;
+        const tryOrder = (order: Slot[]): boolean => {
+          const starts = retimeOrder(input, date, order);
+          if (!starts) return false;
+          const prev = order.map((s) => s.start);
+          for (let k = 0; k < order.length; k++) order[k].start = starts[k];
+          const c2 = cost();
+          if (accept(c2)) { cur = c2; return true; }
+          for (let k = 0; k < order.length; k++) order[k].start = prev[k];
+          return false;
+        };
+        outer:
+        for (let i = 0; i < n - 1; i++) {
+          for (let j = i + 1; j < n; j++) {
+            const rev = day.slice();
+            let lo = i, hi = j;
+            while (lo < hi) { [rev[lo], rev[hi]] = [rev[hi], rev[lo]]; lo++; hi--; }
+            if (tryOrder(rev)) { improved = true; break outer; }
+            const sw = day.slice();
+            [sw[i], sw[j]] = [sw[j], sw[i]];
+            if (tryOrder(sw)) { improved = true; break outer; }
+          }
+        }
+      }
     }
   }
 

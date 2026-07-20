@@ -710,6 +710,55 @@ Deno.test("FASE 2 (§9 fixture e): the DP finds a hand-built 3-stop optimum", as
   assert(a.start < c.start && c.start < b.start, "expected order a → c → b");
 });
 
+Deno.test("FASE 2 (§5): a >13-appointment day is reordered by 2-OPT/SWAP", async () => {
+  // 14 appointments (DP skipped). All at the studio except the last two, a and b,
+  // whose edge leg to the studio differs: visiting a last is far cheaper, so the
+  // local 2-OPT/SWAP pass must swap them (b before a).
+  const input = await routedBase();
+  const template = structuredClone(input.appointments[0]);
+  const appts: any[] = [];
+  const hhmm = (min: number) =>
+    `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+  // 12 studio fillers in the morning, 20' apart.
+  for (let i = 0; i < 12; i++) {
+    const a = structuredClone(template);
+    a.id = `fill-${i}`;
+    a.patient_id = `pf-${i}`;
+    a.start_time = hhmm(540 + i * 20); // from 09:00
+    a.end_time = hhmm(540 + i * 20 + 15);
+    a.duration_minutes = 15;
+    appts.push(a);
+  }
+  const mk = (id: string, pid: string, start: number) => {
+    const a = structuredClone(template);
+    a.id = id;
+    a.patient_id = pid;
+    a.start_time = hhmm(start);
+    a.end_time = hhmm(start + 15);
+    a.duration_minutes = 15;
+    return a;
+  };
+  appts.push(mk("appt-a", "patient-a", 840)); // 14:00
+  appts.push(mk("appt-b", "patient-b", 860)); // 14:20 (b last by time)
+  input.appointments = appts;
+  input.context.settings.max_daily_moves = 0; // unlimited (spec default)
+  input.context.settings.max_patient_moves = 0;
+  setLocation(input, "appt-a", "patient-a");
+  setLocation(input, "appt-b", "patient-b");
+  setLeg(input, "studio", "patient-a", 1);
+  setLeg(input, "studio", "patient-b", 1);
+  setLeg(input, "patient-a", "patient-b", 1);
+  setLeg(input, "patient-b", "patient-a", 1);
+  setLeg(input, "patient-a", "studio", 1); // a → home cheap
+  setLeg(input, "patient-b", "studio", 30); // b → home expensive
+
+  const result = runSolver(input);
+  assertEquals(findHardViolation(input, result.slots), null);
+  const a = result.slots.find((s) => s.id === "appt-a")!;
+  const b = result.slots.find((s) => s.id === "appt-b")!;
+  assert(b.start < a.start, `expected b before a after SWAP, got a@${a.start} b@${b.start}`);
+});
+
 Deno.test("routing results stay deterministic for a fixed candidate budget", async () => {
   const first = await routedBase();
   first.context.settings.max_solver_seconds = 30;
