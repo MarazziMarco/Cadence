@@ -19,20 +19,21 @@ import { cn } from '@/lib/utils'
 import { generateDemoWeek, demoWeekDays, type DemoAppointment } from '@/lib/demo/fixtures'
 import { compactWeek, type DemoChange } from '@/lib/demo/compact'
 import { parseAppointment } from '@/lib/voice/parse-appointment'
-import { useSpeech } from '@/lib/voice/use-speech'
+import { speechLang, useSpeech } from '@/lib/voice/use-speech'
+import { usePublicT } from '@/lib/i18n/use-public-t'
+import { bcp47 } from '@/lib/i18n'
 import { DemoMovedMessages } from './demo-moved-messages'
 
 const START_HOUR = 8, END_HOUR = 19, HOUR_H = 80
 const LUNCH_START = 13 * 60, LUNCH_END = 14 * 60
 const DEMO_PALETTE = ['#4f46e5', '#db2777', '#059669', '#d97706', '#0891b2', '#7c3aed']
-const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const DOW_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-
 function ymd(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 function fmt(min: number) { const h = Math.floor(min / 60), m = min % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` }
 function toMin(t: string) { const [h, m] = t.split(':').map(Number); return h * 60 + m }
 
 export function DemoCalendar() {
+  const { t, locale } = usePublicT()
+  const dateLocale = bcp47(locale)
   const days = useMemo(() => demoWeekDays(), [])
   const [appts, setAppts] = useState<DemoAppointment[]>(() => generateDemoWeek())
   const [preview, setPreview] = useState<{ changes: DemoChange[]; minutesRecovered: number } | null>(null)
@@ -51,7 +52,7 @@ export function DemoCalendar() {
   })
 
   // Voice add (Web Speech API + local parser, all in memory).
-  const { supported: micSupported, listening, start: startRec, stop: stopRec } = useSpeech('en-US')
+  const { supported: micSupported, listening, start: startRec, stop: stopRec } = useSpeech(speechLang(locale))
   const [transcript, setTranscript] = useState('')
   const [draft, setDraft] = useState<{ name: string; dateOffset: number; time: string; duration: number } | null>(null)
 
@@ -130,13 +131,13 @@ export function DemoCalendar() {
     setTranscript('')
     startRec(
       (text) => { setTranscript(text); applyVoice(text) },
-      () => toast.error('Microphone unavailable (needs HTTPS). Type the phrase below.'),
+      () => toast.error(t('demo.voiceError')),
     )
   }
 
   function addDraft() {
     if (!draft) return
-    if (!draft.name.trim()) { toast.error('Enter a client name'); return }
+    if (!draft.name.trim()) { toast.error(t('demo.needName')); return }
     const date = ymd(days[draft.dateOffset])
     const appt: DemoAppointment = {
       id: `voice-${Date.now()}`,
@@ -150,7 +151,7 @@ export function DemoCalendar() {
     setAppts((prev) => [...prev, appt])
     setDraft(null)
     setTranscript('')
-    toast.success('Appointment added to the demo calendar')
+    toast.success(t('demo.added'))
   }
 
   const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
@@ -163,16 +164,16 @@ export function DemoCalendar() {
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Demo calendar</h1>
-          <p className="text-sm text-muted-foreground">A sample week, preloaded with fake appointments.</p>
+          <h1 className="text-xl font-bold tracking-tight">{t('demo.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('demo.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm">
             <Clock className="h-3.5 w-3.5 text-primary" />
             <span className="font-semibold">{totalRecovered}</span>
-            <span className="text-muted-foreground">min of idle time recovered</span>
+            <span className="text-muted-foreground">{t('demo.recovered')}</span>
           </div>
-          <Button variant="outline" onClick={handleReset}><RotateCcw className="mr-2 h-4 w-4" /> Reset demo</Button>
+          <Button variant="outline" onClick={handleReset}><RotateCcw className="mr-2 h-4 w-4" /> {t('demo.reset')}</Button>
         </div>
       </div>
 
@@ -182,7 +183,7 @@ export function DemoCalendar() {
           {view === 'day' && (
             <>
               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setDayIdx((i) => Math.max(0, i - 1))} disabled={dayIdx === 0}><ChevronLeft className="h-4 w-4" /></Button>
-              <span className="min-w-[9rem] text-center text-sm font-semibold">{DOW_FULL[dayIdx]} {days[dayIdx].getDate()}</span>
+              <span className="min-w-[9rem] text-center text-sm font-semibold">{days[dayIdx].toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric' })}</span>
               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setDayIdx((i) => Math.min(4, i + 1))} disabled={dayIdx === 4}><ChevronRight className="h-4 w-4" /></Button>
             </>
           )}
@@ -190,10 +191,10 @@ export function DemoCalendar() {
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-lg border border-border p-0.5">
             {(['day', 'week'] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
+              <button key={v} onClick={() => setView(v)} className={cn('rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors', view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{t(`demo.${v}`)}</button>
             ))}
           </div>
-          <Button onClick={handleOptimize}><Wand2 className="mr-2 h-4 w-4" /> {view === 'day' ? 'Optimize day' : 'Optimize'}</Button>
+          <Button onClick={handleOptimize}><Wand2 className="mr-2 h-4 w-4" /> {view === 'day' ? t('demo.optimizeDay') : t('demo.optimize')}</Button>
         </div>
       </div>
 
@@ -207,9 +208,9 @@ export function DemoCalendar() {
                 const closed = idx >= 5
                 return (
                   <div key={ymd(d)} className="flex-1 border-l border-border py-2 text-center">
-                    <div className="text-xs text-muted-foreground">{DOW[idx]}</div>
+                    <div className="text-xs text-muted-foreground">{d.toLocaleDateString(dateLocale, { weekday: 'short' })}</div>
                     <div className={cn('mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold', isToday && 'bg-primary text-primary-foreground')}>{d.getDate()}</div>
-                    {closed && <div className="mt-0.5 text-[10px] text-muted-foreground">Closed</div>}
+                    {closed && <div className="mt-0.5 text-[10px] text-muted-foreground">{t('demo.closed')}</div>}
                   </div>
                 )
               })}
@@ -257,35 +258,35 @@ export function DemoCalendar() {
       {/* Voice add — moved below the calendar. Free, in-memory (Web Speech API +
           local parser). Text input is always available as a fallback (HTTPS). */}
       <div className="mt-4 rounded-xl border border-border bg-card p-4">
-        <div className="mb-1 flex items-center gap-2 text-sm font-medium"><Mic className="h-4 w-4 text-primary" /> Add an appointment by voice</div>
-        <p className="mb-3 text-sm text-muted-foreground">Dictate e.g. “Marco on Tuesday at 3pm”. Everything stays in memory — nothing is saved.</p>
+        <div className="mb-1 flex items-center gap-2 text-sm font-medium"><Mic className="h-4 w-4 text-primary" /> {t('demo.voiceTitle')}</div>
+        <p className="mb-3 text-sm text-muted-foreground">{t('demo.voiceDescription')}</p>
         <div className="flex flex-wrap items-center gap-3">
           {micSupported ? (
             <Button variant={listening ? 'destructive' : 'default'} onClick={toggleMic}>
-              {listening ? <><MicOff className="mr-2 h-4 w-4" /> Stop</> : <><Mic className="mr-2 h-4 w-4" /> Dictate</>}
+              {listening ? <><MicOff className="mr-2 h-4 w-4" /> {t('voice.stop')}</> : <><Mic className="mr-2 h-4 w-4" /> {t('demo.dictate')}</>}
             </Button>
           ) : (
-            <Badge variant="secondary">Microphone unavailable — use text</Badge>
+            <Badge variant="secondary">{t('demo.voiceUnavailable')}</Badge>
           )}
-          {listening && <span className="flex items-center gap-1.5 text-sm text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-destructive" /> Listening…</span>}
+          {listening && <span className="flex items-center gap-1.5 text-sm text-muted-foreground"><span className="h-2 w-2 animate-pulse rounded-full bg-destructive" /> {t('voice.listening')}</span>}
         </div>
         <div className="mt-3 flex gap-2">
-          <Input value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="e.g. Giulia on Friday at 10" />
+          <Input value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder={t('voice.placeholder')} />
           <Button variant="outline" onClick={() => applyVoice(transcript)} disabled={!transcript.trim()}><Sparkles className="h-4 w-4" /></Button>
         </div>
         {draft && (
           <div className="mt-3 grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-4">
-            <div className="space-y-1.5"><Label>Client</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Name" /></div>
+            <div className="space-y-1.5"><Label>{t('voice.client')}</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t('demo.name')} /></div>
             <div className="space-y-1.5">
-              <Label>Day</Label>
+              <Label>{t('demo.day')}</Label>
               <Select value={String(draft.dateOffset)} onValueChange={(v) => setDraft({ ...draft, dateOffset: Number(v) })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{days.slice(0, 5).map((d, i) => <SelectItem key={i} value={String(i)}>{DOW[i]} {d.getDate()}</SelectItem>)}</SelectContent>
+                <SelectContent>{days.slice(0, 5).map((d, i) => <SelectItem key={i} value={String(i)}>{d.toLocaleDateString(dateLocale, { weekday: 'short', day: 'numeric' })}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Time</Label><Input type="time" value={draft.time} onChange={(e) => setDraft({ ...draft, time: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>Duration (min)</Label><Input type="number" value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: parseInt(e.target.value) || 30 })} /></div>
-            <div className="flex justify-end sm:col-span-4"><Button onClick={addDraft}><Plus className="mr-2 h-4 w-4" /> Add to calendar</Button></div>
+            <div className="space-y-1.5"><Label>{t('voice.time')}</Label><Input type="time" value={draft.time} onChange={(e) => setDraft({ ...draft, time: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>{t('demo.duration')}</Label><Input type="number" value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: parseInt(e.target.value) || 30 })} /></div>
+            <div className="flex justify-end sm:col-span-4"><Button onClick={addDraft}><Plus className="mr-2 h-4 w-4" /> {t('demo.addToCalendar')}</Button></div>
           </div>
         )}
       </div>
@@ -293,7 +294,7 @@ export function DemoCalendar() {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-h-[85vh] gap-0 overflow-hidden p-0 sm:max-w-lg">
           <DialogHeader className="border-b border-border px-5 py-4">
-            <DialogTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4 text-primary" /> Optimization (demo)</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-base"><Sparkles className="h-4 w-4 text-primary" /> {t('demo.previewTitle')}</DialogTitle>
           </DialogHeader>
 
           <div className="max-h-[calc(85vh-4rem)] overflow-y-auto p-5">
@@ -303,33 +304,33 @@ export function DemoCalendar() {
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <span className="text-muted-foreground">
                     {preview.changes.length === 0
-                      ? 'Schedule already optimal for the selected range.'
-                      : `Recovered ${preview.minutesRecovered} min of idle time by moving ${preview.changes.length} appointment${preview.changes.length === 1 ? '' : 's'}.`}
+                      ? t('demo.alreadyOptimal')
+                      : t(preview.changes.length === 1 ? 'demo.recoveredOne' : 'demo.recoveredMany', { minutes: preview.minutesRecovered, count: preview.changes.length })}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border border-border p-3">
-                    <div className="flex items-center justify-between"><p className="text-[11px] text-muted-foreground">Idle time</p><Clock className="h-3.5 w-3.5 text-primary" /></div>
+                    <div className="flex items-center justify-between"><p className="text-[11px] text-muted-foreground">{t('demo.idleTime')}</p><Clock className="h-3.5 w-3.5 text-primary" /></div>
                     <p className="mt-1 text-lg font-bold tracking-tight">{preview.minutesRecovered} min</p>
                   </div>
                   <div className="rounded-lg border border-border p-3">
-                    <div className="flex items-center justify-between"><p className="text-[11px] text-muted-foreground">Moved</p><ArrowRightLeft className="h-3.5 w-3.5 text-primary" /></div>
+                    <div className="flex items-center justify-between"><p className="text-[11px] text-muted-foreground">{t('demo.moved')}</p><ArrowRightLeft className="h-3.5 w-3.5 text-primary" /></div>
                     <p className="mt-1 text-lg font-bold tracking-tight">{preview.changes.length}</p>
                   </div>
                 </div>
 
                 {preview.changes.length > 0 && (
                   <div>
-                    <p className="mb-1 text-sm font-semibold">Proposed changes ({preview.changes.length})</p>
-                    <p className="mb-2 text-xs text-muted-foreground">Untick a move to keep that appointment where it is.</p>
+                    <p className="mb-1 text-sm font-semibold">{t('demo.proposed', { count: preview.changes.length })}</p>
+                    <p className="mb-2 text-xs text-muted-foreground">{t('demo.untick')}</p>
                     <div className="space-y-2">
                       {preview.changes.map((c) => (
                         <div key={c.id} className={cn('rounded-lg border border-border p-3 transition-opacity', excluded.has(c.id) && 'opacity-50')}>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
-                              <Checkbox checked={!excluded.has(c.id)} onCheckedChange={() => toggleExcluded(c.id)} aria-label={`Include moving ${c.patientName}`} />
-                              <Badge variant="secondary"><ArrowRightLeft className="mr-1 h-3 w-3" /> Moved</Badge>
+                              <Checkbox checked={!excluded.has(c.id)} onCheckedChange={() => toggleExcluded(c.id)} aria-label={t('demo.includeMove', { name: c.patientName })} />
+                              <Badge variant="secondary"><ArrowRightLeft className="mr-1 h-3 w-3" /> {t('demo.moved')}</Badge>
                               <span className="text-sm font-medium">{c.patientName}</span>
                             </div>
                             <span className="flex items-center gap-2 text-sm">
@@ -338,7 +339,7 @@ export function DemoCalendar() {
                               <span className="font-semibold text-primary">{fmt(c.newStart)}</span>
                             </span>
                           </div>
-                          <p className="mt-1.5 text-xs text-muted-foreground">Moved {c.oldStart - c.newStart} min earlier to close the gap.</p>
+                          <p className="mt-1.5 text-xs text-muted-foreground">{t('demo.movedEarlier', { minutes: c.oldStart - c.newStart })}</p>
                         </div>
                       ))}
                     </div>
@@ -346,8 +347,8 @@ export function DemoCalendar() {
                 )}
 
                 <div className="flex justify-end gap-2 pt-1">
-                  <Button variant="outline" onClick={() => setPreviewOpen(false)}>Cancel</Button>
-                  <Button onClick={handleAccept} disabled={preview.changes.filter((c) => !excluded.has(c.id)).length === 0}><Check className="mr-2 h-4 w-4" /> Apply{preview.changes.length ? ` (${preview.changes.filter((c) => !excluded.has(c.id)).length})` : ''}</Button>
+                  <Button variant="outline" onClick={() => setPreviewOpen(false)}>{t('common.cancel')}</Button>
+                  <Button onClick={handleAccept} disabled={preview.changes.filter((c) => !excluded.has(c.id)).length === 0}><Check className="mr-2 h-4 w-4" /> {t('demo.apply')}{preview.changes.length ? ` (${preview.changes.filter((c) => !excluded.has(c.id)).length})` : ''}</Button>
                 </div>
               </div>
             )}

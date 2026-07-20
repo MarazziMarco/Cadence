@@ -29,7 +29,7 @@ export function LabClient() {
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['schedule-health'] })
     } catch (e: any) {
-      toast.error(e.message || t('lab.seedFailed'))
+      toast.error(t('lab.seedFailed'))
     } finally {
       setSeeding(false)
     }

@@ -33,7 +33,7 @@ export function ServicesClient() {
     enabled: !!businessId,
   })
 
-  const delMut = useMutation({ mutationFn: (id: string) => softDeleteService(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['services'] }); toast.success(t('svc.deleted')) }, onError: (e: any) => toast.error(e.message) })
+  const delMut = useMutation({ mutationFn: (id: string) => softDeleteService(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['services'] }); toast.success(t('svc.deleted')) }, onError: () => toast.error(t('appt.saveFailed')) })
   const toggleMut = useMutation({ mutationFn: ({ id, v }: { id: string; v: boolean }) => toggleServiceActive(id, v), onSuccess: () => qc.invalidateQueries({ queryKey: ['services'] }) })
 
   const groups = services.reduce<Record<string, Service[]>>((acc, s) => {

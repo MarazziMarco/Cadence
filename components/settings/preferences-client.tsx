@@ -193,7 +193,7 @@ export function PreferencesClient() {
       toast.success(t('prefs.saved'))
       router.refresh()
     } catch (e: any) {
-      toast.error(e.message || t('common.saveFailed'))
+      toast.error(t('common.saveFailed'))
     } finally {
       setSaving(false)
     }

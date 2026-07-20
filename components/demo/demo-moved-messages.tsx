@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { MessageSquare, Copy, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { DemoChange } from '@/lib/demo/compact'
+import { usePublicT } from '@/lib/i18n/use-public-t'
+import { bcp47 } from '@/lib/i18n'
 
 // In-memory version of components/calendar/moved-messages.tsx for the public
 // /demo page: no DB, no Edge Function. Builds a ready-to-send message per moved
@@ -14,21 +16,28 @@ function fmt(min: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-function dayLabel(date: string) {
+function dayLabel(date: string, locale: string) {
   try {
-    return new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(date + 'T00:00:00'))
+    return new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(date + 'T00:00:00'))
   } catch {
     return date
   }
 }
 
-function buildText(c: DemoChange) {
-  return `Hi ${c.patientName}, your appointment on ${dayLabel(c.date)} has been moved earlier from ${fmt(c.oldStart)} to ${fmt(c.newStart)}. Let me know if that works for you!`
-}
-
 export function DemoMovedMessages({ changes, onClose }: { changes: DemoChange[]; onClose: () => void }) {
+  const { t, locale } = usePublicT()
+  const dateLocale = bcp47(locale)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const msgs = useMemo(() => changes.map((c) => ({ id: c.id, name: c.patientName, text: buildText(c) })), [changes])
+  const msgs = useMemo(() => changes.map((c) => ({
+    id: c.id,
+    name: c.patientName,
+    text: t('demo.clientMessage', {
+      name: c.patientName,
+      date: dayLabel(c.date, dateLocale),
+      oldTime: fmt(c.oldStart),
+      newTime: fmt(c.newStart),
+    }),
+  })), [changes, dateLocale, t])
 
   async function copy(id: string, text: string) {
     try {
@@ -38,7 +47,7 @@ export function DemoMovedMessages({ changes, onClose }: { changes: DemoChange[];
       try { document.execCommand('copy') } catch {}
       document.body.removeChild(ta)
     }
-    setCopiedId(id); toast.success('Copied ✓')
+    setCopiedId(id); toast.success(t('demo.copied'))
     setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1800)
   }
 
@@ -49,7 +58,7 @@ export function DemoMovedMessages({ changes, onClose }: { changes: DemoChange[];
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm">
           <MessageSquare className="h-4 w-4 shrink-0 text-primary" />
-          <span><span className="font-semibold">{changes.length} appointment{changes.length === 1 ? '' : 's'} moved.</span> Copy the messages to send to your clients.</span>
+          <span><span className="font-semibold">{t(changes.length === 1 ? 'demo.messagesTitleOne' : 'demo.messagesTitle', { count: changes.length })}</span> {t('demo.messagesSubtitle')}</span>
         </div>
         <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={onClose}><X className="h-4 w-4" /></Button>
       </div>
@@ -59,7 +68,7 @@ export function DemoMovedMessages({ changes, onClose }: { changes: DemoChange[];
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-sm font-medium">{m.name}</span>
               <Button size="sm" variant={copiedId === m.id ? 'secondary' : 'outline'} onClick={() => copy(m.id, m.text)}>
-                {copiedId === m.id ? <><Check className="mr-1 h-3.5 w-3.5 text-success" /> Copied ✓</> : <><Copy className="mr-1 h-3.5 w-3.5" /> Copy</>}
+                {copiedId === m.id ? <><Check className="mr-1 h-3.5 w-3.5 text-success" /> {t('demo.copied')}</> : <><Copy className="mr-1 h-3.5 w-3.5" /> {t('demo.copy')}</>}
               </Button>
             </div>
             <p className="whitespace-pre-wrap rounded-md bg-muted/50 p-2.5 text-sm text-muted-foreground">{m.text}</p>

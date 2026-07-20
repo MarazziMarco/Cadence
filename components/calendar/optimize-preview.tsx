@@ -69,8 +69,8 @@ export function OptimizePreview({ businessId, run, changes, onApplied, exact = f
       })))
       toast.success(t('opt.applied', { n: selected.length }))
       onApplied?.()
-    } catch (e: any) {
-      toast.error(e.message)
+    } catch {
+      toast.error(t('opt.failed'))
     } finally {
       setApplying(false)
     }

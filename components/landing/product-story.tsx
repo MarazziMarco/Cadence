@@ -79,7 +79,7 @@ export function ProductStory({
                   <button
                     key={step.id}
                     type="button"
-                    aria-label={`Show ${step.title}`}
+                    aria-label={step.title}
                     aria-current={index === activeIndex ? 'step' : undefined}
                     className="flex h-6 w-6 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={() => setActiveIndex(index)}

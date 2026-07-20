@@ -1,6 +1,10 @@
+'use client'
+
 import { BarChart3 } from 'lucide-react'
 import { ModuleScaffold } from '@/components/common/module-scaffold'
+import { useT } from '@/lib/i18n/use-t'
 
 export default function AnalyticsPage() {
-  return <ModuleScaffold title="Analytics" description="Occupancy, revenue and optimization impact." icon={BarChart3} emptyTitle="Analytics coming online" emptyDesc="Beautiful charts for occupancy, idle time, revenue and AI usage." />
+  const { t } = useT()
+  return <ModuleScaffold title={t('nav.analytics')} description={t('analytics.subtitle')} icon={BarChart3} emptyTitle={t('analytics.emptyTitle')} emptyDesc={t('analytics.emptyDescription')} />
 }

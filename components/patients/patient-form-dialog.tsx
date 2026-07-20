@@ -72,7 +72,7 @@ export function PatientFormDialog({ businessId, patient, open, onOpenChange }: {
       if (editing) qc.invalidateQueries({ queryKey: ['patient', patient!.id] })
       onOpenChange(false)
     },
-    onError: (e: any) => toast.error(e.message || t('appt.saveFailed')),
+    onError: () => toast.error(t('appt.saveFailed')),
   })
 
   return (

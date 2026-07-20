@@ -119,7 +119,7 @@ export function WaitingDialog({ businessId, entry, open, onOpenChange }: { busin
       return editing ? updateWaiting(entry.id, values) : createWaiting(businessId, values)
     },
     onSuccess: () => { toast.success(editing ? t('waitd.updated') : t('waitd.added')); qc.invalidateQueries({ queryKey: ['waiting'] }); onOpenChange(false) },
-    onError: (e: any) => toast.error(e.message),
+    onError: () => toast.error(t('common.saveFailed')),
   })
 
   return (

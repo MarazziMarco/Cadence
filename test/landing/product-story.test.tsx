@@ -166,7 +166,7 @@ describe('ProductStory', () => {
       '/landing/voice.png',
     )
     fireEvent.click(screen.getByRole('button', {
-      name: /show the best route, measured/i,
+      name: /the best route, measured/i,
     }))
     await waitFor(() => {
       expect(screen.getByTestId('product-story-image')).toHaveAttribute(

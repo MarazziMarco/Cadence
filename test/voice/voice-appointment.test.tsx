@@ -13,7 +13,16 @@ const PATIENTS = [
 vi.mock("@/lib/workspace-context", () => ({
   useWorkspace: () => ({ business: { id: "b1", language: "en", default_appointment_duration: 30 } }),
 }));
-vi.mock("@/lib/i18n/use-t", () => ({ useT: () => ({ t: (k: string) => k, locale: "en" }) }));
+vi.mock("@/lib/i18n/use-t", () => ({
+  useT: () => ({
+    t: (k: string) => ({
+      "voice.placeholder": "e.g. Giulia on Friday at 10 checkup",
+      "voice.create": "Create appointment",
+      "voice.speak": "Speak",
+    } as Record<string, string>)[k] ?? k,
+    locale: "en",
+  }),
+}));
 vi.mock("@/lib/voice/use-speech", () => ({
   useSpeech: () => ({ supported: false, listening: false, start: vi.fn(), stop: vi.fn() }),
   speechLang: () => "en-US",

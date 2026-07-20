@@ -57,7 +57,7 @@ export function ServiceFormDialog({ businessId, service, open, onOpenChange }: {
       qc.invalidateQueries({ queryKey: ['services'] })
       onOpenChange(false)
     },
-    onError: (e: any) => toast.error(e.message || t('appt.saveFailed')),
+    onError: () => toast.error(t('appt.saveFailed')),
   })
 
   return (

@@ -5,9 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, ListChecks, MoreHorizontal, Pencil, Trash2, Star, CalendarClock, ChevronsUp, Layers } from 'lucide-react'
 import { listWaiting, deleteWaiting, advanceApptId, poolPlannedCounts } from '@/lib/api/waiting-list'
-import { WEEKDAY_LABELS } from '@/lib/types/db'
+import { WEEKDAYS } from '@/lib/types/db'
 import { useWorkspace } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
+import { bcp47 } from '@/lib/i18n'
 import { PageHeader } from '@/components/common/page-header'
 import { EmptyState } from '@/components/common/empty-state'
 import { WaitingDialog } from './waiting-dialog'
@@ -36,7 +37,8 @@ function parsePlan(notes: unknown): { pool: any | null; note: string } {
 
 export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const { business } = useWorkspace()
-  const { t } = useT()
+  const { t, locale } = useT()
+  const dateLocale = bcp47(locale)
   const businessId = business?.id ?? ''
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
@@ -68,7 +70,7 @@ export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean
       ) : (
         <div className="stagger-in space-y-3">
           {entries.map((e: any) => {
-            const name = e.patients?.full_name || e.patients?.first_name || 'Client'
+            const name = e.patients?.full_name || e.patients?.first_name || t('dash.client')
             const adv = advanceApptId(e)
             const { pool, note } = parsePlan(e.notes)
             return (
@@ -89,7 +91,10 @@ export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {e.services?.name && <span>{e.services.emoji ? e.services.emoji + ' ' : ''}{e.services.name}</span>}
-                      {e.preferred_weekdays?.length > 0 && <span>{e.preferred_weekdays.map((d: any) => WEEKDAY_LABELS[d as keyof typeof WEEKDAY_LABELS]?.slice(0, 3)).join(', ')}</span>}
+                      {e.preferred_weekdays?.length > 0 && <span>{e.preferred_weekdays.map((d: any) => {
+                        const index = WEEKDAYS.indexOf(d)
+                        return new Date(2024, 0, 1 + Math.max(0, index)).toLocaleDateString(dateLocale, { weekday: 'short' })
+                      }).join(', ')}</span>}
                       {(e.earliest_time || e.latest_time) && <span className="inline-flex items-center gap-1"><CalendarClock className="h-3 w-3" />{e.earliest_time?.slice(0, 5) || '—'}–{e.latest_time?.slice(0, 5) || '—'}</span>}
                       {pool && <span>{t('wait.plan.config', { week: pool.max_per_week || '∞', gap: pool.gap_hours })}</span>}
                       {adv ? <span className="italic">{t('wait.advanceNote')}</span> : (note && <span className="italic">“{note}”</span>)}

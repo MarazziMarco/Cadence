@@ -44,11 +44,11 @@ export function PatientProfile({ id }: { id: string }) {
 
   const flagMut = useMutation({
     mutationFn: (patch: any) => setPatientFlag(id, patch),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patient', id] }); qc.invalidateQueries({ queryKey: ['patients'] }); toast.success('Updated') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patient', id] }); qc.invalidateQueries({ queryKey: ['patients'] }); toast.success(t('patient.updated')) },
   })
   const delMut = useMutation({
     mutationFn: () => softDeletePatient(id),
-    onSuccess: () => { toast.success('Client deleted'); router.push('/patients') },
+    onSuccess: () => { toast.success(t('patient.deleted')); router.push('/patients') },
   })
   const delPlanMut = useMutation({
     mutationFn: (parentId: string) => deleteTreatmentPlan(parentId),
@@ -56,19 +56,19 @@ export function PatientProfile({ id }: { id: string }) {
       qc.invalidateQueries({ queryKey: ['patient-plans', id] })
       qc.invalidateQueries({ queryKey: ['patient-upcoming', id] })
       if (business?.id) invalidateCalendarAppointments(qc, business.id)
-      toast.success('Plan deleted')
+      toast.success(t('patient.planDeleted'))
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: () => toast.error(t('common.saveFailed')),
   })
 
   if (isLoading) return <div className="space-y-4"><Skeleton className="h-8 w-40" /><Skeleton className="h-40 w-full" /></div>
-  if (!p) return <div><Link href="/patients" className="text-primary">← Back to clients</Link><p className="mt-4 text-muted-foreground">Client not found.</p></div>
+  if (!p) return <div><Link href="/patients" className="text-primary">← {t('patient.back')}</Link><p className="mt-4 text-muted-foreground">{t('patient.notFound')}</p></div>
 
   const stats = [
-    { label: 'Total', value: p.total_appointments ?? 0, icon: CalendarCheck },
-    { label: 'No-shows', value: p.no_show_count ?? 0, icon: UserX },
-    { label: 'Cancelled', value: (p as any).cancelled_appointments ?? 0, icon: XCircle },
-    { label: 'Spent', value: formatMoney(p.total_spent, business?.currency), icon: Wallet },
+    { label: t('patient.total'), value: p.total_appointments ?? 0, icon: CalendarCheck },
+    { label: t('patient.noShows'), value: p.no_show_count ?? 0, icon: UserX },
+    { label: t('patient.cancelled'), value: (p as any).cancelled_appointments ?? 0, icon: XCircle },
+    { label: t('patient.spent'), value: formatMoney(p.total_spent, business?.currency), icon: Wallet },
   ]
   const addressLine = [
     p.address,
@@ -77,7 +77,7 @@ export function PatientProfile({ id }: { id: string }) {
 
   return (
     <div>
-      <Link href="/patients" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Clients</Link>
+      <Link href="/patients" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {t('nav.patients')}</Link>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
@@ -86,13 +86,13 @@ export function PatientProfile({ id }: { id: string }) {
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-bold tracking-tight">{p.full_name || p.first_name}</h2>
               {/* VIP is just a star: lit when VIP, off otherwise */}
-              <button onClick={() => flagMut.mutate({ is_vip: !p.is_vip })} aria-label={p.is_vip ? 'Unset VIP' : 'Set VIP'} className="rounded-full p-1 transition-colors hover:bg-accent">
+              <button onClick={() => flagMut.mutate({ is_vip: !p.is_vip })} aria-label={p.is_vip ? t('patient.unsetVip') : t('patient.setVip')} className="rounded-full p-1 transition-colors hover:bg-accent">
                 <Star className={p.is_vip ? 'h-5 w-5 fill-warning text-warning' : 'h-5 w-5 text-muted-foreground'} />
               </button>
-              <button onClick={() => setEditOpen(true)} aria-label="Edit" className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Pencil className="h-4 w-4" /></button>
-              {p.archived && <Badge variant="secondary">Archived</Badge>}
+              <button onClick={() => setEditOpen(true)} aria-label={t('common.edit')} className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+              {p.archived && <Badge variant="secondary">{t('patient.archived')}</Badge>}
             </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">{[p.email, p.phone].filter(Boolean).join('  ·  ') || 'No contact info'}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{[p.email, p.phone].filter(Boolean).join('  ·  ') || t('patient.noContact')}</p>
             <div className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
               <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <div>
@@ -104,8 +104,8 @@ export function PatientProfile({ id }: { id: string }) {
         </div>
         {/* Primary actions, stacked */}
         <div className="flex flex-col gap-2 sm:w-52">
-          <Button onClick={() => setApptOpen(true)}><CalendarPlus className="mr-2 h-4 w-4" /> New appointment</Button>
-          <Button variant="outline" onClick={() => setPlanOpen(true)}><ClipboardList className="mr-2 h-4 w-4" /> Treatment plan</Button>
+          <Button onClick={() => setApptOpen(true)}><CalendarPlus className="mr-2 h-4 w-4" /> {t('patient.newAppointment')}</Button>
+          <Button variant="outline" onClick={() => setPlanOpen(true)}><ClipboardList className="mr-2 h-4 w-4" /> {t('patient.treatmentPlan')}</Button>
         </div>
       </div>
 
@@ -129,19 +129,19 @@ export function PatientProfile({ id }: { id: string }) {
 
       {/* Upcoming appointments (from today) */}
       <Card className="mt-6 shadow-sm">
-        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-4 w-4 text-primary" /> Upcoming appointments</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-4 w-4 text-primary" /> {t('patient.upcoming')}</CardTitle></CardHeader>
         <CardContent>
           {upcoming.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No upcoming appointments.</p>
+            <p className="text-sm text-muted-foreground">{t('patient.noUpcoming')}</p>
           ) : (
             <div className="space-y-2">
               {upcoming.map((a: any) => (
                 <div key={a.id} className="flex items-center justify-between rounded-lg border border-border p-2.5">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{a.title || a.services?.name || 'Appointment'}</p>
+                    <p className="truncate text-sm font-medium">{a.title || a.services?.name || t('patient.appointment')}</p>
                     <p className="text-xs text-muted-foreground">{a.appointment_date} · {fmtTime(a.start_time)}</p>
                   </div>
-                  <Badge variant="secondary" className="capitalize">{a.status}</Badge>
+                  <Badge variant="secondary" className="capitalize">{t('cal.status.' + a.status)}</Badge>
                 </div>
               ))}
             </div>
@@ -152,12 +152,12 @@ export function PatientProfile({ id }: { id: string }) {
       {/* Treatment plans */}
       <Card className="mt-6 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-primary" /> Treatment plans</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setPlanOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> New plan</Button>
+          <CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-primary" /> {t('patient.plans')}</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setPlanOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> {t('patient.newPlan')}</Button>
         </CardHeader>
         <CardContent>
           {plans.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No active plan. Create one to generate linked sessions.</p>
+            <p className="text-sm text-muted-foreground">{t('patient.noPlan')}</p>
           ) : (
             <div className="space-y-4">
               {plans.map((plan) => {
@@ -170,21 +170,21 @@ export function PatientProfile({ id }: { id: string }) {
                         <p className="text-xs text-muted-foreground">{[plan.serviceName, plan.therapist].filter(Boolean).join('  ·  ') || '—'}</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Badge variant="secondary">{plan.completed}/{plan.total} done</Badge>
-                        <button onClick={() => setEditPlan(plan)} aria-label="Edit plan" className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                        <Badge variant="secondary">{plan.completed}/{plan.total} {t('patient.done')}</Badge>
+                        <button onClick={() => setEditPlan(plan)} aria-label={t('patient.editPlan')} className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
                         <AlertDialog>
-                          <AlertDialogTrigger asChild><button aria-label="Delete plan" className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button></AlertDialogTrigger>
+                          <AlertDialogTrigger asChild><button aria-label={t('patient.deletePlan')} className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button></AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>Delete this plan?</AlertDialogTitle><AlertDialogDescription>All its sessions (past and future) will be removed.</AlertDialogDescription></AlertDialogHeader>
-                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => delPlanMut.mutate(plan.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
+                            <AlertDialogHeader><AlertDialogTitle>{t('patient.deletePlanTitle')}</AlertDialogTitle><AlertDialogDescription>{t('patient.deletePlanDescription')}</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={() => delPlanMut.mutate(plan.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t('common.delete')}</AlertDialogAction></AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
                       </div>
                     </div>
                     <Progress value={pct} className="mt-2.5" />
                     <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{plan.remaining} remaining</span>
-                      {plan.nextDate && <span>Next: {plan.nextDate}</span>}
+                      <span>{t('patient.remaining', { count: plan.remaining })}</span>
+                      {plan.nextDate && <span>{t('patient.nextDate', { date: plan.nextDate })}</span>}
                     </div>
                   </div>
                 )
@@ -198,32 +198,32 @@ export function PatientProfile({ id }: { id: string }) {
       <div className="mt-8 flex flex-col gap-2 border-t border-border pt-6 sm:flex-row sm:justify-end">
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline"><Archive className="mr-2 h-4 w-4" /> {p.archived ? 'Unarchive client' : 'Archive client'}</Button>
+            <Button variant="outline"><Archive className="mr-2 h-4 w-4" /> {p.archived ? t('patient.unarchive') : t('patient.archive')}</Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{p.archived ? 'Unarchive this client?' : 'Archive this client?'}</AlertDialogTitle>
-              <AlertDialogDescription>{p.archived ? 'They will appear in your active clients again.' : 'They will be hidden from your active clients. You can unarchive them anytime.'}</AlertDialogDescription>
+              <AlertDialogTitle>{p.archived ? t('patient.unarchiveTitle') : t('patient.archiveTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>{p.archived ? t('patient.unarchiveDescription') : t('patient.archiveDescription')}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => flagMut.mutate({ archived: !p.archived })}>Confirm</AlertDialogAction>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={() => flagMut.mutate({ archived: !p.archived })}>{t('common.confirm')}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Delete client</Button>
+            <Button variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> {t('patient.delete')}</Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete this client?</AlertDialogTitle>
-              <AlertDialogDescription>This removes the client from your list. This can’t be easily undone.</AlertDialogDescription>
+              <AlertDialogTitle>{t('patient.deleteTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('patient.deleteDescription')}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => delMut.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction onClick={() => delMut.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t('common.delete')}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

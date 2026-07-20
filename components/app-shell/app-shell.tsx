@@ -127,7 +127,7 @@ export function AppShell({ user, business, children }: { user: { email: string; 
               <h1 className="hidden text-lg font-semibold tracking-tight sm:block">{title}</h1>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="hidden sm:inline-flex"><ThemeToggle /></span>
+              <span className="hidden sm:inline-flex"><ThemeToggle label={translate(locale, 'account.toggleTheme')} /></span>
               <UserMenu email={user.email} name={user.name} />
             </div>
           </header>

@@ -61,7 +61,7 @@ export function HistoryClient({ embedded = false }: { embedded?: boolean } = {})
       qc.invalidateQueries({ queryKey: ['waiting'] })
       qc.invalidateQueries({ queryKey: ['pool-planned', businessId] })
     },
-    onError: (e: any) => toast.error(e.message || t('hist.undoFailed')),
+    onError: () => toast.error(t('hist.undoFailed')),
   })
 
   const undoButton = (

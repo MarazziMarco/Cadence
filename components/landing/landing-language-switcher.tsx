@@ -20,7 +20,7 @@ export function LandingLanguageSwitcher({
 }) {
   return (
     <div
-      aria-label="Language"
+      aria-label={LABELS[locale]}
       className="inline-flex h-9 items-center rounded-lg border border-border bg-background/80 p-0.5 shadow-sm"
       role="group"
     >

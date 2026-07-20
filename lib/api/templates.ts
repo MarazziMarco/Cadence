@@ -9,8 +9,9 @@ export const TEMPLATE_PLACEHOLDERS = ['{nome}', '{servizio}', '{vecchia_data}', 
 const DEFAULTS: Record<string, string> = {
   it: 'Ciao {nome}, il tuo appuntamento di {servizio} è stato spostato da {vecchia_data} {vecchia_ora} a {nuova_data} {nuova_ora}. Fammi sapere se va bene!',
   en: 'Hi {nome}, your {servizio} appointment has been moved from {vecchia_data} {vecchia_ora} to {nuova_data} {nuova_ora}. Let me know if that works!',
+  es: 'Hola {nome}, tu cita de {servizio} se ha movido de {vecchia_data} {vecchia_ora} a {nuova_data} {nuova_ora}. ¡Dime si te va bien!',
 }
-const FALLBACK_SERVICE: Record<string, string> = { it: 'appuntamento', en: 'appointment' }
+const FALLBACK_SERVICE: Record<string, string> = { it: 'appuntamento', en: 'appointment', es: 'cita' }
 
 export function serviceFallback(lang: string) { return FALLBACK_SERVICE[lang] || FALLBACK_SERVICE.en }
 export function defaultBody(lang: string) { return DEFAULTS[lang] || DEFAULTS.en }
@@ -75,7 +76,8 @@ export function fmtDate(dateStr: string | null, lang: string): string {
   if (!dateStr) return '—'
   try {
     const d = new Date(dateStr + 'T00:00:00')
-    return new Intl.DateTimeFormat(lang === 'it' ? 'it-IT' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' }).format(d)
+    const locale = lang === 'it' ? 'it-IT' : lang === 'es' ? 'es-ES' : 'en-US'
+    return new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short' }).format(d)
   } catch { return dateStr }
 }
 export function fmtHour(t: string | null): string { return t ? t.slice(0, 5) : '—' }

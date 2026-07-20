@@ -141,7 +141,7 @@ describe('Landing localization and story integration', () => {
       name: 'Deja de perder el domingo organizando la próxima semana',
     })).toBeInTheDocument()
     await user.click(screen.getByRole('button', {
-      name: 'Show Convierte cancelaciones en oportunidades',
+      name: 'Convierte cancelaciones en oportunidades',
     }))
     await waitFor(() => {
       expect(screen.getByRole('heading', {

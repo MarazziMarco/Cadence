@@ -34,8 +34,8 @@ export function FreePeriodDialog({ businessId, date, kind, open, onOpenChange, a
         const fetched = await fetchRun(res.runId)
         if (!alive) return
         setMeta(res); setRun(fetched.run); setChanges(fetched.changes)
-      } catch (e: any) {
-        if (alive) { toast.error(e.message || 'Free-period failed'); onOpenChange(false) }
+      } catch {
+        if (alive) { toast.error(t('opt.failed')); onOpenChange(false) }
       } finally {
         if (alive) setLoading(false)
       }

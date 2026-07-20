@@ -155,7 +155,7 @@ export function SchedulerClient() {
       const res = await fetchRun(runId)
       setRun(res.run); setChanges(res.changes)
       setPreviewOpen(true) // always show the result in a modal (even if 0 changes)
-    } catch (e: any) { toast.error(e.message || t('opt.failed')) }
+    } catch { toast.error(t('opt.failed')) }
     finally { setLoading(false) }
   }
 

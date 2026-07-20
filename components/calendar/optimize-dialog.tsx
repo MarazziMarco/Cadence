@@ -43,7 +43,7 @@ export function OptimizeDialog({
       const res = await fetchRun(runId)
       setRun(res.run); setChanges(res.changes)
     } catch (e: any) {
-      toast.error(e.message || t('opt.failed'))
+      toast.error(t('opt.failed'))
     } finally { setLoading(false) }
   }, [businessId, dateFrom, dateTo, t])
 

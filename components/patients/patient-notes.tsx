@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Plus, X, StickyNote } from 'lucide-react'
 import { updatePatient } from '@/lib/api/patients'
 import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n/use-t'
 import { Button } from '@/components/ui/button'
 
 // Sticky-note board persisted in patients.notes (as JSON). Backward compatible:
@@ -30,6 +31,7 @@ function parse(initial: string | null): Note[] {
 
 export function PatientNotes({ patientId, initial }: { patientId: string; initial: string | null }) {
   const qc = useQueryClient()
+  const { t } = useT()
   const [notes, setNotes] = useState<Note[]>(() => parse(initial))
 
   async function persist(next: Note[]) {
@@ -37,7 +39,7 @@ export function PatientNotes({ patientId, initial }: { patientId: string; initia
     try {
       await updatePatient(patientId, { notes: next.length ? JSON.stringify(next) : null } as any)
       qc.invalidateQueries({ queryKey: ['patient', patientId] })
-    } catch (e: any) { toast.error(e.message || 'Failed to save note') }
+    } catch { toast.error(t('notes.saveError')) }
   }
 
   const add = () => persist([...notes, { id: Date.now().toString(), text: '', color: 'yellow' }])
@@ -48,22 +50,22 @@ export function PatientNotes({ patientId, initial }: { patientId: string; initia
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium"><StickyNote className="h-4 w-4 text-primary" /> Notes</div>
-        <Button size="sm" variant="outline" onClick={add}><Plus className="mr-1.5 h-4 w-4" /> Add note</Button>
+        <div className="flex items-center gap-2 text-sm font-medium"><StickyNote className="h-4 w-4 text-primary" /> {t('notes.title')}</div>
+        <Button size="sm" variant="outline" onClick={add}><Plus className="mr-1.5 h-4 w-4" /> {t('notes.add')}</Button>
       </div>
       {notes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No notes yet — add a sticky note.</p>
+        <p className="text-sm text-muted-foreground">{t('notes.empty')}</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {notes.map((n) => {
             const c = COLORS.find((x) => x.key === n.color) ?? COLORS[0]
             return (
               <div key={n.id} className={cn('relative rounded-xl border p-3 shadow-sm', c.cls)}>
-                <button onClick={() => remove(n.id)} aria-label="Delete note" className="absolute right-1.5 top-1.5 rounded p-0.5 opacity-60 transition-opacity hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
-                <textarea value={n.text} onChange={(e) => setText(n.id, e.target.value)} onBlur={() => persist(notes)} rows={4} placeholder="Write a note…" className="w-full resize-none bg-transparent pr-4 text-sm outline-none placeholder:opacity-60" />
+                <button onClick={() => remove(n.id)} aria-label={t('notes.delete')} className="absolute right-1.5 top-1.5 rounded p-0.5 opacity-60 transition-opacity hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
+                <textarea value={n.text} onChange={(e) => setText(n.id, e.target.value)} onBlur={() => persist(notes)} rows={4} placeholder={t('notes.placeholder')} className="w-full resize-none bg-transparent pr-4 text-sm outline-none placeholder:opacity-60" />
                 <div className="mt-2 flex gap-1.5">
                   {COLORS.map((col) => (
-                    <button key={col.key} onClick={() => setColor(n.id, col.key)} aria-label={col.key} className={cn('h-4 w-4 rounded-full border', col.cls, n.color === col.key && 'ring-2 ring-foreground/40')} />
+                    <button key={col.key} onClick={() => setColor(n.id, col.key)} aria-label={`${t('notes.color')}: ${t('notes.' + col.key)}`} className={cn('h-4 w-4 rounded-full border', col.cls, n.color === col.key && 'ring-2 ring-foreground/40')} />
                   ))}
                 </div>
               </div>

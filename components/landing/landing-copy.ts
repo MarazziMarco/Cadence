@@ -273,8 +273,8 @@ export const LANDING_COPY: Record<LandingLocale, LandingCopy> = {
           id: 'waiting',
           image: images.waiting,
           title: 'Trasforma le cancellazioni in opportunità',
-          desc: 'Tieni i clienti flessibili in una waiting list e usa le loro disponibilità per riempire il buco giusto.',
-          alt: 'Waiting list Cadence con clienti e relative disponibilità',
+          desc: 'Tieni i clienti flessibili in una lista d’attesa e usa le loro disponibilità per riempire il buco giusto.',
+          alt: 'Lista d’attesa Cadence con clienti e relative disponibilità',
         },
         {
           id: 'personal',

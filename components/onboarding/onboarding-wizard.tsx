@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils'
 import { normalizeLocale, translate, bcp47 } from '@/lib/i18n'
 import {
-  BUSINESS_TYPES, BUSINESS_TYPE_LABELS, WEEKDAYS, WEEKDAY_LABELS,
+  BUSINESS_TYPES, WEEKDAYS,
   LANGUAGES, TIMEZONES, CURRENCIES, type Weekday,
 } from '@/lib/types/db'
 
@@ -110,7 +110,7 @@ export function OnboardingWizard({ defaultFirstName, defaultLastName }: { defaul
       router.push('/dashboard')
       router.refresh()
     } catch (e: any) {
-      toast.error(e.message || t('onb.error'))
+      toast.error(t('onb.error'))
       setSaving(false)
     }
   }
@@ -156,7 +156,7 @@ export function OnboardingWizard({ defaultFirstName, defaultLastName }: { defaul
                     <Label>{t('onb.bizType')}</Label>
                     <Select value={businessType} onValueChange={setBusinessType}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{BUSINESS_TYPES.map((t) => <SelectItem key={t} value={t}>{BUSINESS_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
+                      <SelectContent>{BUSINESS_TYPES.map((type) => <SelectItem key={type} value={type}>{t('businessType.' + type)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>
@@ -257,7 +257,7 @@ export function OnboardingWizard({ defaultFirstName, defaultLastName }: { defaul
         </div>
 
         <div className="mt-6">
-          <Disclaimer lang={language === 'it' ? 'it' : 'en'} />
+          <Disclaimer lang={language} />
         </div>
       </div>
     </div>

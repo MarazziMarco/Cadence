@@ -64,12 +64,12 @@ export function PatientsClient() {
   const flagMut = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: any }) => setPatientFlag(id, patch),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['patients'] }); toast.success(t('pat.updated')) },
-    onError: (e: any) => toast.error(e.message),
+    onError: () => toast.error(t('common.saveFailed')),
   })
   const delMut = useMutation({
     mutationFn: (id: string) => softDeletePatient(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['patients'] }); toast.success(t('pat.deleted')) },
-    onError: (e: any) => toast.error(e.message),
+    onError: () => toast.error(t('common.saveFailed')),
   })
 
   function openNew() { setEditing(null); setDialogOpen(true) }

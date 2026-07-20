@@ -42,7 +42,7 @@ export function MovedMessages({ businessId, changes }: { businessId: string; cha
       })
       setMsgs(list)
     } catch (e: any) {
-      toast.error(e.message || t('mv.prepareError'))
+      toast.error(t('mv.prepareError'))
       setPreparing(false)
     } finally { setLoading(false) }
   }
