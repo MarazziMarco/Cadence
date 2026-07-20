@@ -414,7 +414,7 @@ export function CalendarController({ onSelectedDateChange }: { onSelectedDateCha
     if (isSupportedCalendarView(storedView)) {
       dispatch({ type: 'set-view', view: storedView })
     } else {
-      dispatch({ type: 'set-view', view: 'day' })
+      dispatch({ type: 'set-view', view: 'week' })
     }
     if (storedDensity !== null) {
       dispatch({ type: 'set-density', density: storedDensity })
