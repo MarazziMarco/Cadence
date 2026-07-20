@@ -220,6 +220,7 @@ export interface ChangeOutput {
   new_end_time: string;
   was_moved: boolean;
   ai_reason: string;
+  waiting_list_id?: string | null; // pool plan link for creates (spec §7)
 }
 
 export interface SolverOutput {

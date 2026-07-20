@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, ListChecks, MoreHorizontal, Pencil, Trash2, Star, CalendarClock, ChevronsUp, Layers } from 'lucide-react'
-import { listWaiting, deleteWaiting, advanceApptId } from '@/lib/api/waiting-list'
+import { listWaiting, deleteWaiting, advanceApptId, poolPlannedCounts } from '@/lib/api/waiting-list'
 import { WEEKDAY_LABELS } from '@/lib/types/db'
 import { useWorkspace } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
@@ -43,6 +43,7 @@ export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean
   const [editing, setEditing] = useState<any>(null)
 
   const { data: entries = [], isLoading } = useQuery({ queryKey: ['waiting', businessId], queryFn: () => listWaiting(businessId), enabled: !!businessId })
+  const { data: planned = {} } = useQuery({ queryKey: ['pool-planned', businessId], queryFn: () => poolPlannedCounts(businessId), enabled: !!businessId })
   const del = useMutation({ mutationFn: (id: string) => deleteWaiting(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['waiting'] }); toast.success(t('wait.removed')) } })
 
   function openNew() { setEditing(null); setOpen(true) }
@@ -84,7 +85,7 @@ export function WaitingListClient({ hideHeader = false }: { hideHeader?: boolean
                       )}
                       {!adv && <Badge className={PRIORITY_STYLE[e.priority] + ' capitalize hover:' + PRIORITY_STYLE[e.priority]}>{e.priority === 'high' && <Star className="mr-1 h-3 w-3" />}{t('wait.priority.' + e.priority)}</Badge>}
                       {!adv && e.flexible && <Badge variant="secondary" className="font-normal">{t('wait.flexible')}</Badge>}
-                      {!adv && pool && <Badge className="bg-primary/15 text-primary hover:bg-primary/15"><Layers className="mr-1 h-3 w-3" />{t('wait.plan.badge', { total: pool.sessions_total })}</Badge>}
+                      {!adv && pool && <Badge className="bg-primary/15 text-primary hover:bg-primary/15"><Layers className="mr-1 h-3 w-3" />{t('wait.plan.badge', { planned: planned[e.id] ?? 0, total: pool.sessions_total })}</Badge>}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {e.services?.name && <span>{e.services.emoji ? e.services.emoji + ' ' : ''}{e.services.name}</span>}

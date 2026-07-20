@@ -63,6 +63,7 @@ interface Slot {
   location_key: string;
   // waiting-list bookkeeping (created only)
   wlPriority?: string;
+  wlEntryId?: string; // pool plan entry id, for the created->pool link (spec §7)
 }
 
 interface Origin {
@@ -721,6 +722,7 @@ function buildOutput(
         new_end_time: toHHMMSS(toHHMM(s.start + s.dur)),
         was_moved: true,
         ai_reason: explainCreate(s.wlPriority ?? "normal"),
+        waiting_list_id: s.wlEntryId ?? null,
       });
       continue;
     }
@@ -1371,6 +1373,7 @@ export function runSolver(input: SolverInput): SolverResult {
             manual_override: false,
             location_key: studioLocationKey(input),
             wlPriority: entry.priority,
+            wlEntryId: entry.id,
           };
           for (const cand of candidateStarts(input, slots, probe, date)) {
             if (!wlTimeOk(entry, cand, dur)) continue;

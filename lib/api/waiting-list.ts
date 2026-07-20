@@ -9,6 +9,20 @@ export async function listWaiting(businessId: string) {
   return data ?? []
 }
 
+// Sittings already planned per pool entry: appointments linked back to their
+// waiting_list entry via appointments.waiting_list_id (spec §7 x/S).
+export async function poolPlannedCounts(businessId: string): Promise<Record<string, number>> {
+  const { data, error } = await sb().from('appointments').select('waiting_list_id')
+    .eq('business_id', businessId).not('waiting_list_id', 'is', null).is('deleted_at', null)
+  if (error) return {}
+  const counts: Record<string, number> = {}
+  for (const row of data ?? []) {
+    const id = (row as any).waiting_list_id as string | null
+    if (id) counts[id] = (counts[id] ?? 0) + 1
+  }
+  return counts
+}
+
 export async function createWaiting(businessId: string, values: any) {
   const { error } = await sb().from('waiting_list').insert({ business_id: businessId, ...values })
   if (error) throw error

@@ -80,6 +80,7 @@ export async function persistOutput(
       was_moved: c.was_moved,
       accepted: false,
       ai_reason: c.ai_reason,
+      waiting_list_id: c.waiting_list_id ?? null,
     }));
     const { error: chErr } = await supabase
       .from("optimization_changes")
