@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Loader2, LocateFixed, Save } from 'lucide-react'
+import { ArrowLeft, Download, Loader2, LocateFixed, Save, Trash2 } from 'lucide-react'
 import { useWorkspace, formatMoney } from '@/lib/workspace-context'
 import { useT } from '@/lib/i18n/use-t'
 import {
@@ -20,6 +20,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   PHONE_WEEK_LAYOUT_STORAGE_KEY,
   parsePhoneWeekLayout,
@@ -50,6 +54,9 @@ export function PreferencesClient() {
   const { t } = useT()
   const router = useRouter()
   const businessId = business?.id ?? ''
+  const [accountBusy, setAccountBusy] = useState<'' | 'export' | 'delete'>('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
   const [currency, setCurrency] = useState(business?.currency || 'EUR')
   const [language, setLanguage] = useState(business?.language || 'en')
   const [address, setAddress] = useState(business?.address ?? '')
@@ -199,6 +206,38 @@ export function PreferencesClient() {
     }
   }
 
+  async function exportData() {
+    setAccountBusy('export')
+    try {
+      const res = await fetch('/api/account/export', { method: 'POST' })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'cadence-data.json'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error(t('account.exportFailed'))
+    } finally {
+      setAccountBusy('')
+    }
+  }
+
+  async function deleteAccount() {
+    setAccountBusy('delete')
+    try {
+      const res = await fetch('/api/account/delete', { method: 'POST' })
+      if (!res.ok) throw new Error()
+      toast.success(t('account.deleted'))
+      window.location.href = '/'
+    } catch {
+      toast.error(t('account.deleteFailed'))
+      setAccountBusy('')
+    }
+  }
+
   return (
     <div>
       <Link href="/settings" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {t('nav.settings')}</Link>
@@ -334,6 +373,57 @@ export function PreferencesClient() {
           </p>
         </CardContent>
       </Card>
+
+      <Card className="mt-6 max-w-lg shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">{t('account.title')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">{t('account.exportTitle')}</p>
+              <p className="text-xs text-muted-foreground">{t('account.exportHint')}</p>
+            </div>
+            <Button variant="outline" onClick={exportData} disabled={accountBusy !== ''}>
+              {accountBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span className="ml-1.5">{t('account.export')}</span>
+            </Button>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+            <div>
+              <p className="text-sm font-medium text-destructive">{t('account.deleteTitle')}</p>
+              <p className="text-xs text-muted-foreground">{t('account.deleteHint')}</p>
+            </div>
+            <Button variant="destructive" onClick={() => { setDeleteConfirm(''); setDeleteOpen(true) }} disabled={accountBusy !== ''}>
+              <Trash2 className="mr-1.5 h-4 w-4" /> {t('account.delete')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('account.deleteConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('account.deleteConfirmBody')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="del-confirm">{t('account.deleteConfirmLabel')}</Label>
+            <Input id="del-confirm" value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder={t('account.deleteConfirmWord')} />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteConfirm.trim().toUpperCase() !== t('account.deleteConfirmWord') || accountBusy === 'delete'}
+              onClick={(e) => { e.preventDefault(); setDeleteOpen(false); deleteAccount() }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {accountBusy === 'delete' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {t('account.deleteConfirmAction')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

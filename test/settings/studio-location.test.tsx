@@ -123,6 +123,15 @@ vi.mock('@/components/ui/select', () => ({
   SelectValue: () => null,
 }))
 
+vi.mock('@/components/ui/alert-dialog', () => {
+  const Pass = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>
+  return {
+    AlertDialog: Pass, AlertDialogAction: Pass, AlertDialogCancel: Pass,
+    AlertDialogContent: Pass, AlertDialogDescription: Pass, AlertDialogFooter: Pass,
+    AlertDialogHeader: Pass, AlertDialogTitle: Pass,
+  }
+})
+
 describe('studio location preferences', () => {
   beforeEach(() => {
     vi.useRealTimers()
