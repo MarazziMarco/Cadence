@@ -5,7 +5,12 @@ binario e non ha sorgente nel repo, quindi lo stato "fatto" è tracciato qui.
 _Aggiornato: 21 luglio 2026._
 
 ## Legenda
-✅ fatto · ⚠️ parziale · 📝 bozza pronta (serve legale) · ⏳ da fare
+✅ fatto · ⚠️ parziale (config/legale) · 📝 bozza pronta (serve legale) · ⏳ da fare
+
+## Sintesi
+Rimedio tecnico **sostanzialmente completato**: 04, 05, 06, 07, 10, 11 ✅.
+Parziali di sola **configurazione/legale**: 08, 09. Bozze legali pronte per 01 +
+Termini. Unica voce interamente aperta e non-codice: **02** (DPA/DPIA).
 
 ## Riepilogo per criticità
 
@@ -31,12 +36,14 @@ _Aggiornato: 21 luglio 2026._
 
 Tutte in IT (primario per Italia/Garante); EN/ES da tradurre dopo validazione legale.
 
-## Restano (non codice puro)
-- **06 DSAR** (export/delete/hard-purge/retention) — feature backend.
-- **02** DPA/DPIA/registro/base art. 9 — legale/organizzativo.
-- **08** min-password Supabase + MFA — config + feature.
-- **09** avviso pre-Google/Apple Maps + valutazione provider UE.
-- Pubblicazione informativa/termini reali (dai file bozza) + EN/ES.
+## Restano
+Il **grosso tecnico è completato**. Restano voci **legali/organizzative o di
+configurazione**, non codice applicativo:
+- **02** DPA art. 28, DPIA, registro dei trattamenti, conferma base art. 9 — legale.
+- **08** (config Supabase) alzare la min-password nel dashboard Auth + attivare MFA/TOTP.
+- **09** (piccolo) avviso prima di aprire Google/Apple Maps + valutazione provider UE / DPA ORS.
+- Far **validare e pubblicare** informativa e termini (dalle bozze in `docs/legal/`) + traduzioni EN/ES.
+- Applicare le migrazioni sul DB (`supabase db push`) e verificarle sull'account demo.
 
 ## Nota
 Verifica tecnica, non parere legale. Prima dei dati reali resta valida la
