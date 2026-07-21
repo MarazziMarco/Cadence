@@ -24,7 +24,7 @@ Termini. Unica voce interamente aperta e non-codice: **02** (DPA/DPIA).
 | 06 | Diritti DSAR / cancellazione | ✅ FATTO | **Export** `/api/account/export` (art.15/20) + **cancellazione account** (`/api/account/delete` + RPC `delete_account`, art.17, modal conferma) + **purge automatico** (RPC `purge_expired` schedulata via pg_cron, migrazione 202607210002: cache scaduta, soft-delete >90gg, storico ottimizzatore >90gg). |
 | 07 | Header di sicurezza | ✅ FATTO | `SAMEORIGIN`, `frame-ancestors 'self'`, +`nosniff` +`Referrer-Policy`; rimosso CORS `*`. |
 | 08 | Autenticazione debole | ⚠️ | Signup min password 6→8 + hint. **Da fare su Supabase**: min password nel dashboard + MFA/TOTP. |
-| 09 | Indirizzi/coord a mappe | ⚠️ | Cache ORS geocode+route (meno trasmissioni). Restano: destinatari in informativa (fatti nella bozza §5), avviso pre-apertura Google/Apple, valutazione provider UE. |
+| 09 | Indirizzi/coord a mappe | ✅ (app) / ⚠️ (contratti) | Cache ORS geocode+route + **avviso una-tantum prima di aprire Google/Apple Maps** (le coordinate escono solo su conferma). Destinatari elencati nella bozza informativa §5. Resta contrattuale: DPA ORS / valutazione provider UE. |
 | 10 | Voce descritta come locale | ✅ FATTO | Avviso pre-microfono (una volta) + `processLocally` best-effort + niente claim "solo locale" + input testuale sempre. `docs/legal/nota-voce-IT.md`. |
 | 11 | Consensi/retention non tracciati | ✅ | Signup: Termini e Privacy **separati** + `consents{version,timestamp}` nei metadata. Retention/purge automatico ora fatto (vedi 06, `purge_expired`). |
 

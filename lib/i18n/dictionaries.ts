@@ -619,6 +619,9 @@ const en: Dict = {
   'map.optimizeRoute': 'Optimize following the best route',
   'map.savedTime': '~{min} min',
   'map.openGoogle': 'Open in Google Maps',
+  'map.mapsNoticeTitle': 'Open external maps?',
+  'map.mapsNoticeBody': 'The stop coordinates will be sent to Google/Apple Maps to build the route. Continue?',
+  'map.mapsNoticeConfirm': 'Open maps',
   'map.openApple': 'Open in Apple Maps',
 }
 
@@ -1209,6 +1212,9 @@ const it: Dict = {
   'map.optimizeRoute': 'Ottimizza seguendo la strada migliore',
   'map.savedTime': '~{min} min',
   'map.openGoogle': 'Apri in Google Maps',
+  'map.mapsNoticeTitle': 'Aprire mappe esterne?',
+  'map.mapsNoticeBody': 'Le coordinate delle tappe saranno inviate a Google/Apple Maps per costruire il percorso. Continuare?',
+  'map.mapsNoticeConfirm': 'Apri mappe',
   'map.openApple': 'Apri in Mappe (Apple)',
 }
 
@@ -1799,6 +1805,9 @@ const es: Dict = {
   'map.optimizeRoute': 'Optimizar siguiendo la mejor ruta',
   'map.savedTime': '~{min} min',
   'map.openGoogle': 'Abrir en Google Maps',
+  'map.mapsNoticeTitle': '¿Abrir mapas externos?',
+  'map.mapsNoticeBody': 'Las coordenadas de las paradas se enviarán a Google/Apple Maps para crear la ruta. ¿Continuar?',
+  'map.mapsNoticeConfirm': 'Abrir mapas',
   'map.openApple': 'Abrir en Apple Maps',
 }
 

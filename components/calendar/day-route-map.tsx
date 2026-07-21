@@ -13,6 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { OptimizeDialog } from './optimize-dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import type { MapPoint } from './day-map-canvas'
 import {
   type LL, bestOrder, haversineKm, tripKm,
@@ -124,6 +128,15 @@ export function DayRouteMap({
   // Show the optimized visiting order (default) or the current time-sorted order.
   const [optimized, setOptimized] = useState(true)
   const [optimizeOpen, setOptimizeOpen] = useState(false)
+  // Warn once before sending coordinates to an external maps provider (GDPR 09).
+  const [mapsNoticeOpen, setMapsNoticeOpen] = useState(false)
+  const [pendingMapsUrl, setPendingMapsUrl] = useState('')
+  const openMaps = (url: string) => {
+    const acked = typeof window !== 'undefined' && localStorage.getItem('cadence.maps.ack') === '1'
+    if (acked) { window.open(url, '_blank', 'noopener,noreferrer'); return }
+    setPendingMapsUrl(url)
+    setMapsNoticeOpen(true)
+  }
 
   // The single day X the map draws, per view.
   const day = view === 'week'
@@ -279,15 +292,11 @@ export function DayRouteMap({
               </Button>
               {route.length >= 2 && (
                 <>
-                  <Button asChild size="sm" variant="outline">
-                    <a href={googleMapsHref(route)} target="_blank" rel="noopener noreferrer">
-                      <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openGoogle')}
-                    </a>
+                  <Button size="sm" variant="outline" onClick={() => openMaps(googleMapsHref(route))}>
+                    <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openGoogle')}
                   </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <a href={appleMapsHref(route)} target="_blank" rel="noopener noreferrer">
-                      <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openApple')}
-                    </a>
+                  <Button size="sm" variant="outline" onClick={() => openMaps(appleMapsHref(route))}>
+                    <Navigation className="mr-1.5 h-4 w-4" /> {t('map.openApple')}
                   </Button>
                 </>
               )}
@@ -305,6 +314,26 @@ export function DayRouteMap({
           showTrigger={false}
         />
       )}
+      <AlertDialog open={mapsNoticeOpen} onOpenChange={setMapsNoticeOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('map.mapsNoticeTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('map.mapsNoticeBody')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                try { localStorage.setItem('cadence.maps.ack', '1') } catch {}
+                setMapsNoticeOpen(false)
+                if (pendingMapsUrl) window.open(pendingMapsUrl, '_blank', 'noopener,noreferrer')
+              }}
+            >
+              {t('map.mapsNoticeConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
