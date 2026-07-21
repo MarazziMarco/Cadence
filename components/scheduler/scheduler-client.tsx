@@ -62,6 +62,7 @@ export function SchedulerClient() {
   const [allowCrossWeek, setAllowCrossWeek] = useState(false)
   const [maxCrossWeekDays, setMaxCrossWeekDays] = useState(7)
   const [travelWeight, setTravelWeight] = useState(1) // metadata.W_TRAVEL
+  const [poolReward, setPoolReward] = useState(240) // metadata.R_POOL
   const [unlimitedMoves, setUnlimitedMoves] = useState(true) // budgets 0 = unlimited
   const [startAddress, setStartAddress] = useState('') // metadata.start_location
   const [endAddress, setEndAddress] = useState('') // metadata.end_location
@@ -93,6 +94,7 @@ export function SchedulerClient() {
           Math.max(1, Number(s.metadata?.MAX_CROSS_WEEK_DAYS ?? 7)),
         ))
         setTravelWeight(Math.min(3, Math.max(0, Number(s.metadata?.W_TRAVEL ?? 1))))
+        setPoolReward(Math.min(600, Math.max(0, Number(s.metadata?.R_POOL ?? 240))))
         setUnlimitedMoves(Number(s.max_daily_moves ?? 0) === 0)
         setStartAddress(s.metadata?.start_location?.address ?? '')
         setEndAddress(s.metadata?.end_location?.address ?? '')
@@ -107,6 +109,7 @@ export function SchedulerClient() {
   const changePreferred = (v: boolean) => { setRespectPreferred(v); persist({ weight_patient_preference: v ? 5 : 0 }) }
   const changeAdvance = (v: boolean) => { setPrioritizeAdvance(v); saveAlgorithmMetadata(businessId, { PRIORITIZE_ADVANCE: v }).catch(() => {}) }
   const changeTravelWeight = (v: number) => { setTravelWeight(v); saveAlgorithmMetadata(businessId, { W_TRAVEL: v }).catch(() => {}) }
+  const changePoolReward = (v: number) => { setPoolReward(v); saveAlgorithmMetadata(businessId, { R_POOL: v }).catch(() => {}) }
   const changeMoveFreedom = (unlimited: boolean) => {
     setUnlimitedMoves(unlimited)
     // 0 = unlimited (solver treats 0 as no cap); limited restores sensible caps.
@@ -263,6 +266,19 @@ export function SchedulerClient() {
                 aria-label={t('sched.travelWeight')}
               />
               <p className="text-xs text-muted-foreground">{t('sched.travelWeightHint')}</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t('sched.poolReward')}</Label>
+                <span className="text-sm font-semibold tabular-nums">{poolReward}</span>
+              </div>
+              <input
+                type="range" min={0} max={600} step={20} value={poolReward}
+                onChange={(e) => changePoolReward(Number(e.target.value))}
+                className="w-full accent-primary"
+                aria-label={t('sched.poolReward')}
+              />
+              <p className="text-xs text-muted-foreground">{t('sched.poolRewardHint')}</p>
             </div>
             <div className="flex items-center justify-between">
               <div>

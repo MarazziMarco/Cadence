@@ -34,6 +34,7 @@ const DEF_MOVE_BASE = 0; // spec §2: w_moves default 0 — moves are free by de
 const DEF_PRICE_UNIT = 10;
 const DEF_MIN_IDLE_GAP = 5;
 const DEF_W_TRAVEL = 1.0; // spec §2: 1 min driving = 1 min idle
+const DEF_R_POOL = 240; // spec §7: reward per pool sitting inserted (~4h equivalent)
 // Last-resort per-leg estimate (minutes) when neither an ORS leg nor
 // coordinates exist — keeps a day feasible instead of freezing it (spec §3).
 const DEF_UNKNOWN_TRAVEL = 15;
@@ -207,6 +208,7 @@ function tuning(settings: Settings) {
     PRICE_UNIT: m.PRICE_UNIT ?? DEF_PRICE_UNIT,
     MIN_IDLE_GAP: m.MIN_IDLE_GAP ?? DEF_MIN_IDLE_GAP,
     W_TRAVEL: m.W_TRAVEL ?? DEF_W_TRAVEL,
+    R_POOL: m.R_POOL ?? DEF_R_POOL,
     PRIORITIZE_ADVANCE: m.PRIORITIZE_ADVANCE ?? true,
     ADVANCE_MIN_DAYS: m.ADVANCE_MIN_DAYS ?? 3,
   };
@@ -477,6 +479,7 @@ function totalCost(
     PRICE_UNIT: number;
     MIN_IDLE_GAP: number;
     W_TRAVEL: number;
+    R_POOL: number;
   },
 ): CostBreakdown {
   const S = input.context.settings;
@@ -484,10 +487,11 @@ function totalCost(
   const im = idleAndGaps(input, slots, K.MIN_IDLE_GAP);
   const travel = totalTravel(input, slots);
 
-  let movePen = 0, moved = 0, vipMoved = 0, placed = 0, createdRev = 0;
+  let movePen = 0, moved = 0, vipMoved = 0, placed = 0, poolPlaced = 0, createdRev = 0;
   for (const s of slots) {
     if (s.created) {
       placed++;
+      if (s.wlEntryId) poolPlaced++; // pool sitting: rewarded by R_POOL (spec §7)
       createdRev += s.price;
       continue;
     }
@@ -514,7 +518,8 @@ function totalCost(
     mult * movePen +
     S.weight_patient_preference * pref +
     S.weight_continuity * cont -
-    S.weight_waiting_list * placed -
+    S.weight_waiting_list * (placed - poolPlaced) -
+    K.R_POOL * poolPlaced -
     S.weight_revenue * (createdRev / K.PRICE_UNIT) -
     S.weight_free_slots * gapCons;
 
@@ -1387,7 +1392,10 @@ export function runSolver(input: SolverInput): SolverResult {
             probe.start = cand;
             slots.push(probe);
             const c2 = cost();
-            const ok = c2.idle <= baselineIdle &&
+            // Accept only when the R_POOL reward outweighs the added idle/travel
+            // (C strictly improves). A low R_POOL therefore places fewer sittings.
+            const ok = c2.C < cur.C - 1e-9 &&
+              c2.idle <= baselineIdle &&
               findHardViolation(input, slots) === null &&
               budgetsOk(input, slots, origin);
             slots.pop();

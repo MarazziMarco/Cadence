@@ -22,6 +22,7 @@ export interface Tuning {
   PRICE_UNIT?: number; // default 10 — normalizes revenue into points
   MIN_IDLE_GAP?: number; // default 5 — minimum gap (min) counted as idle
   W_TRAVEL?: number; // default 1.0 — weight of a travel minute in the cost (spec §2)
+  R_POOL?: number; // default 240 — reward per pool sitting inserted (spec §7)
   PRIORITIZE_ADVANCE?: boolean; // default true — pull "move me up" clients into freed slots first
   ADVANCE_MIN_DAYS?: number; // default 3 — only advance if the new slot is >= this many days earlier
   WALK_MAX_MINUTES?: number; // routing prep (matrix.ts): max minutes to prefer walking
