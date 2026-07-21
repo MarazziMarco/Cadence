@@ -1,7 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
+import { createTtlCache } from '@/lib/server/ttl-cache'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+// Cache successful route geometry by waypoint set so repeated map draws of the
+// same day don't re-hit ORS Directions (quota) nor re-transmit coordinates.
+const routeCache = createTtlCache<{
+  geometry: [number, number][]
+  durations: number[] | null
+  waypoints: number[] | null
+}>({ ttlMs: 60 * 60 * 1000, max: 300 })
 
 // Road-following route geometry via OpenRouteService Directions. Keeps the ORS
 // key server-side. Input/output coordinates are [lat, lng] (Leaflet order);
@@ -22,6 +31,10 @@ export async function POST(request: Request) {
   // ORS free tier caps waypoints; keep it safe.
   const capped = coords.slice(0, 50)
 
+  const cacheKey = JSON.stringify(capped)
+  const cached = routeCache.get(cacheKey)
+  if (cached) return Response.json(cached)
+
   try {
     const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
       method: 'POST',
@@ -40,11 +53,13 @@ export async function POST(request: Request) {
     // Indices into `geometry` where each waypoint sits (to slice the road path
     // into per-leg segments).
     const waypoints = feature?.properties?.way_points as number[] | undefined
-    return Response.json({
-      geometry: line.map(([lng, lat]) => [lat, lng]),
+    const result = {
+      geometry: line.map(([lng, lat]) => [lat, lng]) as [number, number][],
       durations: durations.length ? durations : null,
       waypoints: Array.isArray(waypoints) ? waypoints : null,
-    })
+    }
+    routeCache.set(cacheKey, result)
+    return Response.json(result)
   } catch {
     return Response.json({ geometry: null, reason: 'fetch-failed' })
   }
