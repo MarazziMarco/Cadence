@@ -9,6 +9,26 @@ export async function listWaiting(businessId: string) {
   return data ?? []
 }
 
+// Active pool plans for a patient (notes JSON has a pool block), so a manually
+// created appointment can be attributed to a plan and count toward its x/S.
+export async function patientPoolPlans(businessId: string, patientId: string) {
+  if (!patientId) return [] as any[]
+  const { data } = await sb().from('waiting_list')
+    .select('id, notes, preferred_service_id')
+    .eq('business_id', businessId).eq('patient_id', patientId)
+    .eq('active', true).is('deleted_at', null)
+  return (data ?? []).filter((row: any) => {
+    try { return !!JSON.parse(row.notes || '')?.pool } catch { return false }
+  })
+}
+
+// Link an existing appointment to its pool waiting_list entry (owner-only, RLS).
+export async function linkAppointmentToPool(appointmentId: string, waitingListId: string) {
+  const { error } = await sb().from('appointments')
+    .update({ waiting_list_id: waitingListId }).eq('id', appointmentId)
+  if (error) throw error
+}
+
 // Sittings already planned per pool entry: appointments linked back to their
 // waiting_list entry via appointments.waiting_list_id (spec §7 x/S).
 export async function poolPlannedCounts(businessId: string): Promise<Record<string, number>> {

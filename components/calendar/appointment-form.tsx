@@ -26,7 +26,7 @@ import {
   type WeeklyAvailability,
 } from '@/lib/api/patients'
 import { listServices } from '@/lib/api/services'
-import { createAdvanceWaiting } from '@/lib/api/waiting-list'
+import { createAdvanceWaiting, patientPoolPlans, linkAppointmentToPool } from '@/lib/api/waiting-list'
 import { listWorkingHours } from '@/lib/api/working-hours'
 import { invalidateCalendarAppointments } from '@/lib/calendar/query-keys'
 import { businessToday } from '@/lib/calendar/date'
@@ -113,6 +113,7 @@ export function AppointmentForm({
     createDefaultWeeklyAvailability,
   )
   const [advanceUp, setAdvanceUp] = useState(false)
+  const [linkPool, setLinkPool] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const availabilityEditedRef = useRef(false)
 
@@ -144,6 +145,14 @@ export function AppointmentForm({
     queryFn: () => listWorkingHours(businessId),
     enabled: Boolean(businessId),
   })
+  // Active pool plans for this patient, so a manual booking can be counted
+  // toward the plan's x/S (only relevant when creating).
+  const { data: poolPlans = [] } = useQuery({
+    queryKey: ['patient-pool-plans', businessId, patientId],
+    queryFn: () => patientPoolPlans(businessId, patientId),
+    enabled: !editing && Boolean(patientId),
+  })
+  const poolPlanId = poolPlans[0]?.id as string | undefined
   const { data: savedWeeklyAvailability } = useQuery({
     queryKey: ['patient-weekly-availability', patientId, workingHours],
     queryFn: () => getPatientWeeklyAvailability(patientId, workingHours),
@@ -181,6 +190,7 @@ export function AppointmentForm({
     setWeeklyAvailability(createDefaultWeeklyAvailability())
     availabilityEditedRef.current = false
     setAdvanceUp(false)
+    setLinkPool(false)
     setFormError(null)
     initialSnapshotRef.current = JSON.stringify({
       patientId: appointment?.patient_id ?? defaultPatientId ?? '',
@@ -293,6 +303,7 @@ export function AppointmentForm({
     queryClient.invalidateQueries({ queryKey: ['patients'] })
     queryClient.invalidateQueries({ queryKey: ['patients-select'] })
     queryClient.invalidateQueries({ queryKey: ['waiting'] })
+    queryClient.invalidateQueries({ queryKey: ['pool-planned', businessId] })
   }
 
   const save = useMutation({
@@ -350,6 +361,9 @@ export function AppointmentForm({
           durationMinutes,
         })
       }
+      if (linkPool && poolPlanId && created?.id) {
+        await linkAppointmentToPool(created.id, poolPlanId)
+      }
       return created
     },
     onSuccess: (savedAppointment) => {
@@ -376,6 +390,9 @@ export function AppointmentForm({
             serviceId: (values.service_id as string | null) ?? null,
             durationMinutes: Number(values.duration_minutes),
           })
+        }
+        if (!editing && linkPool && poolPlanId) {
+          await linkAppointmentToPool(confirmed.appointment.id, poolPlanId)
         }
         setFormDirty(false)
         toast.success(editing ? t('appt.updated') : t('appt.created'))
@@ -653,6 +670,21 @@ export function AppointmentForm({
                     onCheckedChange={(checked) => {
                       markDirty()
                       setAdvanceUp(checked)
+                    }}
+                  />
+                </div>
+              ) : null}
+              {!editing && poolPlanId ? (
+                <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                  <div>
+                    <p className="text-sm font-medium">{t('appt.linkPoolTitle')}</p>
+                    <p className="text-xs text-muted-foreground">{t('appt.linkPoolHint')}</p>
+                  </div>
+                  <Switch
+                    checked={linkPool}
+                    onCheckedChange={(checked) => {
+                      markDirty()
+                      setLinkPool(checked)
                     }}
                   />
                 </div>
