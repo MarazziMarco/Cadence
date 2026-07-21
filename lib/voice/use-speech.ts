@@ -18,6 +18,10 @@ export function useSpeech(lang: string) {
     const rec = new SR()
     rec.interimResults = false
     rec.maxAlternatives = 1
+    // Ask for on-device recognition where supported (best effort). This is not a
+    // guarantee: on some browsers the audio is still sent to the vendor's servers,
+    // which is why the UI shows a pre-activation notice instead of claiming local.
+    try { (rec as any).processLocally = true } catch {}
     rec.onresult = (e: any) => {
       // Stop + reset immediately so the mic UI never stays "listening" after an
       // auto-finalized result (some browsers fire onresult without a prompt onend).

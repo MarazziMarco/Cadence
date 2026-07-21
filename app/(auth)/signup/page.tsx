@@ -20,20 +20,28 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [acceptTerms, setAcceptTerms] = useState(false)
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false)
   const [acceptBeta, setAcceptBeta] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!acceptTerms || !acceptBeta) {
+    if (!acceptTerms || !acceptPrivacy || !acceptBeta) {
       toast.error(t('auth.mustAccept'))
       return
     }
     setLoading(true)
+    // Record separate consents with version + timestamp (proof of acceptance).
+    const at = new Date().toISOString()
+    const consents = {
+      terms: { accepted: true, version: 'terms-1.0', at },
+      privacy: { seen: true, version: 'privacy-1.0', at },
+      beta: { accepted: true, version: 'beta-1.0', at },
+    }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name } },
+      options: { data: { full_name: name, consents } },
     })
     setLoading(false)
     if (error) {
@@ -72,8 +80,14 @@ export default function SignupPage() {
           <label className="flex cursor-pointer items-start gap-2.5 text-sm">
             <Checkbox checked={acceptTerms} onCheckedChange={(v) => setAcceptTerms(v === true)} className="mt-0.5" />
             <span className="text-muted-foreground">
-              {t('auth.acceptTerms1')}{' '}
-              <Link href="/terms" target="_blank" className="font-medium text-primary hover:underline">{t('auth.terms')}</Link>{' '}{t('auth.and')}{' '}
+              {t('auth.acceptTermsOnly')}{' '}
+              <Link href="/terms" target="_blank" className="font-medium text-primary hover:underline">{t('auth.terms')}</Link>.
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+            <Checkbox checked={acceptPrivacy} onCheckedChange={(v) => setAcceptPrivacy(v === true)} className="mt-0.5" />
+            <span className="text-muted-foreground">
+              {t('auth.acceptPrivacy')}{' '}
               <Link href="/privacy" target="_blank" className="font-medium text-primary hover:underline">{t('auth.privacy')}</Link>.
             </span>
           </label>
@@ -85,7 +99,7 @@ export default function SignupPage() {
           </label>
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading || !acceptTerms || !acceptBeta}>
+        <Button type="submit" className="w-full" disabled={loading || !acceptTerms || !acceptPrivacy || !acceptBeta}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t('auth.createAccount')}
         </Button>
       </form>

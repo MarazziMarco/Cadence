@@ -114,6 +114,7 @@ export function AppointmentForm({
   )
   const [advanceUp, setAdvanceUp] = useState(false)
   const [linkPool, setLinkPool] = useState(false)
+  const [voiceNoticeOpen, setVoiceNoticeOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const availabilityEditedRef = useRef(false)
 
@@ -283,12 +284,19 @@ export function AppointmentForm({
     }
   }
 
+  function beginRecording() {
+    startRecording(applyVoice, () => toast.error(t('appt.micDenied')))
+  }
   function toggleMic() {
     if (listening) {
       stopRecording()
       return
     }
-    startRecording(applyVoice, () => toast.error(t('appt.micDenied')))
+    // First-ever use: show the voice notice (transcription may leave the device)
+    // before turning on the microphone. Remembered so it's shown only once.
+    const acked = typeof window !== 'undefined' && localStorage.getItem('cadence.voice.ack') === '1'
+    if (!acked) { setVoiceNoticeOpen(true); return }
+    beginRecording()
   }
 
   function onServiceChange(nextServiceId: string) {
@@ -757,6 +765,26 @@ export function AppointmentForm({
           </Button>
         </div>
       </div>
+      <AlertDialog open={voiceNoticeOpen} onOpenChange={setVoiceNoticeOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('voice.noticeTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('voice.noticeBody')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                try { localStorage.setItem('cadence.voice.ack', '1') } catch {}
+                setVoiceNoticeOpen(false)
+                beginRecording()
+              }}
+            >
+              {t('voice.noticeConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   )
 }
