@@ -65,7 +65,7 @@ export default function SignupPage() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">{t('auth.password')}</Label>
-          <Input id="password" type="password" required autoComplete="new-password" minLength={6} placeholder={t('auth.passwordHint')} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input id="password" type="password" required autoComplete="new-password" minLength={8} placeholder={t('auth.passwordHint')} value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
 
         <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
