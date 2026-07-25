@@ -93,3 +93,4 @@ credentials.json
 graphify-out/
 
 .superpowers/
+.claude/settings.local.json
